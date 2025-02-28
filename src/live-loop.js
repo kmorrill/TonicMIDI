@@ -17,6 +17,7 @@
  *  - A 'muted' flag to enable/disable noteOn sending (useful for layering/unlayering).
  *  - A 'transpose' (or semitone shift) to raise/lower the pitch for hype or tension changes.
  *  - Both can be changed on the fly by an EnergyManager or other orchestrator.
+ *  - Support for GlobalContext with ChordManager and RhythmManager.
  */
 
 export class LiveLoop {
@@ -26,6 +27,8 @@ export class LiveLoop {
    * @property {Array} [lfos] - Array of LFO instances (each with update(deltaTime) => waveValue).
    * @property {number} [midiChannel=1] - Default MIDI channel for noteOn and controlChange.
    * @property {any} [context] - Optional context passed to pattern (e.g. chord data).
+   * @property {object} [globalContext] - Optional GlobalContext with chordManager, rhythmManager.
+   * @property {string} [name] - Optional name for the loop (useful for EnergyManager targeting).
    *
    * @property {boolean} [muted=false] - If true, loop won't send noteOn at tick.
    * @property {number} [transpose=0]  - Semitone transposition applied after note name -> MIDI #.
@@ -36,6 +39,8 @@ export class LiveLoop {
    *     lfos: [someLfo],
    *     midiChannel: 2,
    *     context: { chord: 'Cmaj7' },
+   *     globalContext: sharedGlobalContext,
+   *     name: "Chord",
    *     muted: false,
    *     transpose: 0
    *   });
@@ -52,6 +57,8 @@ export class LiveLoop {
       lfos = [],
       midiChannel = 1,
       context = {},
+      globalContext = null,
+      name = '',
       muted = false,
       transpose = 0,
     } = {}
@@ -61,6 +68,8 @@ export class LiveLoop {
     this.lfos = lfos;
     this.midiChannel = midiChannel;
     this.context = context;
+    this.globalContext = globalContext;
+    this.name = name;
 
     // For controlling hype/tension layering:
     this.muted = muted; // skip noteOn if true
@@ -68,6 +77,9 @@ export class LiveLoop {
 
     // For queued changes that we only want to apply at a pattern boundary
     this.changeQueue = [];
+    
+    // For note name to MIDI number conversion
+    this._initNoteToMidiMap();
   }
 
   /**
@@ -81,10 +93,13 @@ export class LiveLoop {
     // 1) Apply any queued changes if we're at loop boundary
     this._applyQueuedChangesIfNeeded(stepIndex);
 
-    // 2) Always get notes from the pattern for this step, even when muted
-    const notes = this.pattern.getNotes(stepIndex, this.context);
+    // 2) Get effective context (local context enhanced with global context if available)
+    const effectiveContext = this._getEffectiveContext(stepIndex);
 
-    // 3) Send noteOn only if not muted
+    // 3) Always get notes from the pattern for this step, even when muted
+    const notes = this.pattern.getNotes(stepIndex, effectiveContext);
+
+    // 4) Send noteOn only if not muted
     if (!this.muted && notes && notes.length) {
       for (const noteObj of notes) {
         // Convert note name (e.g. 'C4') to a MIDI note number
@@ -105,7 +120,7 @@ export class LiveLoop {
       }
     }
 
-    // 3) Update each LFO and send controlChange
+    // 5) Update each LFO and send controlChange
     for (const lfo of this.lfos) {
       const waveValue = lfo.update(deltaTime);
       // For example, map [-1..1] => [0..127]
@@ -121,6 +136,42 @@ export class LiveLoop {
         value: ccValue,
       });
     }
+  }
+  
+  /**
+   * Combines local context with global context to create an effective context for patterns
+   * 
+   * @private
+   * @param {number} stepIndex - Current step index
+   * @returns {Object} Combined context object
+   */
+  _getEffectiveContext(stepIndex) {
+    // Start with local context
+    const effectiveContext = { ...this.context };
+    
+    // If we have a global context, merge its managers
+    if (this.globalContext) {
+      // Add managers directly for easier access
+      if (this.globalContext.chordManager) {
+        effectiveContext.chordManager = this.globalContext.chordManager;
+      }
+      
+      if (this.globalContext.rhythmManager) {
+        effectiveContext.rhythmManager = this.globalContext.rhythmManager;
+      }
+      
+      // Add current energy state if available
+      if (this.globalContext.getEnergyState) {
+        effectiveContext.energyState = this.globalContext.getEnergyState();
+      }
+      
+      // Merge any additional context from global context
+      if (this.globalContext.additionalContext) {
+        Object.assign(effectiveContext, this.globalContext.additionalContext);
+      }
+    }
+    
+    return effectiveContext;
   }
 
   /**
@@ -144,6 +195,8 @@ export class LiveLoop {
         } else if (change.type === "updateLFO") {
           // e.g. change = { type: 'updateLFO', index: 0, newProps: { frequency: 2.0 } }
           Object.assign(this.lfos[change.index], change.newProps);
+        } else if (change.type === "setContext") {
+          this.context = change.context;
         }
       }
       this.changeQueue = [];
@@ -151,13 +204,48 @@ export class LiveLoop {
   }
 
   /**
-   * Convert note name (e.g. "C4") to MIDI note number. Stub here,
-   * but in a real system you'd use a library or a mapping.
+   * Initialize the note name to MIDI number mapping.
+   * @private
+   */
+  _initNoteToMidiMap() {
+    // Maps note names to semitone values
+    this._noteToSemitone = {
+      'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
+      'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 
+      'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+    };
+  }
+
+  /**
+   * Convert note name (e.g. "C4") to MIDI note number.
+   * @private
+   * @param {string} noteName - Note name with octave (e.g. "C4", "F#3")
+   * @returns {number} MIDI note number
    */
   _convertNoteNameToMidi(noteName) {
-    // Placeholder: always return 60 for "C4"
-    // In reality, parse the note name properly.
-    return 60;
+    // Handle numeric note values (already MIDI numbers)
+    if (!isNaN(noteName)) {
+      return parseInt(noteName, 10);
+    }
+    
+    // Parse note name and octave
+    const match = noteName.match(/^([A-G][b#]?)(\d+)$/i);
+    
+    if (!match) {
+      console.warn(`Invalid note name: ${noteName}. Defaulting to C4 (60).`);
+      return 60;
+    }
+    
+    const [_, note, octave] = match;
+    const semitone = this._noteToSemitone[note];
+    
+    if (semitone === undefined) {
+      console.warn(`Unknown note: ${note}. Defaulting to C.`);
+      return 60;
+    }
+    
+    // Calculate MIDI note number: (octave+1)*12 + semitone
+    return (parseInt(octave, 10) + 1) * 12 + semitone;
   }
 
   // -- Public Methods for Changing Patterns or LFOs --
@@ -198,11 +286,24 @@ export class LiveLoop {
   }
 
   /**
-   * Set or update the context (e.g. chord info, scale, user data).
-   * Typically immediate, but you could queue it if you wanted.
+   * Set or update the local context (e.g. chord info, scale, user data).
+   * @param {object} context - New context to set
+   * @param {boolean} [immediate=true] - If true, apply immediately; if false, queue for next loop
    */
-  setContext(context) {
-    this.context = context;
+  setContext(context, immediate = true) {
+    if (immediate) {
+      this.context = context;
+    } else {
+      this.changeQueue.push({ type: "setContext", context });
+    }
+  }
+  
+  /**
+   * Set or update the global context.
+   * @param {object} globalContext - New global context to use
+   */
+  setGlobalContext(globalContext) {
+    this.globalContext = globalContext;
   }
 
   /**
@@ -221,5 +322,13 @@ export class LiveLoop {
    */
   setTranspose(semitones) {
     this.transpose = semitones;
+  }
+  
+  /**
+   * Set the name of this loop, useful for targeting by EnergyManager.
+   * @param {string} name - The name for this loop
+   */
+  setName(name) {
+    this.name = name;
   }
 }
