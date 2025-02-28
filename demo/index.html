@@ -79,6 +79,33 @@
       background: #0078d7;
       color: white;
     }
+    .pattern-controls div {
+      margin-bottom: 10px;
+    }
+    .pattern-controls label {
+      margin-right: 15px;
+      cursor: pointer;
+    }
+    .transport-status {
+      margin: 15px 0;
+      padding: 10px;
+      background: #f5f5f5;
+      border-radius: 4px;
+    }
+    #transport-status.running {
+      color: green;
+      font-weight: bold;
+    }
+    #transport-status.stopped {
+      color: red;
+    }
+    #pattern-sending-status.enabled {
+      color: green;
+      font-weight: bold;
+    }
+    #pattern-sending-status.disabled {
+      color: red;
+    }
   </style>
 </head>
 <body>
@@ -98,9 +125,23 @@
   <div class="pattern-demo">
     <h2>Pattern Demo</h2>
     <div class="pattern-controls">
-      <button id="play-pattern-a">Play Pattern A (C-E-G)</button>
-      <button id="play-pattern-b">Play Pattern B (C(2)-E-G)</button>
-      <button id="stop-pattern">Stop Pattern</button>
+      <div>
+        <label>
+          <input type="checkbox" id="enable-pattern"> Enable Pattern Sending
+        </label>
+      </div>
+      <div>
+        <label>
+          <input type="radio" name="pattern-type" id="pattern-a" checked> Pattern A (C-E-G)
+        </label>
+        <label>
+          <input type="radio" name="pattern-type" id="pattern-b"> Pattern B (C(2)-E-G)
+        </label>
+      </div>
+    </div>
+    <div class="transport-status">
+      <div>External Transport: <span id="transport-status">Stopped</span></div>
+      <div>Pattern Sending: <span id="pattern-sending-status">Disabled</span></div>
     </div>
     <div id="current-step" class="current-step">Current Step: None</div>
     <div id="pattern-visualization" class="pattern-visualization">

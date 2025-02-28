@@ -6,6 +6,8 @@ const outputsList = document.getElementById('outputs-list');
 const midiLog = document.getElementById('midi-log');
 const currentStepEl = document.getElementById('current-step');
 const patternVisualizationEl = document.getElementById('pattern-visualization');
+const transportStatusEl = document.getElementById('transport-status');
+const patternSendingStatusEl = document.getElementById('pattern-sending-status');
 
 // Notes & Buttons
 const noteCButton = document.getElementById('note-c');
@@ -14,10 +16,10 @@ const noteGButton = document.getElementById('note-g');
 const chordCButton = document.getElementById('chord-c');
 const stopAllButton = document.getElementById('stop-all');
 
-// Pattern Buttons
-const playPatternAButton = document.getElementById('play-pattern-a');
-const playPatternBButton = document.getElementById('play-pattern-b');
-const stopPatternButton = document.getElementById('stop-pattern');
+// Pattern Controls
+const enablePatternCheckbox = document.getElementById('enable-pattern');
+const patternARadio = document.getElementById('pattern-a');
+const patternBRadio = document.getElementById('pattern-b');
 
 // Initialize MIDI
 const midiBus = new MidiBus();
@@ -36,6 +38,8 @@ let currentPattern = null;
 let currentStep = 0;
 let patternInterval = null;
 let activeNotes = [];
+let isTransportRunning = false;
+let isPatternSendingEnabled = false;
 
 // Map note names to MIDI numbers
 const noteToMidi = {
@@ -153,35 +157,84 @@ function stopActiveNotes() {
   activeNotes = [];
 }
 
-// Start playing a pattern
-function startPattern(pattern, bpm = 120) {
-  // Stop any currently playing pattern
-  stopPattern();
+// Handle external transport start
+function handleTransportStart() {
+  if (!isTransportRunning) {
+    isTransportRunning = true;
+    currentStep = 0;
+    
+    // Update UI
+    transportStatusEl.textContent = 'Running';
+    transportStatusEl.className = 'running';
+    
+    // Log event
+    logEvent('transportStart', {});
+    
+    // Start pattern if enabled
+    if (isPatternSendingEnabled) {
+      startPatternClock();
+    }
+  }
+}
+
+// Handle external transport stop
+function handleTransportStop() {
+  if (isTransportRunning) {
+    isTransportRunning = false;
+    
+    // Stop pattern clock
+    stopPatternClock();
+    
+    // Update UI
+    transportStatusEl.textContent = 'Stopped';
+    transportStatusEl.className = 'stopped';
+    
+    // Log event
+    logEvent('transportStop', {});
+  }
+}
+
+// Start the pattern clock
+function startPatternClock() {
+  // Use the currently selected pattern
+  const pattern = patternARadio.checked ? patternA : patternB;
   
-  // Set current pattern
+  // Set current pattern and update visualization
   currentPattern = pattern;
-  currentStep = 0;
-  
-  // Update visualization
   updatePatternVisualization(pattern);
   
-  // Calculate step duration in ms based on BPM
+  // Calculate step duration in ms based on BPM (hardcoded for now)
+  // In a real implementation, this would follow the external clock
+  const bpm = 120;
   const stepDuration = 60000 / bpm;
+  
+  // Clear any existing interval
+  if (patternInterval) {
+    clearInterval(patternInterval);
+  }
   
   // Start the pattern playback interval
   patternInterval = setInterval(() => {
-    playPatternStep(pattern, currentStep);
-    
-    // Increment step
-    currentStep = (currentStep + 1) % pattern.getLength();
+    if (isTransportRunning && isPatternSendingEnabled) {
+      playPatternStep(pattern, currentStep);
+      
+      // Increment step
+      currentStep = (currentStep + 1) % pattern.getLength();
+    }
   }, stepDuration);
   
   // Start immediately
-  playPatternStep(pattern, currentStep);
+  if (isTransportRunning && isPatternSendingEnabled) {
+    playPatternStep(pattern, currentStep);
+  }
+  
+  // Update pattern sending status
+  patternSendingStatusEl.textContent = 'Enabled';
+  patternSendingStatusEl.className = 'enabled';
 }
 
-// Stop the pattern playback
-function stopPattern() {
+// Stop the pattern clock
+function stopPatternClock() {
   if (patternInterval) {
     clearInterval(patternInterval);
     patternInterval = null;
@@ -194,6 +247,12 @@ function stopPattern() {
   document.querySelectorAll('.step').forEach(el => {
     el.classList.remove('active');
   });
+  
+  // Update pattern sending status if disabled
+  if (!isPatternSendingEnabled) {
+    patternSendingStatusEl.textContent = 'Disabled';
+    patternSendingStatusEl.className = 'disabled';
+  }
 }
 
 // Set up button event handlers
@@ -238,25 +297,106 @@ stopAllButton.addEventListener('click', () => {
   logEvent('stopAllNotes', {});
 });
 
-// Pattern playback buttons
-playPatternAButton.addEventListener('click', () => {
-  startPattern(patternA, 120);
-  logEvent('startPattern', { type: 'A', notes: ["C4", "E4", "G4"] });
+// Pattern sending checkbox handler
+enablePatternCheckbox.addEventListener('change', () => {
+  isPatternSendingEnabled = enablePatternCheckbox.checked;
+  
+  if (isPatternSendingEnabled) {
+    patternSendingStatusEl.textContent = 'Enabled';
+    patternSendingStatusEl.className = 'enabled';
+    
+    // Start pattern if transport is running
+    if (isTransportRunning) {
+      startPatternClock();
+    }
+    
+    logEvent('patternSendingEnabled', {});
+  } else {
+    patternSendingStatusEl.textContent = 'Disabled';
+    patternSendingStatusEl.className = 'disabled';
+    stopPatternClock();
+    logEvent('patternSendingDisabled', {});
+  }
 });
 
-playPatternBButton.addEventListener('click', () => {
-  startPattern(patternB, 120);
-  logEvent('startPattern', { type: 'B', notes: [
-    { note: "C4", durationStepsOrBeats: 2 },
-    { note: "E4" },
-    { note: "G4" }
-  ]});
+// Pattern type radio button handlers
+patternARadio.addEventListener('change', () => {
+  if (patternARadio.checked && isPatternSendingEnabled) {
+    currentPattern = patternA;
+    updatePatternVisualization(patternA);
+    logEvent('patternChanged', { type: 'A', notes: ["C4", "E4", "G4"] });
+  }
 });
 
-stopPatternButton.addEventListener('click', () => {
-  stopPattern();
-  logEvent('stopPattern', {});
+patternBRadio.addEventListener('change', () => {
+  if (patternBRadio.checked && isPatternSendingEnabled) {
+    currentPattern = patternB;
+    updatePatternVisualization(patternB);
+    logEvent('patternChanged', { type: 'B', notes: [
+      { note: "C4", durationStepsOrBeats: 2 },
+      { note: "E4" },
+      { note: "G4" }
+    ]});
+  }
 });
+
+// Subscribe to MIDI messages
+function setupTransportListeners() {
+  // For the demo, we'll use some keyboard keys to simulate transport messages
+  // In a real implementation, this would receive actual MIDI messages
+  
+  // Listen for key events to simulate MIDI transport messages
+  document.addEventListener('keydown', (event) => {
+    // Space = Toggle transport
+    if (event.code === 'Space') {
+      if (isTransportRunning) {
+        handleTransportStop();
+      } else {
+        handleTransportStart();
+      }
+    }
+    
+    // Enter = Start transport
+    if (event.code === 'Enter') {
+      handleTransportStart();
+    }
+    
+    // Escape = Stop transport
+    if (event.code === 'Escape') {
+      handleTransportStop();
+    }
+  });
+  
+  // In a real implementation, you would listen for MIDI messages like this:
+  // The TransportManager component would handle this in the full implementation
+  /*
+  realEngine.subscribeToMidiMessages(msg => {
+    // Check for MIDI Start message (0xFA)
+    if (msg.data[0] === 0xFA) {
+      handleTransportStart();
+    }
+    // Check for MIDI Stop message (0xFC)
+    else if (msg.data[0] === 0xFC) {
+      handleTransportStop();
+    }
+  });
+  */
+}
 
 // Initialize when the page is loaded
-document.addEventListener('DOMContentLoaded', initMidi);
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize MIDI and setup UI elements
+  initMidi();
+  
+  // Setup transport listeners
+  setupTransportListeners();
+  
+  // Set initial states
+  transportStatusEl.textContent = 'Stopped';
+  transportStatusEl.className = 'stopped';
+  patternSendingStatusEl.textContent = 'Disabled';
+  patternSendingStatusEl.className = 'disabled';
+  
+  // Initialize pattern visualization
+  updatePatternVisualization(patternA);
+});
