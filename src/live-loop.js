@@ -12,6 +12,11 @@
  * This ensures we never start/stop the transport ourselves,
  * and we do not handle note-off logic. The TransportManager
  * or external device controls that.
+ *
+ * Added for Energy / Tension:
+ *  - A 'muted' flag to enable/disable noteOn sending (useful for layering/unlayering).
+ *  - A 'transpose' (or semitone shift) to raise/lower the pitch for hype or tension changes.
+ *  - Both can be changed on the fly by an EnergyManager or other orchestrator.
  */
 
 export class LiveLoop {
@@ -22,12 +27,17 @@ export class LiveLoop {
    * @property {number} [midiChannel=1] - Default MIDI channel for noteOn and controlChange.
    * @property {any} [context] - Optional context passed to pattern (e.g. chord data).
    *
+   * @property {boolean} [muted=false] - If true, loop won't send noteOn at tick.
+   * @property {number} [transpose=0]  - Semitone transposition applied after note name -> MIDI #.
+   *
    * Example usage:
    *   const loop = new LiveLoop(midiBus, {
    *     pattern: somePattern,
    *     lfos: [someLfo],
    *     midiChannel: 2,
-   *     context: { chord: 'Cmaj7' }
+   *     context: { chord: 'Cmaj7' },
+   *     muted: false,
+   *     transpose: 0
    *   });
    */
 
@@ -37,13 +47,24 @@ export class LiveLoop {
    */
   constructor(
     midiBus,
-    { pattern, lfos = [], midiChannel = 1, context = {} } = {}
+    {
+      pattern,
+      lfos = [],
+      midiChannel = 1,
+      context = {},
+      muted = false,
+      transpose = 0,
+    } = {}
   ) {
     this.midiBus = midiBus;
     this.pattern = pattern;
     this.lfos = lfos;
     this.midiChannel = midiChannel;
     this.context = context;
+
+    // For controlling hype/tension layering:
+    this.muted = muted; // skip noteOn if true
+    this.transpose = transpose; // semitone shift
 
     // For queued changes that we only want to apply at a pattern boundary
     this.changeQueue = [];
@@ -60,14 +81,20 @@ export class LiveLoop {
     // 1) Apply any queued changes if we're at loop boundary
     this._applyQueuedChangesIfNeeded(stepIndex);
 
-    // 2) Get notes from the pattern for this step
+    // 2) Always get notes from the pattern for this step, even when muted
     const notes = this.pattern.getNotes(stepIndex, this.context);
 
-    // 3) Send noteOn (but NOT noteOff)
-    if (notes && notes.length) {
+    // 3) Send noteOn only if not muted
+    if (!this.muted && notes && notes.length) {
       for (const noteObj of notes) {
-        // Convert note name (e.g. 'C4') to a MIDI note number (if needed)
-        const midiNote = this._convertNoteNameToMidi(noteObj.note);
+        // Convert note name (e.g. 'C4') to a MIDI note number
+        let midiNote = this._convertNoteNameToMidi(noteObj.note);
+
+        // Apply transpose semitone shift
+        midiNote += this.transpose;
+
+        // Safety clamp in [0..127] (MIDI range) if desired
+        midiNote = Math.max(0, Math.min(127, midiNote));
 
         this.midiBus.noteOn({
           channel: this.midiChannel,
@@ -78,7 +105,7 @@ export class LiveLoop {
       }
     }
 
-    // 4) Update each LFO and send controlChange
+    // 3) Update each LFO and send controlChange
     for (const lfo of this.lfos) {
       const waveValue = lfo.update(deltaTime);
       // For example, map [-1..1] => [0..127]
@@ -171,10 +198,28 @@ export class LiveLoop {
   }
 
   /**
-   * Set or update the context (e.g. chord info, scale, user data)
+   * Set or update the context (e.g. chord info, scale, user data).
    * Typically immediate, but you could queue it if you wanted.
    */
   setContext(context) {
     this.context = context;
+  }
+
+  /**
+   * Mute or unmute the loop. If muted, tick() won't send noteOn messages.
+   * This is helpful for layering during hype changes.
+   * @param {boolean} bool
+   */
+  setMuted(bool) {
+    this.muted = bool;
+  }
+
+  /**
+   * Set the semitone transposition. Positive = shift up, negative = shift down.
+   * Will be applied in the next tick's noteOn calls.
+   * @param {number} semitones
+   */
+  setTranspose(semitones) {
+    this.transpose = semitones;
   }
 }

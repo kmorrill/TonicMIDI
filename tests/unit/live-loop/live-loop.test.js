@@ -7,10 +7,13 @@
  * 3. Handle immediate vs. enqueued pattern changes.
  * 4. Not override transport (no calls to start/stop).
  * 5. Optionally handle multiple LFOs.
+ * 6. (New) Respect 'muted' and 'transpose' fields for hype/tension layering:
+ *    - If muted, should not send noteOn.
+ *    - If transpose != 0, should shift note values by that many semitones.
  */
 
+import { jest } from "@jest/globals"; // Needed for ES module jest usage
 import { LiveLoop } from "../../../src/live-loop.js";
-import { jest } from '@jest/globals';
 
 describe("LiveLoop", () => {
   let midiBusMock;
@@ -43,6 +46,8 @@ describe("LiveLoop", () => {
       lfos: [lfoMock],
       midiChannel: 1,
       context: {},
+      muted: false,
+      transpose: 0,
     });
   });
 
@@ -75,8 +80,7 @@ describe("LiveLoop", () => {
   });
 
   it("updates the LFO and sends controlChange", () => {
-    // lfoMock.update() defaults to 0.0 => waveValue => we map [-1..1] => [0..127]
-    // waveValue = 0 => ccValue => ~ 63.5 => floored to 63
+    // lfoMock.update() defaults to 0.0 => waveValue => 0 => ccValue = 63
     liveLoop.tick(1, 0.25);
 
     // LFO update called with deltaTime=0.25
@@ -94,7 +98,7 @@ describe("LiveLoop", () => {
   it("handles multiple LFOs", () => {
     // Add another mock LFO
     const secondLfoMock = {
-      update: jest.fn().mockReturnValue(1.0), // waveValue=1 => mapped ~127
+      update: jest.fn().mockReturnValue(1.0), // waveValue=1 => mapped 127
     };
     liveLoop.addLFO(secondLfoMock);
 
@@ -118,7 +122,7 @@ describe("LiveLoop", () => {
   });
 
   it("immediate pattern change takes effect on the next tick", () => {
-    // Original pattern returns "C4" for stepIndex=0
+    // Original pattern
     patternMock.getNotes.mockReturnValue([{ note: "C4" }]);
     liveLoop.tick(0, 0.25);
     expect(midiBusMock.noteOn).toHaveBeenCalledTimes(1);
@@ -156,24 +160,20 @@ describe("LiveLoop", () => {
     // Queue the change (immediate=false)
     liveLoop.setPattern(newPatternMock, false);
 
-    // In our design, old pattern length = 8
-    // For steps 1..7, we should still see the old pattern
+    // old pattern from steps 1..7
     patternMock.getNotes.mockReturnValue([{ note: "E4" }]);
     for (let s = 1; s < 8; s++) {
       liveLoop.tick(s, 0.25);
     }
-    // We expect newPatternMock NOT to be called yet
+    // Not yet switched
     expect(newPatternMock.getNotes).not.toHaveBeenCalled();
 
-    // At stepIndex=8 => boundary (8 % 8 = 0)
-    // The queued change should apply
+    // Next tick at step=8 => boundary => switch
     liveLoop.tick(8, 0.25);
-
-    // newPatternMock is now active
     expect(newPatternMock.getNotes).toHaveBeenCalledWith(8, {});
     expect(midiBusMock.noteOn).toHaveBeenLastCalledWith({
       channel: 1,
-      note: 60, // "F4" => 60 stub
+      note: 60, // "F4" => 60
       velocity: 70,
     });
   });
@@ -183,40 +183,93 @@ describe("LiveLoop", () => {
     const secondLfoMock = { update: jest.fn().mockReturnValue(-0.5) };
     liveLoop.addLFO(secondLfoMock);
 
-    // Initially, we call tick => check default waveValue
+    // call tick => old amplitude or settings
     liveLoop.tick(0, 0.1);
     expect(secondLfoMock.update).toHaveBeenCalledWith(0.1);
 
-    // Enqueue an LFO update (like changing frequency or amplitude)
+    // Enqueue LFO update
     liveLoop.updateLFO(1, { amplitude: 2.0 }, false);
 
-    // For steps 1..7, no boundary => old amplitude
+    // steps 1..7 => no boundary => old amplitude
     for (let s = 1; s < 8; s++) {
       liveLoop.tick(s, 0.1);
     }
-    // Should not have changed the second LFO yet
-    // no direct check, but we rely on the test not failing
 
-    // At step=8 => pattern boundary => apply the queued changes
+    // stepIndex=8 => boundary => apply queued LFO update
     liveLoop.tick(8, 0.1);
-
-    // Now secondLfoMock amplitude = 2.0
-    // We won't see that in a direct test unless we check secondLfoMock object
     expect(secondLfoMock.update).toHaveBeenCalledWith(0.1);
-    // We can confirm the code didn't crash or fail
   });
 
   it("never calls noteOff, deferring to TransportManager", () => {
-    // Just confirm noteOff is not invoked
     patternMock.getNotes.mockReturnValue([{ note: "C4" }]);
     liveLoop.tick(0, 0.25);
     expect(midiBusMock.noteOff).not.toHaveBeenCalled();
   });
 
   it("does not start/stop transport internally", () => {
-    // The LiveLoop never tries to call midiBus.start or midiBus.stop
-    // We'll just confirm they don't exist or aren't called
     expect(midiBusMock.start).toBeUndefined();
     expect(midiBusMock.stop).toBeUndefined();
+  });
+
+  describe("muted behavior", () => {
+    it("does not send noteOn when muted is true", () => {
+      // Turn on muted
+      liveLoop.setMuted(true);
+
+      patternMock.getNotes.mockReturnValue([{ note: "C4" }]);
+      liveLoop.tick(0, 0.25);
+
+      expect(patternMock.getNotes).toHaveBeenCalledWith(0, {});
+      // But no noteOn calls
+      expect(midiBusMock.noteOn).not.toHaveBeenCalled();
+    });
+
+    it("unmutes and sends notes again", () => {
+      liveLoop.setMuted(true);
+
+      patternMock.getNotes.mockReturnValue([{ note: "C4" }]);
+      liveLoop.tick(0, 0.25);
+      expect(midiBusMock.noteOn).not.toHaveBeenCalled();
+
+      // Now unmute
+      liveLoop.setMuted(false);
+      liveLoop.tick(1, 0.25);
+      expect(midiBusMock.noteOn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("transpose behavior", () => {
+    it("shifts note pitch by transpose amount", () => {
+      patternMock.getNotes.mockReturnValue([{ note: "C4", velocity: 100 }]);
+      // Set transpose up 2 semitones
+      liveLoop.setTranspose(2);
+
+      liveLoop.tick(0, 0.25);
+      // original logic => "C4" => 60, plus transpose(2) => 62
+      expect(midiBusMock.noteOn).toHaveBeenCalledWith({
+        channel: 1,
+        note: 62,
+        velocity: 100,
+      });
+    });
+
+    it("clamps transposed MIDI note within [0..127]", () => {
+      // Suppose pattern returns a super high note, "C8" => 108 (stub = 60?)
+      // Let's just force it to 126 in test to see if it clamps properly
+      patternMock.getNotes.mockReturnValue([
+        { note: "Whatever", velocity: 80 },
+      ]);
+      // We'll pretend convertNoteNameToMidi -> 126 in code, plus 5 => 131 => clamp => 127
+      jest.spyOn(liveLoop, "_convertNoteNameToMidi").mockReturnValue(126);
+
+      liveLoop.setTranspose(5);
+      liveLoop.tick(0, 0.1);
+
+      expect(midiBusMock.noteOn).toHaveBeenCalledWith({
+        channel: 1,
+        note: 127, // clamped
+        velocity: 80,
+      });
+    });
   });
 });
