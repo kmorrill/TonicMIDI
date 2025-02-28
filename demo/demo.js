@@ -1,8 +1,262 @@
-import { WebMidi } from "webmidi";
-import { MidiBus, TransportManager } from "../src/index.js";
+import { MidiBus, RealPlaybackEngine, ExplicitNotePattern } from "../src/index.js";
 
-// initialize your MIDI setup here...
-WebMidi.enable().then(() => {
-  console.log("WebMidi enabled!");
-  // MIDI logic here...
+// DOM Elements
+const statusEl = document.getElementById('status');
+const outputsList = document.getElementById('outputs-list');
+const midiLog = document.getElementById('midi-log');
+const currentStepEl = document.getElementById('current-step');
+const patternVisualizationEl = document.getElementById('pattern-visualization');
+
+// Notes & Buttons
+const noteCButton = document.getElementById('note-c');
+const noteEButton = document.getElementById('note-e');
+const noteGButton = document.getElementById('note-g');
+const chordCButton = document.getElementById('chord-c');
+const stopAllButton = document.getElementById('stop-all');
+
+// Pattern Buttons
+const playPatternAButton = document.getElementById('play-pattern-a');
+const playPatternBButton = document.getElementById('play-pattern-b');
+const stopPatternButton = document.getElementById('stop-pattern');
+
+// Initialize MIDI
+const midiBus = new MidiBus();
+const realEngine = new RealPlaybackEngine(midiBus);
+
+// Create pattern instances
+const patternA = new ExplicitNotePattern(["C4", "E4", "G4"]);
+const patternB = new ExplicitNotePattern([
+  { note: "C4", durationStepsOrBeats: 2 },
+  { note: "E4" },
+  { note: "G4" }
+]);
+
+// Pattern playback state
+let currentPattern = null;
+let currentStep = 0;
+let patternInterval = null;
+let activeNotes = [];
+
+// Map note names to MIDI numbers
+const noteToMidi = {
+  'C4': 60,
+  'E4': 64,
+  'G4': 67
+};
+
+// Log MIDI events to the UI
+function logEvent(event, data) {
+  const logEntry = document.createElement('div');
+  logEntry.textContent = `${new Date().toISOString().substr(11, 8)} - ${event}: ${JSON.stringify(data)}`;
+  midiLog.appendChild(logEntry);
+  midiLog.scrollTop = midiLog.scrollHeight;
+}
+
+// Subscribe to MidiBus events to log them
+midiBus.on('noteOn', (data) => logEvent('noteOn', data));
+midiBus.on('noteOff', (data) => logEvent('noteOff', data));
+midiBus.on('controlChange', (data) => logEvent('controlChange', data));
+
+// Initialize Web MIDI
+async function initMidi() {
+  try {
+    await realEngine.init();
+    
+    // Update status
+    if (realEngine.midiOutputs.length > 0) {
+      statusEl.textContent = `MIDI Initialized: ${realEngine.midiOutputs.length} output(s) available`;
+      statusEl.style.backgroundColor = '#e6ffe6';
+      
+      // Update outputs list
+      outputsList.innerHTML = '';
+      realEngine.midiOutputs.forEach(output => {
+        const li = document.createElement('li');
+        li.textContent = `${output.name} (${output.id})`;
+        outputsList.appendChild(li);
+      });
+    } else {
+      statusEl.textContent = 'No MIDI outputs found. Connect a MIDI device and refresh.';
+      statusEl.style.backgroundColor = '#fff0e6';
+    }
+
+    // Initialize pattern visualization
+    updatePatternVisualization(patternA);
+  } catch (error) {
+    statusEl.textContent = `MIDI Error: ${error.message}`;
+    statusEl.style.backgroundColor = '#ffe6e6';
+    console.error('MIDI initialization error:', error);
+  }
+}
+
+// Update the pattern visualization in the UI
+function updatePatternVisualization(pattern) {
+  patternVisualizationEl.innerHTML = '';
+  
+  for (let i = 0; i < pattern.getLength(); i++) {
+    const stepEl = document.createElement('div');
+    stepEl.className = 'step';
+    stepEl.setAttribute('data-step', i);
+    
+    const notes = pattern.getNotes(i);
+    stepEl.textContent = notes.map(n => n.note.replace(/\d+/, '')).join(' ');
+    
+    patternVisualizationEl.appendChild(stepEl);
+  }
+}
+
+// Highlight the current step in the visualization
+function highlightCurrentStep(step) {
+  // Remove active class from all steps
+  document.querySelectorAll('.step').forEach(el => {
+    el.classList.remove('active');
+  });
+  
+  // Add active class to current step
+  const stepEl = document.querySelector(`.step[data-step="${step}"]`);
+  if (stepEl) {
+    stepEl.classList.add('active');
+  }
+  
+  // Update current step text
+  currentStepEl.textContent = `Current Step: ${step + 1}`;
+}
+
+// Play a pattern step
+function playPatternStep(pattern, step) {
+  // Stop any active notes
+  stopActiveNotes();
+  
+  // Get notes for current step
+  const notes = pattern.getNotes(step);
+  
+  // Play the notes
+  notes.forEach(noteObj => {
+    // Convert note name to MIDI number
+    const midiNote = noteToMidi[noteObj.note];
+    if (midiNote !== undefined) {
+      midiBus.noteOn({ channel: 1, note: midiNote, velocity: 100 });
+      
+      // Track active notes
+      activeNotes.push(midiNote);
+    }
+  });
+  
+  // Update visualization
+  highlightCurrentStep(step);
+}
+
+// Stop currently active notes
+function stopActiveNotes() {
+  activeNotes.forEach(note => {
+    midiBus.noteOff({ channel: 1, note });
+  });
+  activeNotes = [];
+}
+
+// Start playing a pattern
+function startPattern(pattern, bpm = 120) {
+  // Stop any currently playing pattern
+  stopPattern();
+  
+  // Set current pattern
+  currentPattern = pattern;
+  currentStep = 0;
+  
+  // Update visualization
+  updatePatternVisualization(pattern);
+  
+  // Calculate step duration in ms based on BPM
+  const stepDuration = 60000 / bpm;
+  
+  // Start the pattern playback interval
+  patternInterval = setInterval(() => {
+    playPatternStep(pattern, currentStep);
+    
+    // Increment step
+    currentStep = (currentStep + 1) % pattern.getLength();
+  }, stepDuration);
+  
+  // Start immediately
+  playPatternStep(pattern, currentStep);
+}
+
+// Stop the pattern playback
+function stopPattern() {
+  if (patternInterval) {
+    clearInterval(patternInterval);
+    patternInterval = null;
+  }
+  
+  stopActiveNotes();
+  currentStepEl.textContent = 'Current Step: None';
+  
+  // Remove active class from all steps
+  document.querySelectorAll('.step').forEach(el => {
+    el.classList.remove('active');
+  });
+}
+
+// Set up button event handlers
+noteCButton.addEventListener('click', () => {
+  midiBus.noteOn({ channel: 1, note: 60, velocity: 100 });
+  // Automatically turn the note off after 500ms
+  setTimeout(() => {
+    midiBus.noteOff({ channel: 1, note: 60 });
+  }, 500);
 });
+
+noteEButton.addEventListener('click', () => {
+  midiBus.noteOn({ channel: 1, note: 64, velocity: 100 });
+  setTimeout(() => {
+    midiBus.noteOff({ channel: 1, note: 64 });
+  }, 500);
+});
+
+noteGButton.addEventListener('click', () => {
+  midiBus.noteOn({ channel: 1, note: 67, velocity: 100 });
+  setTimeout(() => {
+    midiBus.noteOff({ channel: 1, note: 67 });
+  }, 500);
+});
+
+chordCButton.addEventListener('click', () => {
+  // Play C Major chord (C, E, G)
+  midiBus.noteOn({ channel: 1, note: 60, velocity: 100 }); // C
+  midiBus.noteOn({ channel: 1, note: 64, velocity: 100 }); // E
+  midiBus.noteOn({ channel: 1, note: 67, velocity: 100 }); // G
+  
+  // Turn off after 1 second
+  setTimeout(() => {
+    midiBus.noteOff({ channel: 1, note: 60 });
+    midiBus.noteOff({ channel: 1, note: 64 });
+    midiBus.noteOff({ channel: 1, note: 67 });
+  }, 1000);
+});
+
+stopAllButton.addEventListener('click', () => {
+  midiBus.stopAllNotes();
+  logEvent('stopAllNotes', {});
+});
+
+// Pattern playback buttons
+playPatternAButton.addEventListener('click', () => {
+  startPattern(patternA, 120);
+  logEvent('startPattern', { type: 'A', notes: ["C4", "E4", "G4"] });
+});
+
+playPatternBButton.addEventListener('click', () => {
+  startPattern(patternB, 120);
+  logEvent('startPattern', { type: 'B', notes: [
+    { note: "C4", durationStepsOrBeats: 2 },
+    { note: "E4" },
+    { note: "G4" }
+  ]});
+});
+
+stopPatternButton.addEventListener('click', () => {
+  stopPattern();
+  logEvent('stopPattern', {});
+});
+
+// Initialize when the page is loaded
+document.addEventListener('DOMContentLoaded', initMidi);

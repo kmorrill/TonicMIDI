@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OP-XY-Live MIDI Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 {
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 10px;
+    }
+    button {
+      margin: 5px;
+      padding: 8px 16px;
+      background: #0078d7;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005fa3;
+    }
+    #status {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 5px;
+    }
+    #midi-outputs {
+      margin-top: 20px;
+    }
+    #midi-log {
+      margin-top: 20px;
+      height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 10px;
+      background: #f9f9f9;
+      font-family: monospace;
+    }
+    .pattern-demo {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f8ff;
+      border-radius: 5px;
+    }
+    .pattern-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .current-step {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .pattern-visualization {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .step {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .step.active {
+      background: #0078d7;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>OP-XY-Live MIDI Demo</h1>
+  
+  <div id="status">Initializing MIDI...</div>
+  
+  <div>
+    <h2>MIDI Controls</h2>
+    <button id="note-c">Play C (60)</button>
+    <button id="note-e">Play E (64)</button>
+    <button id="note-g">Play G (67)</button>
+    <button id="chord-c">Play C Major Chord</button>
+    <button id="stop-all">Stop All Notes</button>
+  </div>
+  
+  <div class="pattern-demo">
+    <h2>Pattern Demo</h2>
+    <div class="pattern-controls">
+      <button id="play-pattern-a">Play Pattern A (C-E-G)</button>
+      <button id="play-pattern-b">Play Pattern B (C(2)-E-G)</button>
+      <button id="stop-pattern">Stop Pattern</button>
+    </div>
+    <div id="current-step" class="current-step">Current Step: None</div>
+    <div id="pattern-visualization" class="pattern-visualization">
+      <!-- Step visualization will be added by JS -->
+    </div>
+  </div>
+  
+  <div id="midi-outputs">
+    <h2>Available MIDI Outputs</h2>
+    <ul id="outputs-list">
+      <li>No MIDI outputs detected</li>
+    </ul>
+  </div>
+  
+  <div>
+    <h2>MIDI Event Log</h2>
+    <div id="midi-log"></div>
+  </div>
+  
+  <script type="module" src="./demo.js"></script>
+</body>
+</html>
