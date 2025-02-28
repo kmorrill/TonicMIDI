@@ -1,0 +1,18 @@
+{
+  "name": "op-xy-live",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "start": "vite demo",
+    "build:demo": "vite build demo --outDir dist"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "vite": "^6.2.0"
+  }
+}
