@@ -7,7 +7,8 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "start": "vite demo",
     "build:demo": "vite build demo --outDir dist",
-    "dump-docs": "find docs -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done"
+    "dump-docs": "find docs -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done",
+    "dump-demo": "find demo -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done"
   },
   "keywords": [],
   "author": "",

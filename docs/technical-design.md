@@ -407,6 +407,8 @@ Updates each LFO and sends controlChange to midiBus.
 Optionally schedules or directly triggers noteOff if you have durations.
 Decide if LiveLoop stores note durations internally or you rely on the TransportManager to call noteOff. (Either approach can work, but be consistent.)
 Write unit tests using the mock MIDI Bus and mock Pattern to confirm correct calls.
+Update demo/index.html to use the new LiveLoop.
+Discuss in the tech design approaches whereby we could in a REPL immediately update the playing live loop, and also have a separate option for enqueueing changes to be applied when the pattern next loops.
 
 6. TransportManager
 What it is: The component that listens for external MIDI clock (start/stop, clock pulses, etc.), converts pulses to “steps,” and calls each LiveLoop’s tick(stepIndex).

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>LiveLoop Demo</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      .controls {
+        margin-bottom: 10px;
+      }
+      .log-container {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #f9f9f9;
+        padding: 10px;
+        border: 1px solid #ccc;
+      }
+      .active-step {
+        color: green;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>LiveLoop Demo</h1>
+
+    <div class="controls">
+      <button id="start-transport">Start Transport</button>
+      <button id="stop-transport">Stop Transport</button>
+
+      <p>
+        <label for="pattern-select">Pattern: </label>
+        <select id="pattern-select">
+          <option value="A">Pattern A</option>
+          <option value="B">Pattern B</option>
+        </select>
+        <label
+          ><input type="checkbox" id="pattern-enqueued" /> Enqueue pattern
+          change?</label
+        >
+      </p>
+
+      <p>
+        <label><input type="checkbox" id="enable-lfo" /> Enable LFO?</label>
+        (modulating CC#74)
+      </p>
+
+      <div>Current Step: <span id="current-step">0</span></div>
+      <div>MIDI Log:</div>
+      <div class="log-container" id="midi-log"></div>
+    </div>
+
+    <script type="module" src="./live-loop-demo.js"></script>
+  </body>
+</html>
