@@ -519,12 +519,22 @@ async function initMIDI() {
     // Request MIDI access with sysex enabled to ensure we get all MIDI messages
     midiAccess = await navigator.requestMIDIAccess({ sysex: true });
     
+    // Get all available MIDI outputs
+    const midiOutputs = Array.from(midiAccess.outputs.values());
+    
     // Add all available MIDI outputs to the select dropdown
-    for (const output of midiAccess.outputs.values()) {
+    for (const output of midiOutputs) {
       const option = document.createElement('option');
       option.value = output.id;
       option.textContent = output.name;
       midiOutputSelect.appendChild(option);
+    }
+    
+    // Auto-select if only one MIDI device is found
+    if (midiOutputs.length === 1) {
+      midiOutputSelect.value = midiOutputs[0].id;
+      midiOutput = midiOutputs[0];
+      logEvent('MIDI Output auto-selected', midiOutput.name);
     }
     
     // Listen for MIDI output selection

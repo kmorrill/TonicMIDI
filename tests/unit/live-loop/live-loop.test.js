@@ -64,14 +64,16 @@ describe("LiveLoop", () => {
 
     // Should have called noteOn for each returned note
     expect(midiBusMock.noteOn).toHaveBeenCalledTimes(2);
+    // C4 is MIDI note 60
     expect(midiBusMock.noteOn).toHaveBeenNthCalledWith(1, {
       channel: 1,
-      note: 60, // default from _convertNoteNameToMidi stub
+      note: 60,
       velocity: 80,
     });
+    // E4 is MIDI note 64 (E in octave 4)
     expect(midiBusMock.noteOn).toHaveBeenNthCalledWith(2, {
       channel: 1,
-      note: 60, // also 60
+      note: 64,
       velocity: 100, // default if not specified
     });
 
@@ -122,12 +124,12 @@ describe("LiveLoop", () => {
   });
 
   it("immediate pattern change takes effect on the next tick", () => {
-    // Original pattern
+    // Original pattern - C4 is MIDI note 60
     patternMock.getNotes.mockReturnValue([{ note: "C4" }]);
     liveLoop.tick(0, 0.25);
     expect(midiBusMock.noteOn).toHaveBeenCalledTimes(1);
 
-    // New pattern
+    // New pattern - G4 is MIDI note 67
     const newPatternMock = {
       getNotes: jest.fn().mockReturnValue([{ note: "G4", velocity: 90 }]),
       getLength: jest.fn().mockReturnValue(4),
@@ -141,7 +143,7 @@ describe("LiveLoop", () => {
     expect(newPatternMock.getNotes).toHaveBeenCalledWith(1, {});
     expect(midiBusMock.noteOn).toHaveBeenLastCalledWith({
       channel: 1,
-      note: 60, // from "G4" stub
+      note: 67,
       velocity: 90,
     });
   });
@@ -152,6 +154,7 @@ describe("LiveLoop", () => {
     liveLoop.tick(0, 0.25);
     expect(midiBusMock.noteOn).toHaveBeenCalledTimes(1);
 
+    // F4 is MIDI note 65
     const newPatternMock = {
       getNotes: jest.fn().mockReturnValue([{ note: "F4", velocity: 70 }]),
       getLength: jest.fn().mockReturnValue(8),
@@ -160,7 +163,7 @@ describe("LiveLoop", () => {
     // Queue the change (immediate=false)
     liveLoop.setPattern(newPatternMock, false);
 
-    // old pattern from steps 1..7
+    // old pattern from steps 1..7 (E4 is MIDI note 64)
     patternMock.getNotes.mockReturnValue([{ note: "E4" }]);
     for (let s = 1; s < 8; s++) {
       liveLoop.tick(s, 0.25);
@@ -173,7 +176,7 @@ describe("LiveLoop", () => {
     expect(newPatternMock.getNotes).toHaveBeenCalledWith(8, {});
     expect(midiBusMock.noteOn).toHaveBeenLastCalledWith({
       channel: 1,
-      note: 60, // "F4" => 60
+      note: 65,
       velocity: 70,
     });
   });

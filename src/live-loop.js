@@ -219,7 +219,7 @@ export class LiveLoop {
   /**
    * Convert note name (e.g. "C4") to MIDI note number.
    * @private
-   * @param {string} noteName - Note name with octave (e.g. "C4", "F#3")
+   * @param {string|number} noteName - Note name with octave (e.g. "C4", "F#3") or MIDI number
    * @returns {number} MIDI note number
    */
   _convertNoteNameToMidi(noteName) {

@@ -25,6 +25,7 @@ describe("EnergyManager", () => {
       name: "Drums",
       setMuted: jest.fn(),
       setPattern: jest.fn(),
+      setTranspose: jest.fn(),
       lfos: [
         {
           setFrequency: jest.fn(),
@@ -36,12 +37,14 @@ describe("EnergyManager", () => {
       name: "Bass",
       setMuted: jest.fn(),
       setPattern: jest.fn(),
+      setTranspose: jest.fn(),
       lfos: [],
     };
     mockLoopC = {
       name: "Chord",
       setMuted: jest.fn(),
       setPattern: jest.fn(),
+      setTranspose: jest.fn(),
       lfos: [],
     };
 
