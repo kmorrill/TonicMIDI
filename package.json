@@ -2,10 +2,12 @@
   "name": "op-xy-live",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "jest",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "start": "vite demo",
-    "build:demo": "vite build demo --outDir dist"
+    "build:demo": "vite build demo --outDir dist",
+    "dump-docs": "find docs -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done"
   },
   "keywords": [],
   "author": "",
