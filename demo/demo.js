@@ -1,4 +1,5 @@
 import { MidiBus, RealPlaybackEngine, ExplicitNotePattern } from "../src/index.js";
+import { LFO } from "./lfo.js";
 
 // DOM Elements
 const statusEl = document.getElementById('status');
@@ -383,6 +384,185 @@ function setupTransportListeners() {
   */
 }
 
+// LFO Demo Implementation
+const lfoFrequencySlider = document.getElementById('lfo-frequency');
+const lfoFrequencyValue = document.getElementById('lfo-frequency-value');
+const lfoAmplitudeSlider = document.getElementById('lfo-amplitude');
+const lfoAmplitudeValue = document.getElementById('lfo-amplitude-value');
+const lfoOffsetSlider = document.getElementById('lfo-offset');
+const lfoOffsetValue = document.getElementById('lfo-offset-value');
+const lfoShapeSelect = document.getElementById('lfo-shape');
+const lfoCurrentValue = document.getElementById('lfo-current-value');
+const lfoToMidiCheckbox = document.getElementById('lfo-to-midi');
+const lfoCcNumberSelect = document.getElementById('lfo-cc-number');
+const lfoCanvas = document.getElementById('lfo-canvas');
+const lfoCanvasCtx = lfoCanvas.getContext('2d');
+
+// Create an LFO with 2 cycles/second, amplitude = 0.5, offset = 0.5, sine shape
+const lfo = new LFO({ 
+  frequency: parseFloat(lfoFrequencySlider.value), 
+  amplitude: parseFloat(lfoAmplitudeSlider.value), 
+  offset: parseFloat(lfoOffsetSlider.value), 
+  shape: lfoShapeSelect.value 
+});
+
+// Animation and update variables
+let animationFrameId = null;
+let lastFrameTime = 0;
+const historyPoints = 100;
+const lfoHistory = Array(historyPoints).fill(lfo.offset);
+let sendLfoToMidi = false;
+
+// Update LFO parameters based on UI controls
+function updateLfoParameters() {
+  const frequency = parseFloat(lfoFrequencySlider.value);
+  const amplitude = parseFloat(lfoAmplitudeSlider.value);
+  const offset = parseFloat(lfoOffsetSlider.value);
+  const shape = lfoShapeSelect.value;
+  
+  lfo.setFrequency(frequency);
+  lfo.setAmplitude(amplitude);
+  lfo.setOffset(offset);
+  lfo.setShape(shape);
+  
+  // Update display values
+  lfoFrequencyValue.textContent = `${frequency.toFixed(1)} Hz`;
+  lfoAmplitudeValue.textContent = amplitude.toFixed(2);
+  lfoOffsetValue.textContent = offset.toFixed(2);
+}
+
+// Draw the LFO waveform on the canvas
+function drawLfoVisualization() {
+  const { width, height } = lfoCanvas;
+  
+  // Clear the canvas
+  lfoCanvasCtx.clearRect(0, 0, width, height);
+  
+  // Draw the center line
+  lfoCanvasCtx.beginPath();
+  lfoCanvasCtx.strokeStyle = '#ccc';
+  lfoCanvasCtx.moveTo(0, height / 2);
+  lfoCanvasCtx.lineTo(width, height / 2);
+  lfoCanvasCtx.stroke();
+  
+  // Draw min/max lines
+  lfoCanvasCtx.beginPath();
+  lfoCanvasCtx.strokeStyle = '#eee';
+  lfoCanvasCtx.moveTo(0, 10);
+  lfoCanvasCtx.lineTo(width, 10);
+  lfoCanvasCtx.moveTo(0, height - 10);
+  lfoCanvasCtx.lineTo(width, height - 10);
+  lfoCanvasCtx.stroke();
+  
+  // Draw the LFO waveform
+  lfoCanvasCtx.beginPath();
+  lfoCanvasCtx.strokeStyle = '#0078d7';
+  lfoCanvasCtx.lineWidth = 2;
+  
+  for (let i = 0; i < historyPoints; i++) {
+    const x = (i / (historyPoints - 1)) * width;
+    // Map value from 0-1 to canvas height
+    const y = height - ((lfoHistory[i] * 0.8 * height) + 0.1 * height);
+    
+    if (i === 0) {
+      lfoCanvasCtx.moveTo(x, y);
+    } else {
+      lfoCanvasCtx.lineTo(x, y);
+    }
+  }
+  
+  lfoCanvasCtx.stroke();
+  
+  // Draw the current value point
+  const currentValue = lfoHistory[lfoHistory.length - 1];
+  const x = width - 5;
+  const y = height - ((currentValue * 0.8 * height) + 0.1 * height);
+  
+  lfoCanvasCtx.beginPath();
+  lfoCanvasCtx.fillStyle = '#ff4500';
+  lfoCanvasCtx.arc(x, y, 6, 0, Math.PI * 2);
+  lfoCanvasCtx.fill();
+}
+
+// Animation loop for the LFO
+function lfoAnimationLoop(timestamp) {
+  if (!lastFrameTime) lastFrameTime = timestamp;
+  
+  // Calculate delta time in seconds
+  const deltaTime = (timestamp - lastFrameTime) / 1000;
+  lastFrameTime = timestamp;
+  
+  // Update LFO
+  const currentValue = lfo.update(deltaTime);
+  
+  // Update history array (shift values to the left and add new value at the end)
+  lfoHistory.shift();
+  lfoHistory.push(currentValue);
+  
+  // Update display
+  lfoCurrentValue.textContent = currentValue.toFixed(3);
+  drawLfoVisualization();
+  
+  // Send to MIDI if enabled
+  if (sendLfoToMidi) {
+    const ccValue = Math.round(currentValue * 127); // Scale to 0-127 MIDI range
+    const ccNumber = parseInt(lfoCcNumberSelect.value);
+    
+    midiBus.controlChange({ 
+      channel: 1,
+      controller: ccNumber,
+      value: Math.min(127, Math.max(0, ccValue)) // Ensure within MIDI range
+    });
+  }
+  
+  // Continue animation
+  animationFrameId = requestAnimationFrame(lfoAnimationLoop);
+}
+
+// Start LFO animation
+function startLfoAnimation() {
+  if (!animationFrameId) {
+    lastFrameTime = 0;
+    animationFrameId = requestAnimationFrame(lfoAnimationLoop);
+  }
+}
+
+// Stop LFO animation
+function stopLfoAnimation() {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+}
+
+// Setup LFO event listeners
+function setupLfoControls() {
+  // Frequency slider
+  lfoFrequencySlider.addEventListener('input', updateLfoParameters);
+  
+  // Amplitude slider
+  lfoAmplitudeSlider.addEventListener('input', updateLfoParameters);
+  
+  // Offset slider
+  lfoOffsetSlider.addEventListener('input', updateLfoParameters);
+  
+  // Shape select
+  lfoShapeSelect.addEventListener('change', updateLfoParameters);
+  
+  // MIDI CC checkbox
+  lfoToMidiCheckbox.addEventListener('change', () => {
+    sendLfoToMidi = lfoToMidiCheckbox.checked;
+    logEvent('lfoToMidi', { enabled: sendLfoToMidi, cc: lfoCcNumberSelect.value });
+  });
+  
+  // CC Number select
+  lfoCcNumberSelect.addEventListener('change', () => {
+    if (sendLfoToMidi) {
+      logEvent('lfoMidiCcChanged', { cc: lfoCcNumberSelect.value });
+    }
+  });
+}
+
 // Initialize when the page is loaded
 document.addEventListener('DOMContentLoaded', () => {
   // Initialize MIDI and setup UI elements
@@ -399,4 +579,25 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Initialize pattern visualization
   updatePatternVisualization(patternA);
+  
+  // Setup LFO controls
+  setupLfoControls();
+  
+  // Start LFO animation
+  startLfoAnimation();
+  
+  // Example usage code in console
+  console.log('LFO Example Usage:');
+  console.log(`
+import { LFO } from './lfo.js';
+
+// Create an LFO with 2 cycles/second, amplitude = 0.5, offset = 0.5, sine shape
+const lfo = new LFO({ frequency: 2, amplitude: 0.5, offset: 0.5, shape: 'sine' });
+
+// Suppose we call update every 1/60th of a second in a render loop
+const deltaTime = 1/60;
+const currentValue = lfo.update(deltaTime);
+console.log('Current LFO value:', currentValue); 
+// ~ 0..1 range because amplitude=0.5, offset=0.5
+`);
 });
