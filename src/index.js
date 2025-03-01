@@ -5,6 +5,7 @@ export { MockPlaybackEngine } from "./engines/mock-playback-engine.js";
 export { ExplicitNotePattern } from "./patterns/explicit-note-pattern.js";
 export { LiveLoop } from "./live-loop.js";
 export { EnergyManager } from "./energy-manager.js";
+export { TransportManager } from "./transport/transport-manager.js";
 
 // New exports for harmonic and rhythmic context
 export { ChordManager } from "./chord-manager.js";
