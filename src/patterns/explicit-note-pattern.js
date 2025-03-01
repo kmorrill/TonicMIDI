@@ -74,7 +74,16 @@ export class ExplicitNotePattern extends AbstractPattern {
    * @returns {Array<{ note: string, durationStepsOrBeats: number, velocity?: number }>}
    */
   getNotes(stepIndex, context) {
-    const index = stepIndex % this.getLength();
+    const intStep = Math.floor(stepIndex); // Floor the step index for rhythm checks
+    if (
+      context &&
+      context.rhythmManager &&
+      !context.rhythmManager.isBeat(intStep)
+    ) {
+      return []; // Return empty array if not on a beat
+    }
+
+    const index = intStep % this.getLength(); // Use the floored step index for pattern logic
     // If for some reason this.notes[index] is missing or not an array, default to []
     const noteObjects = this.notes[index] || [];
 

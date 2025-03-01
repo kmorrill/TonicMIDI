@@ -162,4 +162,45 @@ describe("TransportManager", () => {
     // stepIndex should remain 0, no calls to tick
     expect(liveLoop1.tick).not.toHaveBeenCalled();
   });
+
+  it("should increment timeInBeats by 1/24 per clock pulse", () => {
+    // Start the transport
+    simulateMidiMessage([0xfa]);
+    expect(transportManager.timeInBeats).toBe(0.0);
+    
+    // Send 3 clock pulses
+    simulateMidiMessage([0xf8]);
+    simulateMidiMessage([0xf8]);
+    simulateMidiMessage([0xf8]);
+    
+    // Check that timeInBeats has increased by 3/24 = 0.125
+    expect(transportManager.timeInBeats).toBeCloseTo(0.125, 5);
+    
+    // Send 3 more pulses (total 6)
+    simulateMidiMessage([0xf8]);
+    simulateMidiMessage([0xf8]);
+    simulateMidiMessage([0xf8]);
+    
+    // Check that timeInBeats has increased to 6/24 = 0.25
+    expect(transportManager.timeInBeats).toBeCloseTo(0.25, 5);
+  });
+  
+  it("should reset timeInBeats to 0 when receiving Start message", () => {
+    // Start the transport
+    simulateMidiMessage([0xfa]);
+    
+    // Send some clock pulses to increment timeInBeats
+    for (let i = 0; i < 12; i++) {
+      simulateMidiMessage([0xf8]);
+    }
+    
+    // Verify timeInBeats has been incremented
+    expect(transportManager.timeInBeats).toBeCloseTo(0.5, 5); // 12/24 = 0.5
+    
+    // Send another Start message
+    simulateMidiMessage([0xfa]);
+    
+    // Verify timeInBeats has been reset to 0
+    expect(transportManager.timeInBeats).toBe(0.0);
+  });
 });

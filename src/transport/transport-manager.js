@@ -35,6 +35,7 @@ export class TransportManager {
     this.isRunning = false;
     this.stepIndex = 0;
     this.pulseCounter = 0;
+    this.timeInBeats = 0.0; // Continuous time counter in beats (1 beat = 1 quarter note)
 
     // Bind handler for incoming MIDI messages
     this._handleIncomingClock = this._handleIncomingClock.bind(this);
@@ -75,6 +76,7 @@ export class TransportManager {
     this.isRunning = true;
     this.stepIndex = 0;
     this.pulseCounter = 0;
+    this.timeInBeats = 0.0; // Reset the continuous time counter on start
     // Optionally: Clear any leftover notes if you want a fresh start
     // this.midiBus.stopAllNotes();
   }
@@ -96,6 +98,9 @@ export class TransportManager {
    */
   _onClockPulse() {
     if (!this.isRunning) return;
+
+    // Increment the continuous time counter (assuming 24 PPQ standard MIDI clock)
+    this.timeInBeats += 1.0 / 24.0;
 
     // If we want highest resolution, call tick() on every pulse
     if (this.highResolution) {
