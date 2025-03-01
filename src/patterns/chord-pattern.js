@@ -37,7 +37,7 @@ export class ChordPattern extends AbstractPattern {
    * 
    * @param {number} stepIndex - Current step index
    * @param {Object} context - Context object including chordManager and rhythmManager
-   * @returns {Array<{ note: string, velocity: number }>} Array of note objects
+   * @returns {Array<{ note: string, velocity: number, durationStepsOrBeats: number }>} Array of note objects
    */
   getNotes(stepIndex, context) {
     // If no context or no chord manager, return empty array
@@ -126,7 +126,8 @@ export class ChordPattern extends AbstractPattern {
     if (chord.notes && chord.notes.length) {
       return chord.notes.map(note => ({
         note,
-        velocity
+        velocity,
+        durationStepsOrBeats: 1
       }));
     }
     
@@ -155,10 +156,11 @@ export class ChordPattern extends AbstractPattern {
         break;
     }
     
-    // Convert MIDI note numbers back to note names
+    // Convert MIDI note numbers back to note names and include default duration
     return chordNotes.map(midiNote => ({
       note: this._getMidiNoteName(midiNote),
-      velocity
+      velocity,
+      durationStepsOrBeats: 1
     }));
   }
   

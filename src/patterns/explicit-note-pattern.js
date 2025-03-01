@@ -38,12 +38,19 @@ export class ExplicitNotePattern extends AbstractPattern {
    *
    * @param {number} stepIndex - Which step we are on (0-based).
    * @param {any} [context] - Unused in this pattern, but could be chord info, etc.
-   * @returns {Array<{ note: string, durationStepsOrBeats?: number }>}
+   * @returns {Array<{ note: string, durationStepsOrBeats: number }>}
    */
   getNotes(stepIndex, context) {
     const index = stepIndex % this.getLength();
-    // Return an array of length 1. You could modify this pattern to return multiple notes if needed.
-    return [this.notes[index]];
+    const noteObj = this.notes[index];
+    // Provide a default if durationStepsOrBeats doesn't exist
+    const duration = noteObj.durationStepsOrBeats ?? 1;
+
+    // Return an array with the extended object
+    return [{
+      ...noteObj,
+      durationStepsOrBeats: duration
+    }];
   }
 
   /**
