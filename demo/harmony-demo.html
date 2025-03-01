@@ -1,296 +1,319 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Harmony and Live Loops Demo</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 20px;
-      line-height: 1.6;
-      background-color: #f7f7f7;
-      color: #333;
-    }
-    
-    h1, h2, h3 {
-      border-bottom: 1px solid #ddd;
-      padding-bottom: 8px;
-      color: #222;
-    }
-    
-    .container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-    }
-    
-    .panel {
-      flex: 1;
-      min-width: 280px;
-      background-color: #fff;
-      border-radius: 8px;
-      padding: 15px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-      margin-bottom: 20px;
-    }
-    
-    .control-group {
-      margin-bottom: 15px;
-    }
-    
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: 500;
-    }
-    
-    select, input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background-color: #f9f9f9;
-    }
-    
-    button {
-      padding: 10px 15px;
-      background-color: #0078d7;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-right: 8px;
-      margin-bottom: 8px;
-    }
-    
-    button:hover {
-      background-color: #0067b8;
-    }
-    
-    button.secondary {
-      background-color: #6c757d;
-    }
-    
-    button.secondary:hover {
-      background-color: #5a6268;
-    }
-    
-    .transport-status-container {
-      display: flex;
-      align-items: center;
-      padding: 12px;
-      border-radius: 8px;
-      background-color: #e9ecef;
-      margin-bottom: 20px;
-    }
-    
-    .transport-status {
-      margin-left: 15px;
-      font-weight: 500;
-    }
-    
-    .transport-status.running {
-      color: #28a745;
-    }
-    
-    .transport-status.stopped {
-      color: #dc3545;
-    }
-    
-    .pattern-visualization {
-      display: flex;
-      gap: 4px;
-      margin-top: 10px;
-      overflow-x: auto;
-      padding-bottom: 5px;
-    }
-    
-    .step {
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background-color: #f8f9fa;
-    }
-    
-    .step.active {
-      background-color: #0078d7;
-      color: white;
-      font-weight: bold;
-    }
-    
-    .midi-channel-control {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .midi-channel-control input {
-      width: 60px;
-    }
-    
-    .current-chord {
-      font-size: 24px;
-      font-weight: bold;
-      text-align: center;
-      margin: 10px 0;
-      padding: 8px;
-      background-color: #f0f8ff;
-      border-radius: 4px;
-    }
-    
-    .log-container {
-      height: 150px;
-      overflow-y: auto;
-      border: 1px solid #ddd;
-      padding: 10px;
-      border-radius: 4px;
-      background-color: #f8f9fa;
-      font-family: monospace;
-      font-size: 12px;
-    }
-    
-    .midi-device-selector {
-      margin-bottom: 20px;
-      padding: 15px;
-      background-color: #f0f8ff;
-      border-radius: 8px;
-    }
-  </style>
-</head>
-<body>
-  <h1>Harmony and Live Loops Demo</h1>
-  
-  <div class="midi-device-selector">
-    <h2>MIDI Output</h2>
-    <select id="midi-output-select">
-      <option value="">Select MIDI Output</option>
-    </select>
-  </div>
-  
-  <div class="transport-status-container">
-    <div class="transport-status stopped" id="transport-status">Stopped (Waiting for External Transport)</div>
-  </div>
-  
-  <div class="container">
-    <div class="panel">
-      <h2>Chord Track</h2>
-      <div class="current-chord" id="current-chord">C maj7</div>
-      
-      <div class="control-group">
-        <label for="chord-progression">Chord Progression</label>
-        <select id="chord-progression">
-          <option value="simple">Simple (Cmaj7 - Fmaj7)</option>
-          <option value="pop">Pop (C - G - Am - F)</option>
-          <option value="jazz">Jazz (Cmaj7 - Dm7 - G7 - Cmaj7)</option>
-          <option value="tension">Tension (Cmaj7 - D7#11 - Ebmaj7#5 - G7b9)</option>
-        </select>
-      </div>
-      
-      <div class="control-group">
-        <label for="chord-voicing">Voicing Type</label>
-        <select id="chord-voicing">
-          <option value="close">Close Voicing</option>
-          <option value="open">Open Voicing</option>
-          <option value="spread">Spread Voicing</option>
-        </select>
-      </div>
-      
-      <div class="control-group">
-        <label for="chord-octave">Base Octave</label>
-        <select id="chord-octave">
-          <option value="2">Low (2)</option>
-          <option value="3">Medium-Low (3)</option>
-          <option value="4" selected>Medium (4)</option>
-          <option value="5">Medium-High (5)</option>
-        </select>
-      </div>
-      
-      <div class="control-group">
-        <label>MIDI Channel</label>
-        <div class="midi-channel-control">
-          <input type="number" id="chord-channel" min="1" max="16" value="8">
-          <span>(1-16)</span>
-        </div>
-      </div>
-      
-      <div class="pattern-visualization" id="chord-visualization">
-        <!-- Steps will be added by JS -->
-      </div>
-    </div>
-    
-    <div class="panel">
-      <h2>Melody Track</h2>
-      
-      <div class="control-group">
-        <label for="melody-style">Melody Style</label>
-        <select id="melody-style">
-          <option value="arpeggio">Arpeggio (Chord Tones)</option>
-          <option value="scale">Scale Run</option>
-          <option value="harmonized">Harmonized (3rds above melody)</option>
-        </select>
-      </div>
-      
-      <div class="control-group">
-        <label for="melody-octave">Octave</label>
-        <select id="melody-octave">
-          <option value="3">Low (3)</option>
-          <option value="4">Medium (4)</option>
-          <option value="5" selected>High (5)</option>
-          <option value="6">Very High (6)</option>
-        </select>
-      </div>
-      
-      <div class="control-group">
-        <label>MIDI Channel</label>
-        <div class="midi-channel-control">
-          <input type="number" id="melody-channel" min="1" max="16" value="5">
-          <span>(1-16)</span>
-        </div>
-      </div>
-      
-      <div class="pattern-visualization" id="melody-visualization">
-        <!-- Steps will be added by JS -->
-      </div>
-    </div>
-  </div>
-  
-  <div class="panel">
-    <h2>Live Loop</h2>
-    
-    <div class="control-group">
-      <label for="loop-pattern">Loop Pattern</label>
-      <select id="loop-pattern">
-        <option value="kick">Kick Pattern</option>
-        <option value="hihat">Hi-Hat Pattern</option>
-        <option value="percussion">Percussion Pattern</option>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Harmony and Live Loops Demo</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+        background-color: #f7f7f7;
+        color: #333;
+      }
+
+      h1,
+      h2,
+      h3 {
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 8px;
+        color: #222;
+      }
+
+      .container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .panel {
+        flex: 1;
+        min-width: 280px;
+        background-color: #fff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+      }
+
+      .control-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+      }
+
+      select,
+      input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #f9f9f9;
+      }
+
+      button {
+        padding: 10px 15px;
+        background-color: #0078d7;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 8px;
+        margin-bottom: 8px;
+      }
+
+      button:hover {
+        background-color: #0067b8;
+      }
+
+      button.secondary {
+        background-color: #6c757d;
+      }
+
+      button.secondary:hover {
+        background-color: #5a6268;
+      }
+
+      .transport-status-container {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        border-radius: 8px;
+        background-color: #e9ecef;
+        margin-bottom: 20px;
+      }
+
+      .transport-status {
+        margin-left: 15px;
+        font-weight: 500;
+      }
+
+      .transport-status.running {
+        color: #28a745;
+      }
+
+      .transport-status.stopped {
+        color: #dc3545;
+      }
+
+      .pattern-visualization {
+        display: flex;
+        gap: 4px;
+        margin-top: 10px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+      }
+
+      .step {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+      }
+
+      .step.active {
+        background-color: #0078d7;
+        color: white;
+        font-weight: bold;
+      }
+
+      .midi-channel-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .midi-channel-control input {
+        width: 60px;
+      }
+
+      .current-chord {
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        margin: 10px 0;
+        padding: 8px;
+        background-color: #f0f8ff;
+        border-radius: 4px;
+      }
+
+      .log-container {
+        height: 150px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        font-family: monospace;
+        font-size: 12px;
+      }
+
+      .midi-device-selector {
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: #f0f8ff;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Harmony and Live Loops Demo</h1>
+
+    <!-- SELECT MIDI OUTPUT -->
+    <div class="midi-device-selector">
+      <h2>MIDI Output</h2>
+      <select id="midi-output-select">
+        <option value="">Select MIDI Output</option>
       </select>
     </div>
-    
-    <div class="control-group">
-      <label>MIDI Channel</label>
-      <div class="midi-channel-control">
-        <input type="number" id="loop-channel" min="1" max="16" value="1">
-        <span>(1-16)</span>
+
+    <!-- TRANSPORT STATUS -->
+    <div class="transport-status-container">
+      <div class="transport-status stopped" id="transport-status">
+        Stopped (Waiting for External Transport)
       </div>
     </div>
-    
-    <div class="pattern-visualization" id="loop-visualization">
-      <!-- Steps will be added by JS -->
+
+    <!-- MAIN PANELS -->
+    <div class="container">
+      <!-- CHORD TRACK PANEL -->
+      <div class="panel">
+        <h2>Chord Track</h2>
+        <div class="current-chord" id="current-chord">C maj7</div>
+
+        <div class="control-group">
+          <label for="chord-progression">Chord Progression</label>
+          <select id="chord-progression">
+            <option value="simple">Simple (Cmaj7 - Fmaj7)</option>
+            <option value="pop">Pop (C - G - Am - F)</option>
+            <option value="jazz">Jazz (Cmaj7 - Dm7 - G7 - Cmaj7)</option>
+            <option value="tension">
+              Tension (Cmaj7 - D7#11 - Ebmaj7#5 - G7b9)
+            </option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="chord-voicing">Voicing Type</label>
+          <select id="chord-voicing">
+            <option value="close">Close Voicing</option>
+            <option value="open">Open Voicing</option>
+            <option value="spread">Spread Voicing</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="chord-octave">Base Octave</label>
+          <select id="chord-octave">
+            <option value="2">Low (2)</option>
+            <option value="3">Medium-Low (3)</option>
+            <option value="4" selected>Medium (4)</option>
+            <option value="5">Medium-High (5)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>MIDI Channel</label>
+          <div class="midi-channel-control">
+            <input
+              type="number"
+              id="chord-channel"
+              min="1"
+              max="16"
+              value="8"
+            />
+            <span>(1-16)</span>
+          </div>
+        </div>
+
+        <!-- We'll populate steps with JavaScript -->
+        <div class="pattern-visualization" id="chord-visualization"></div>
+      </div>
+
+      <!-- MELODY TRACK PANEL -->
+      <div class="panel">
+        <h2>Melody Track</h2>
+
+        <div class="control-group">
+          <label for="melody-style">Melody Style</label>
+          <select id="melody-style">
+            <option value="arpeggio">Arpeggio (Chord Tones)</option>
+            <option value="scale">Scale Run</option>
+            <option value="harmonized">Harmonized (3rds above melody)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="melody-octave">Octave</label>
+          <select id="melody-octave">
+            <option value="3">Low (3)</option>
+            <option value="4">Medium (4)</option>
+            <option value="5" selected>High (5)</option>
+            <option value="6">Very High (6)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label>MIDI Channel</label>
+          <div class="midi-channel-control">
+            <input
+              type="number"
+              id="melody-channel"
+              min="1"
+              max="16"
+              value="5"
+            />
+            <span>(1-16)</span>
+          </div>
+        </div>
+
+        <div class="pattern-visualization" id="melody-visualization"></div>
+      </div>
     </div>
-  </div>
-  
-  <div class="panel">
-    <h2>MIDI Log</h2>
-    <div class="log-container" id="midi-log"></div>
-  </div>
-  
-  <script type="module" src="./harmony-demo.js"></script>
-</body>
+
+    <!-- LIVE LOOP (PERCUSSION) PANEL -->
+    <div class="panel">
+      <h2>Live Loop</h2>
+
+      <div class="control-group">
+        <label for="loop-pattern">Loop Pattern</label>
+        <select id="loop-pattern">
+          <option value="kick">Kick Pattern</option>
+          <option value="hihat">Hi-Hat Pattern</option>
+          <option value="percussion">Percussion Pattern</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>MIDI Channel</label>
+        <div class="midi-channel-control">
+          <input type="number" id="loop-channel" min="1" max="16" value="1" />
+          <span>(1-16)</span>
+        </div>
+      </div>
+
+      <div class="pattern-visualization" id="loop-visualization"></div>
+    </div>
+
+    <!-- MIDI LOG PANEL -->
+    <div class="panel">
+      <h2>MIDI Log</h2>
+      <div class="log-container" id="midi-log"></div>
+    </div>
+
+    <!-- The main script that sets up everything -->
+    <script type="module" src="./harmony-demo.js"></script>
+  </body>
 </html>

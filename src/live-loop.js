@@ -154,24 +154,13 @@ export class LiveLoop {
           // We found an already-active note with the same pitch + channel
           const existingNoteObj = this.activeNotes[existingNoteIndex];
 
-          if (stepIndex < existingNoteObj.endStep) {
-            // The note is still playing -- so do NOT retrigger!
-            // If the new duration extends beyond the old endStep, update it:
-            if (endStep > existingNoteObj.endStep) {
-              existingNoteObj.endStep = endStep;
-            }
-            // Skip further processing for this note, so we don't send noteOn again
-            continue;
-          } else {
-            // It's no longer active (stepIndex >= endStep), so let's do a fresh trigger
-            // Send noteOff (if it hasn't already been turned off)
-            this.midiBus.noteOff({
-              channel: existingNoteObj.channel,
-              note: existingNoteObj.note,
-            });
-            // Remove it from activeNotes
-            this.activeNotes.splice(existingNoteIndex, 1);
-          }
+          // Always send noteOff when the same note is retriggered
+          this.midiBus.noteOff({
+            channel: existingNoteObj.channel,
+            note: existingNoteObj.note,
+          });
+          // Remove it from activeNotes
+          this.activeNotes.splice(existingNoteIndex, 1);
         }
 
         // If we reach here, either it's not active or it just ended. So do a new noteOn:
