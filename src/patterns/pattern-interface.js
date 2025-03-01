@@ -10,7 +10,7 @@
  *
  *   export class MyPattern extends AbstractPattern {
  *     getNotes(stepIndex, context) {
- *       // return an array of { note: string, durationStepsOrBeats?: number }
+ *       // return an array of { note: string, durationSteps?: number }
  *     }
  *     getLength() {
  *       // return total number of steps in pattern
@@ -21,7 +21,7 @@
 /**
  * @typedef {Object} PatternNote
  * @property {string} note - A note name (e.g., "C4", "D#3", or a drum note like "C1").
- * @property {number} [durationStepsOrBeats] - (Optional) How many steps or beats the note should last.
+ * @property {number} [durationSteps] - (Optional) How many integer steps the note should last.
  */
 
 /**

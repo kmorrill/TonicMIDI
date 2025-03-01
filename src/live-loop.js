@@ -21,9 +21,9 @@
  * 
  * Added for Note Duration Management:
  *  - An 'activeNotes' array to track currently playing notes
- *  - Each note stores its endStep, calculated from stepIndex + (noteObj.durationStepsOrBeats || 1)
- *  - At each tick, checks for expired notes (endStep <= currentStep) and sends noteOff
- *  - This ensures proper note duration timing based on step count
+ *  - Each note stores its endStep, calculated from stepIndex + (noteObj.durationSteps || 1)
+ *  - At each tick, checks for expired notes (stepIndex >= endStep) and sends noteOff
+ *  - Using strictly integer step durations for reliability
  */
 
 export class LiveLoop {
@@ -135,8 +135,10 @@ export class LiveLoop {
         midiNote = Math.max(0, Math.min(127, midiNote));
         
         // Calculate endStep based on duration (default to 1 if not specified)
-        const duration = noteObj.durationStepsOrBeats ?? 1;
-        const endStep = stepIndex + duration;
+        // Handle either new or old duration property name for backward compatibility
+        const duration = noteObj.durationSteps ?? noteObj.durationStepsOrBeats ?? 1;
+        // Ensure integer step durations
+        const endStep = stepIndex + Math.floor(duration);
         
         // Velocity (use default if not specified)
         const velocity = noteObj.velocity ?? 100;
@@ -204,7 +206,7 @@ export class LiveLoop {
     const stillActive = [];
     for (let noteObj of this.activeNotes) {
       if (stepIndex >= noteObj.endStep) {
-        // Time to noteOff
+        // Time to noteOff when we reach or pass the end step
         this.midiBus.noteOff({
           channel: noteObj.channel,
           note: noteObj.note

@@ -14,12 +14,12 @@ import { AbstractPattern } from "./pattern-interface.js";
 
 export class ExplicitNotePattern extends AbstractPattern {
   /**
-   * @param {Array<string|{note: string, durationStepsOrBeats?: number, velocity?: number}|Array<string|{note: string, durationStepsOrBeats?: number, velocity?: number}>>} notesArray
+   * @param {Array<string|{note: string, durationSteps?: number, velocity?: number}|Array<string|{note: string, durationSteps?: number, velocity?: number}>>} notesArray
    *   An array of note definitions. Each item can be:
    *     - A string like "C4" (will be converted internally to { note: "C4" })
-   *     - An object like { note: "C4", durationStepsOrBeats: 2 }
+   *     - An object like { note: "C4", durationSteps: 2 }
    *     - An array of strings or objects for multiple notes per step: ["C4", "E4", "G4"]
-   *     - An array of note objects: [{ note: "C4", durationStepsOrBeats: 2 }, { note: "E4", durationStepsOrBeats: 3 }]
+   *     - An array of note objects: [{ note: "C4", durationSteps: 2 }, { note: "E4", durationSteps: 3 }]
    *
    * @example
    *   // Simple sequence of single notes
@@ -28,20 +28,20 @@ export class ExplicitNotePattern extends AbstractPattern {
    *   // Single notes with durations
    *   new ExplicitNotePattern([
    *     { note: "C4" },
-   *     { note: "E4", durationStepsOrBeats: 1 },
+   *     { note: "E4", durationSteps: 1 },
    *     { note: "G4" }
    *   ]);
    *
    *   // Multiple notes per step (chords)
    *   new ExplicitNotePattern([
-   *     [{ note: "C4", durationStepsOrBeats: 2 }, { note: "E4", durationStepsOrBeats: 2 }, { note: "G4", durationStepsOrBeats: 2 }],
-   *     [{ note: "F4", durationStepsOrBeats: 3 }, { note: "A4", durationStepsOrBeats: 3 }, { note: "C5", durationStepsOrBeats: 3 }]
+   *     [{ note: "C4", durationSteps: 2 }, { note: "E4", durationSteps: 2 }, { note: "G4", durationSteps: 2 }],
+   *     [{ note: "F4", durationSteps: 3 }, { note: "A4", durationSteps: 3 }, { note: "C5", durationSteps: 3 }]
    *   ]);
    *
    *   // Mixed single notes and chords
    *   new ExplicitNotePattern([
-   *     { note: "C4", durationStepsOrBeats: 1 },
-   *     [{ note: "E4", durationStepsOrBeats: 2 }, { note: "G4", durationStepsOrBeats: 2 }],
+   *     { note: "C4", durationSteps: 1 },
+   *     [{ note: "E4", durationSteps: 2 }, { note: "G4", durationSteps: 2 }],
    *     "B4"
    *   ]);
    */
@@ -71,7 +71,7 @@ export class ExplicitNotePattern extends AbstractPattern {
    *
    * @param {number} stepIndex - Which step we are on (0-based).
    * @param {any} [context] - Unused in this pattern, but could be chord info, etc.
-   * @returns {Array<{ note: string, durationStepsOrBeats: number, velocity?: number }>}
+   * @returns {Array<{ note: string, durationSteps: number, velocity?: number }>}
    */
   getNotes(stepIndex, context) {
     const intStep = Math.floor(stepIndex); // Floor the step index for rhythm checks
@@ -93,10 +93,14 @@ export class ExplicitNotePattern extends AbstractPattern {
     );
 
     // Now map safely
-    return validNoteObjects.map((noteObj) => ({
-      ...noteObj,
-      durationStepsOrBeats: noteObj.durationStepsOrBeats ?? 1,
-    }));
+    return validNoteObjects.map((noteObj) => {
+      // Check for old property name and migrate it
+      const duration = noteObj.durationSteps ?? noteObj.durationStepsOrBeats ?? 1;
+      return {
+        ...noteObj,
+        durationSteps: Math.floor(duration), // Ensure integer steps
+      };
+    });
   }
 
   /**

@@ -101,7 +101,7 @@ describe("MockPlaybackEngine", () => {
     const patternMock = {
       getNotes: (stepIndex) => {
         if (stepIndex === 0) {
-          return [{ note: "C4", durationStepsOrBeats: 2 }]; // Note with 2-step duration
+          return [{ note: "C4", durationSteps: 2 }]; // Note with 2-step duration
         }
         return []; // No new notes on other steps
       },

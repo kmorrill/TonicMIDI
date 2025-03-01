@@ -12,7 +12,7 @@
  *    - If transpose != 0, should shift note values by that many semitones.
  * 7. (New) Track active notes with endStep:
  *    - Store notes with appropriate endStep in activeNotes array
- *    - Handle durations properly (using durationStepsOrBeats if provided)
+ *    - Handle durations properly (using durationSteps if provided)
  */
 
 import { jest } from "@jest/globals"; // Needed for ES module jest usage
@@ -305,9 +305,9 @@ describe("LiveLoop", () => {
       });
     });
     
-    it("uses durationStepsOrBeats to calculate endStep when provided", () => {
+    it("uses durationSteps to calculate endStep when provided", () => {
       patternMock.getNotes.mockReturnValue([
-        { note: "D4", velocity: 90, durationStepsOrBeats: 4 }
+        { note: "D4", velocity: 90, durationSteps: 4 }
       ]);
       
       liveLoop.tick(10, 0.25); // stepIndex = 10
@@ -316,16 +316,16 @@ describe("LiveLoop", () => {
       expect(liveLoop.activeNotes[0]).toEqual({
         note: 62, // D4 is MIDI 62
         velocity: 90,
-        endStep: 14, // stepIndex(10) + durationStepsOrBeats(4)
+        endStep: 14, // stepIndex(10) + durationSteps(4)
         channel: 1
       });
     });
     
     it("adds multiple notes to activeNotes with correct endSteps", () => {
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationStepsOrBeats: 2 },
-        { note: "E4", velocity: 90, durationStepsOrBeats: 1 },
-        { note: "G4", velocity: 100, durationStepsOrBeats: 3 }
+        { note: "C4", velocity: 80, durationSteps: 2 },
+        { note: "E4", velocity: 90, durationSteps: 1 },
+        { note: "G4", velocity: 100, durationSteps: 3 }
       ]);
       
       liveLoop.tick(8, 0.25); // stepIndex = 8
@@ -334,19 +334,19 @@ describe("LiveLoop", () => {
       expect(liveLoop.activeNotes[0]).toEqual({
         note: 60, // C4
         velocity: 80,
-        endStep: 10, // stepIndex(8) + durationStepsOrBeats(2)
+        endStep: 10, // stepIndex(8) + durationSteps(2)
         channel: 1
       });
       expect(liveLoop.activeNotes[1]).toEqual({
         note: 64, // E4
         velocity: 90,
-        endStep: 9, // stepIndex(8) + durationStepsOrBeats(1)
+        endStep: 9, // stepIndex(8) + durationSteps(1)
         channel: 1
       });
       expect(liveLoop.activeNotes[2]).toEqual({
         note: 67, // G4
         velocity: 100,
-        endStep: 11, // stepIndex(8) + durationStepsOrBeats(3)
+        endStep: 11, // stepIndex(8) + durationSteps(3)
         channel: 1
       });
     });
@@ -355,7 +355,7 @@ describe("LiveLoop", () => {
       liveLoop.setMuted(true);
       
       patternMock.getNotes.mockReturnValue([
-        { note: "A4", velocity: 85, durationStepsOrBeats: 2 }
+        { note: "A4", velocity: 85, durationSteps: 2 }
       ]);
       
       liveLoop.tick(4, 0.25);
@@ -368,7 +368,7 @@ describe("LiveLoop", () => {
       expect(liveLoop.activeNotes[0]).toEqual({
         note: 69, // A4
         velocity: 85,
-        endStep: 6, // stepIndex(4) + durationStepsOrBeats(2)
+        endStep: 6, // stepIndex(4) + durationSteps(2)
         channel: 1
       });
     });
@@ -377,7 +377,7 @@ describe("LiveLoop", () => {
       liveLoop.setTranspose(3); // Up 3 semitones
       
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 100, durationStepsOrBeats: 2 }
+        { note: "C4", velocity: 100, durationSteps: 2 }
       ]);
       
       liveLoop.tick(2, 0.25);
@@ -386,7 +386,7 @@ describe("LiveLoop", () => {
       expect(liveLoop.activeNotes[0]).toEqual({
         note: 63, // C4(60) + transpose(3)
         velocity: 100,
-        endStep: 4, // stepIndex(2) + durationStepsOrBeats(2)
+        endStep: 4, // stepIndex(2) + durationSteps(2)
         channel: 1
       });
     });
@@ -394,7 +394,7 @@ describe("LiveLoop", () => {
     it("handles zero-step durations by immediately turning notes off", () => {
       // Set up a pattern that returns a note with zero duration
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationStepsOrBeats: 0 }
+        { note: "C4", velocity: 80, durationSteps: 0 }
       ]);
       
       // Execute tick and capture noteOn/noteOff order
@@ -423,9 +423,9 @@ describe("LiveLoop", () => {
       
       // Step 0: Add 3 notes with different durations
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationStepsOrBeats: 2 }, // Ends at step 2
-        { note: "E4", velocity: 90, durationStepsOrBeats: 3 }, // Ends at step 3
-        { note: "G4", velocity: 100, durationStepsOrBeats: 4 } // Ends at step 4
+        { note: "C4", velocity: 80, durationSteps: 2 }, // Ends at step 2
+        { note: "E4", velocity: 90, durationSteps: 3 }, // Ends at step 3
+        { note: "G4", velocity: 100, durationSteps: 4 } // Ends at step 4
       ]);
       
       liveLoop.tick(0, 0.25); // stepIndex = 0
@@ -439,7 +439,7 @@ describe("LiveLoop", () => {
       
       // Step 1: Add a new overlapping note
       patternMock.getNotes.mockReturnValue([
-        { note: "D4", velocity: 85, durationStepsOrBeats: 2 } // Ends at step 3
+        { note: "D4", velocity: 85, durationSteps: 2 } // Ends at step 3
       ]);
       
       liveLoop.tick(1, 0.25); // stepIndex = 1
@@ -515,7 +515,7 @@ describe("LiveLoop", () => {
       
       // Step 0: Add a C4 note with 3-step duration
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationStepsOrBeats: 3 } // Ends at step 3
+        { note: "C4", velocity: 80, durationSteps: 3 } // Ends at step 3
       ]);
       
       liveLoop.tick(0, 0.25); // stepIndex = 0
@@ -530,7 +530,7 @@ describe("LiveLoop", () => {
       
       // Step 1: Retrigger the same C4 note with 2-step duration
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 90, durationStepsOrBeats: 2 } // Ends at step 3
+        { note: "C4", velocity: 90, durationSteps: 2 } // Ends at step 3
       ]);
       
       liveLoop.tick(1, 0.25); // stepIndex = 1
@@ -690,7 +690,7 @@ describe("LiveLoop", () => {
       
       // Add new note at step 4
       patternMock.getNotes.mockReturnValue([
-        { note: "E4", velocity: 90, durationStepsOrBeats: 2 }
+        { note: "E4", velocity: 90, durationSteps: 2 }
       ]);
       
       // Tick at step 4
@@ -724,7 +724,7 @@ describe("LiveLoop", () => {
       
       // Add a new note with explicit 1-step duration
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationStepsOrBeats: 1 }
+        { note: "C4", velocity: 80, durationSteps: 1 }
       ]);
       
       // Tick at step 5

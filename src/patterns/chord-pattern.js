@@ -41,7 +41,7 @@ export class ChordPattern extends AbstractPattern {
    *
    * @param {number} stepIndex - Current step index
    * @param {Object} context - Context object including chordManager and rhythmManager
-   * @returns {Array<{ note: string, velocity: number, durationStepsOrBeats: number }>} Array of note objects
+   * @returns {Array<{ note: string, velocity: number, durationSteps: number }>} Array of note objects
    */
   getNotes(stepIndex, context) {
     // If no context or no chord manager, return empty array
@@ -126,7 +126,7 @@ export class ChordPattern extends AbstractPattern {
    * @private
    * @param {Object} chord - Chord object from ChordManager
    * @param {number} velocity - MIDI velocity for the notes
-   * @returns {Array<{ note: string, velocity: number, durationStepsOrBeats: number }>} Array of note objects
+   * @returns {Array<{ note: string, velocity: number, durationSteps: number }>} Array of note objects
    */
   _generateChordNotes(chord, velocity) {
     const notes = [];
@@ -139,15 +139,15 @@ export class ChordPattern extends AbstractPattern {
           return {
             note: noteItem,
             velocity,
-            durationStepsOrBeats: chord.duration || 1, // Use chord's global duration if available
+            durationSteps: Math.floor(chord.duration || 1), // Use chord's global duration if available, ensure integer
           };
         } else {
           // Note item is an object with its own properties
+          const duration = noteItem.durationSteps ?? noteItem.durationStepsOrBeats ?? chord.duration ?? 1;
           return {
             note: noteItem.note,
             velocity: noteItem.velocity || velocity,
-            durationStepsOrBeats:
-              noteItem.durationStepsOrBeats || chord.duration || 1,
+            durationSteps: Math.floor(duration), // Ensure integer steps
           };
         }
       });
@@ -197,7 +197,7 @@ export class ChordPattern extends AbstractPattern {
       return {
         note: noteName,
         velocity,
-        durationStepsOrBeats: duration,
+        durationSteps: Math.floor(duration),
       };
     });
   }

@@ -7,7 +7,7 @@
 import { ChordPattern } from "../../../src/patterns/chord-pattern.js";
 
 describe("ChordPattern", () => {
-  it("returns notes with durationStepsOrBeats set to 1", () => {
+  it("returns notes with durationSteps set to 1", () => {
     const pattern = new ChordPattern({ length: 4 });
     
     // Mock chord manager
@@ -32,7 +32,7 @@ describe("ChordPattern", () => {
     // Verify notes have the expected properties
     expect(notes).toHaveLength(3);
     notes.forEach(note => {
-      expect(note).toHaveProperty("durationStepsOrBeats", 1);
+      expect(note).toHaveProperty("durationSteps", 1);
       expect(note).toHaveProperty("note");
       expect(note).toHaveProperty("velocity");
     });
