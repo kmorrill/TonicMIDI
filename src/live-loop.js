@@ -4,15 +4,14 @@
  * A LiveLoop class that:
  *  - Holds a Pattern (implements getNotes(stepIndex, context?))
  *  - Holds zero or more LFOs
- *  - On each tick, calls pattern.getNotes(...) and sends noteOn to the MIDI Bus (but no noteOff)
+ *  - On each tick, calls pattern.getNotes(...) and sends noteOn to the MIDI Bus
  *  - Updates each LFO and sends controlChange events for parameter modulation
- *  - Defers noteOff scheduling to the TransportManager
+ *  - Handles noteOff scheduling for active notes based on their duration
  *  - Allows immediate or enqueued updates of patterns and LFOs
- *  - Keeps track of active notes with their expected end steps for future noteOff processing
+ *  - Keeps track of active notes with their expected end steps for noteOff processing
  *
  * This ensures we never start/stop the transport ourselves,
- * and we do not handle note-off logic directly. The TransportManager
- * or external device controls that.
+ * and the note-off logic is handled internally based on the step index.
  *
  * Added for Energy / Tension:
  *  - A 'muted' flag to enable/disable noteOn sending (useful for layering/unlayering).
@@ -23,7 +22,8 @@
  * Added for Note Duration Management:
  *  - An 'activeNotes' array to track currently playing notes
  *  - Each note stores its endStep, calculated from stepIndex + (noteObj.durationStepsOrBeats || 1)
- *  - This enables future TransportManager improvements to handle proper noteOff timing
+ *  - At each tick, checks for expired notes (endStep <= currentStep) and sends noteOff
+ *  - This ensures proper note duration timing based on step count
  */
 
 export class LiveLoop {
@@ -99,13 +99,15 @@ export class LiveLoop {
    * stepIndex could be a step counter or pulse counter.
    * deltaTime is time since last tick (beats or seconds), for LFO updates.
    *
-   * We only send noteOn here; noteOff is deferred to TransportManager.
-   * 
-   * For each note, we:
-   * 1. Send noteOn if the loop is not muted
-   * 2. Store the note in activeNotes with calculated endStep
-   *    - endStep = stepIndex + (noteObj.durationStepsOrBeats || 1)
-   * 3. The TransportManager will later use activeNotes to send appropriate noteOff commands
+   * On each tick, we:
+   * 1. Apply any queued changes if at loop boundary
+   * 2. Get notes from the pattern for this step
+   * 3. Process new notes:
+   *    - Send noteOn if the loop is not muted
+   *    - Store the note in activeNotes with calculated endStep
+   *      (endStep = stepIndex + (noteObj.durationStepsOrBeats || 1))
+   * 4. Check activeNotes for expired notes and send noteOff for any where endStep <= stepIndex
+   * 5. Update LFOs and send controlChange events
    */
   tick(stepIndex, deltaTime) {
     // 1) Apply any queued changes if we're at loop boundary
@@ -154,8 +156,23 @@ export class LiveLoop {
         });
       }
     }
+    
+    // 5) Check for notes that need to be turned off
+    const stillActive = [];
+    for (let noteObj of this.activeNotes) {
+      if (stepIndex >= noteObj.endStep) {
+        // Time to noteOff
+        this.midiBus.noteOff({
+          channel: noteObj.channel,
+          note: noteObj.note
+        });
+      } else {
+        stillActive.push(noteObj);
+      }
+    }
+    this.activeNotes = stillActive;
 
-    // 5) Update each LFO and send controlChange
+    // 6) Update each LFO and send controlChange
     for (const lfo of this.lfos) {
       const waveValue = lfo.update(deltaTime);
       // For example, map [-1..1] => [0..127]
