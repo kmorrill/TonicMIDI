@@ -3,7 +3,7 @@
  *
  * Example pattern that cycles through a fixed array of notes.
  * It extends AbstractPattern, ensuring we implement getNotes() and getLength().
- * 
+ *
  * Now supports multiple notes per step:
  * - Each element in notesArray can be a single note or an array of notes
  * - If an array, all notes in the array will be triggered on the same step
@@ -24,20 +24,20 @@ export class ExplicitNotePattern extends AbstractPattern {
    * @example
    *   // Simple sequence of single notes
    *   new ExplicitNotePattern(["C4", "E4", "G4"]);
-   *   
+   *
    *   // Single notes with durations
    *   new ExplicitNotePattern([
    *     { note: "C4" },
    *     { note: "E4", durationStepsOrBeats: 1 },
    *     { note: "G4" }
    *   ]);
-   *   
+   *
    *   // Multiple notes per step (chords)
    *   new ExplicitNotePattern([
    *     [{ note: "C4", durationStepsOrBeats: 2 }, { note: "E4", durationStepsOrBeats: 2 }, { note: "G4", durationStepsOrBeats: 2 }],
    *     [{ note: "F4", durationStepsOrBeats: 3 }, { note: "A4", durationStepsOrBeats: 3 }, { note: "C5", durationStepsOrBeats: 3 }]
    *   ]);
-   *   
+   *
    *   // Mixed single notes and chords
    *   new ExplicitNotePattern([
    *     { note: "C4", durationStepsOrBeats: 1 },
@@ -54,10 +54,10 @@ export class ExplicitNotePattern extends AbstractPattern {
       // If it's an array, it represents multiple notes for this step
       if (Array.isArray(item)) {
         // Normalize each item in the array
-        return item.map(noteItem => 
+        return item.map((noteItem) =>
           typeof noteItem === "string" ? { note: noteItem } : noteItem
         );
-      } 
+      }
       // If it's a single item, it represents one note for this step
       else {
         return [typeof item === "string" ? { note: item } : item];
@@ -75,12 +75,18 @@ export class ExplicitNotePattern extends AbstractPattern {
    */
   getNotes(stepIndex, context) {
     const index = stepIndex % this.getLength();
-    const noteObjects = this.notes[index];
-    
-    // Ensure each note object has a valid durationStepsOrBeats value
-    return noteObjects.map(noteObj => ({
+    // If for some reason this.notes[index] is missing or not an array, default to []
+    const noteObjects = this.notes[index] || [];
+
+    // Filter out nulls before mapping
+    const validNoteObjects = noteObjects.filter(
+      (n) => n !== null && n !== undefined
+    );
+
+    // Now map safely
+    return validNoteObjects.map((noteObj) => ({
       ...noteObj,
-      durationStepsOrBeats: noteObj.durationStepsOrBeats ?? 1
+      durationStepsOrBeats: noteObj.durationStepsOrBeats ?? 1,
     }));
   }
 
