@@ -18,7 +18,7 @@
  *  - A 'transpose' (or semitone shift) to raise/lower the pitch for hype or tension changes.
  *  - Both can be changed on the fly by an EnergyManager or other orchestrator.
  *  - Support for GlobalContext with ChordManager and RhythmManager.
- * 
+ *
  * Added for Note Duration Management:
  *  - An 'activeNotes' array to track currently playing notes
  *  - Each note stores its endStep, calculated from stepIndex + (noteObj.durationSteps || 1)
@@ -38,7 +38,7 @@ export class LiveLoop {
    *
    * @property {boolean} [muted=false] - If true, loop won't send noteOn at tick.
    * @property {number} [transpose=0]  - Semitone transposition applied after note name -> MIDI #.
-   * 
+   *
    * @property {Array} [activeNotes=[]] - Internally managed array of currently playing notes with their end steps.
    *                                     Each note object contains: {note, velocity, endStep, channel}
    *
@@ -67,7 +67,7 @@ export class LiveLoop {
       midiChannel = 1,
       context = {},
       globalContext = null,
-      name = '',
+      name = "",
       muted = false,
       transpose = 0,
     } = {}
@@ -86,10 +86,10 @@ export class LiveLoop {
 
     // For queued changes that we only want to apply at a pattern boundary
     this.changeQueue = [];
-    
+
     // For tracking active notes (note, velocity, endStep, channel)
     this.activeNotes = [];
-    
+
     // For note name to MIDI number conversion
     this._initNoteToMidiMap();
   }
@@ -97,7 +97,7 @@ export class LiveLoop {
   /**
    * Called by TransportManager each "tick" or time subdivision.
    * With the updated TransportManager, this is only called at integer step boundaries.
-   * 
+   *
    * On each tick, we:
    * 1. Apply any queued changes if at loop boundary
    * 2. Get notes from the pattern for this step
@@ -107,7 +107,7 @@ export class LiveLoop {
    *      (endStep = stepIndex + (noteObj.durationStepsOrBeats || 1))
    * 4. Check activeNotes for expired notes and send noteOff for any where endStep <= stepIndex
    * 5. Update LFOs and send controlChange events
-   * 
+   *
    * @param {number} stepIndex - Current step index in the sequence (always an integer)
    * @param {number} deltaTime - Time elapsed since last update in beats
    * @param {number|null} absoluteTime - Optional absolute time position in beats
@@ -124,6 +124,7 @@ export class LiveLoop {
 
     // 4) Process notes (with or without noteOn)
     if (notes && notes.length) {
+      console.log(`[ChordLoop] step=${stepIndex} -> notes=`, notes); // Added for quick debugging
       for (const noteObj of notes) {
         // Convert note name (e.g. 'C4') to a MIDI note number
         let midiNote = this._convertNoteNameToMidi(noteObj.note);
@@ -133,75 +134,65 @@ export class LiveLoop {
 
         // Safety clamp in [0..127] (MIDI range) if desired
         midiNote = Math.max(0, Math.min(127, midiNote));
-        
+
         // Calculate endStep based on duration (default to 1 if not specified)
         // Handle either new or old duration property name for backward compatibility
-        const duration = noteObj.durationSteps ?? noteObj.durationStepsOrBeats ?? 1;
+        const duration =
+          noteObj.durationSteps ?? noteObj.durationStepsOrBeats ?? 1;
         // Ensure integer step durations
         const endStep = stepIndex + Math.floor(duration);
-        
+
         // Velocity (use default if not specified)
         const velocity = noteObj.velocity ?? 100;
 
-        // Check if this note is already active (same channel and note number)
-        const noteKey = `${this.midiChannel}_${midiNote}`;
+        // Check if this note is already active (same channel & note)
         const existingNoteIndex = this.activeNotes.findIndex(
-          n => n.channel === this.midiChannel && n.note === midiNote
+          (n) => n.channel === this.midiChannel && n.note === midiNote
         );
-        
-        // If the same note is already active, turn it off first (retrigger behavior)
+
         if (existingNoteIndex >= 0) {
-          // Send noteOff for the existing note
-          this.midiBus.noteOff({
-            channel: this.midiChannel,
-            note: midiNote
-          });
-          
-          // Remove it from activeNotes
-          this.activeNotes.splice(existingNoteIndex, 1);
-        }
-        
-        // Handle zero-duration case
-        if (duration <= 0) {
-          // For zero duration, send noteOn and immediately noteOff
-          if (!this.muted) {
-            this.midiBus.noteOn({
-              channel: this.midiChannel,
-              note: midiNote,
-              velocity: velocity,
-            });
-            
-            // Immediate noteOff
+          // We found an already-active note with the same pitch + channel
+          const existingNoteObj = this.activeNotes[existingNoteIndex];
+
+          if (stepIndex < existingNoteObj.endStep) {
+            // The note is still playing -- so do NOT retrigger!
+            // If the new duration extends beyond the old endStep, update it:
+            if (endStep > existingNoteObj.endStep) {
+              existingNoteObj.endStep = endStep;
+            }
+            // Skip further processing for this note, so we don't send noteOn again
+            continue;
+          } else {
+            // It's no longer active (stepIndex >= endStep), so let's do a fresh trigger
+            // Send noteOff (if it hasn't already been turned off)
             this.midiBus.noteOff({
-              channel: this.midiChannel,
-              note: midiNote
+              channel: existingNoteObj.channel,
+              note: existingNoteObj.note,
             });
+            // Remove it from activeNotes
+            this.activeNotes.splice(existingNoteIndex, 1);
           }
-          
-          // No need to add to activeNotes since it's already turned off
-          continue;
         }
 
-        // 1) Send noteOn immediately if not muted
+        // If we reach here, either it's not active or it just ended. So do a new noteOn:
         if (!this.muted) {
           this.midiBus.noteOn({
             channel: this.midiChannel,
             note: midiNote,
             velocity: velocity,
-            // No duration scheduling here—TransportManager handles that.
           });
         }
-        
-        // 2) Record it in activeNotes (even if muted, for future noteOff)
+
+        // Record in activeNotes so we know to turn it off later
         this.activeNotes.push({
           note: midiNote,
           velocity: velocity,
           endStep: endStep,
-          channel: this.midiChannel
+          channel: this.midiChannel,
         });
       }
     }
-    
+
     // 5) Check for notes that need to be turned off
     const stillActive = [];
     for (let noteObj of this.activeNotes) {
@@ -209,7 +200,7 @@ export class LiveLoop {
         // Time to noteOff when we reach or pass the end step
         this.midiBus.noteOff({
           channel: noteObj.channel,
-          note: noteObj.note
+          note: noteObj.note,
         });
       } else {
         stillActive.push(noteObj);
@@ -220,22 +211,22 @@ export class LiveLoop {
     // 6) Update LFOs (also happens on every pulse through updateLFOsOnly)
     this._updateLFOs(deltaTime, absoluteTime);
   }
-  
+
   /**
    * Called by TransportManager on every pulse for high-resolution LFO updates.
    * This separates the LFO updates from the note pattern logic.
-   * 
+   *
    * @param {number} deltaTime - Time elapsed since last update in beats
    * @param {number|null} absoluteTime - Optional absolute time position in beats
    */
   updateLFOsOnly(deltaTime, absoluteTime = null) {
     this._updateLFOs(deltaTime, absoluteTime);
   }
-  
+
   /**
    * Helper method to update LFOs and send CC messages.
    * Used by both tick() and updateLFOsOnly().
-   * 
+   *
    * @private
    * @param {number} deltaTime - Time elapsed since last update in beats
    * @param {number|null} absoluteTime - Optional absolute time position in beats
@@ -244,16 +235,19 @@ export class LiveLoop {
     // Update each LFO and send controlChange
     for (const lfo of this.lfos) {
       let waveValue;
-      
+
       // Check if we're using absolute time-based updates or delta time
-      if (absoluteTime !== null && typeof lfo.updateContinuousTime === 'function') {
+      if (
+        absoluteTime !== null &&
+        typeof lfo.updateContinuousTime === "function"
+      ) {
         // Use the high-resolution continuous time approach
         waveValue = lfo.updateContinuousTime(absoluteTime);
       } else {
         // Fallback to the standard delta-time based approach
         waveValue = lfo.update(deltaTime);
       }
-      
+
       // For example, map [-1..1] => [0..127]
       const ccValue = Math.max(
         0,
@@ -268,10 +262,10 @@ export class LiveLoop {
       });
     }
   }
-  
+
   /**
    * Combines local context with global context to create an effective context for patterns
-   * 
+   *
    * @private
    * @param {number} stepIndex - Current step index
    * @returns {Object} Combined context object
@@ -279,29 +273,29 @@ export class LiveLoop {
   _getEffectiveContext(stepIndex) {
     // Start with local context
     const effectiveContext = { ...this.context };
-    
+
     // If we have a global context, merge its managers
     if (this.globalContext) {
       // Add managers directly for easier access
       if (this.globalContext.chordManager) {
         effectiveContext.chordManager = this.globalContext.chordManager;
       }
-      
+
       if (this.globalContext.rhythmManager) {
         effectiveContext.rhythmManager = this.globalContext.rhythmManager;
       }
-      
+
       // Add current energy state if available
       if (this.globalContext.getEnergyState) {
         effectiveContext.energyState = this.globalContext.getEnergyState();
       }
-      
+
       // Merge any additional context from global context
       if (this.globalContext.additionalContext) {
         Object.assign(effectiveContext, this.globalContext.additionalContext);
       }
     }
-    
+
     return effectiveContext;
   }
 
@@ -341,9 +335,23 @@ export class LiveLoop {
   _initNoteToMidiMap() {
     // Maps note names to semitone values
     this._noteToSemitone = {
-      'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3,
-      'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 
-      'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11
+      C: 0,
+      "C#": 1,
+      Db: 1,
+      D: 2,
+      "D#": 3,
+      Eb: 3,
+      E: 4,
+      F: 5,
+      "F#": 6,
+      Gb: 6,
+      G: 7,
+      "G#": 8,
+      Ab: 8,
+      A: 9,
+      "A#": 10,
+      Bb: 10,
+      B: 11,
     };
   }
 
@@ -358,23 +366,23 @@ export class LiveLoop {
     if (!isNaN(noteName)) {
       return parseInt(noteName, 10);
     }
-    
+
     // Parse note name and octave
     const match = noteName.match(/^([A-G][b#]?)(\d+)$/i);
-    
+
     if (!match) {
       console.warn(`Invalid note name: ${noteName}. Defaulting to C4 (60).`);
       return 60;
     }
-    
+
     const [_, note, octave] = match;
     const semitone = this._noteToSemitone[note];
-    
+
     if (semitone === undefined) {
       console.warn(`Unknown note: ${note}. Defaulting to C.`);
       return 60;
     }
-    
+
     // Calculate MIDI note number: (octave+1)*12 + semitone
     return (parseInt(octave, 10) + 1) * 12 + semitone;
   }
@@ -428,7 +436,7 @@ export class LiveLoop {
       this.changeQueue.push({ type: "setContext", context });
     }
   }
-  
+
   /**
    * Set or update the global context.
    * @param {object} globalContext - New global context to use
@@ -454,7 +462,7 @@ export class LiveLoop {
   setTranspose(semitones) {
     this.transpose = semitones;
   }
-  
+
   /**
    * Set the name of this loop, useful for targeting by EnergyManager.
    * @param {string} name - The name for this loop
