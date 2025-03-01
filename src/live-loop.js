@@ -8,9 +8,10 @@
  *  - Updates each LFO and sends controlChange events for parameter modulation
  *  - Defers noteOff scheduling to the TransportManager
  *  - Allows immediate or enqueued updates of patterns and LFOs
+ *  - Keeps track of active notes with their expected end steps for future noteOff processing
  *
  * This ensures we never start/stop the transport ourselves,
- * and we do not handle note-off logic. The TransportManager
+ * and we do not handle note-off logic directly. The TransportManager
  * or external device controls that.
  *
  * Added for Energy / Tension:
@@ -18,6 +19,11 @@
  *  - A 'transpose' (or semitone shift) to raise/lower the pitch for hype or tension changes.
  *  - Both can be changed on the fly by an EnergyManager or other orchestrator.
  *  - Support for GlobalContext with ChordManager and RhythmManager.
+ * 
+ * Added for Note Duration Management:
+ *  - An 'activeNotes' array to track currently playing notes
+ *  - Each note stores its endStep, calculated from stepIndex + (noteObj.durationStepsOrBeats || 1)
+ *  - This enables future TransportManager improvements to handle proper noteOff timing
  */
 
 export class LiveLoop {
@@ -32,6 +38,9 @@ export class LiveLoop {
    *
    * @property {boolean} [muted=false] - If true, loop won't send noteOn at tick.
    * @property {number} [transpose=0]  - Semitone transposition applied after note name -> MIDI #.
+   * 
+   * @property {Array} [activeNotes=[]] - Internally managed array of currently playing notes with their end steps.
+   *                                     Each note object contains: {note, velocity, endStep, channel}
    *
    * Example usage:
    *   const loop = new LiveLoop(midiBus, {
@@ -78,6 +87,9 @@ export class LiveLoop {
     // For queued changes that we only want to apply at a pattern boundary
     this.changeQueue = [];
     
+    // For tracking active notes (note, velocity, endStep, channel)
+    this.activeNotes = [];
+    
     // For note name to MIDI number conversion
     this._initNoteToMidiMap();
   }
@@ -88,6 +100,12 @@ export class LiveLoop {
    * deltaTime is time since last tick (beats or seconds), for LFO updates.
    *
    * We only send noteOn here; noteOff is deferred to TransportManager.
+   * 
+   * For each note, we:
+   * 1. Send noteOn if the loop is not muted
+   * 2. Store the note in activeNotes with calculated endStep
+   *    - endStep = stepIndex + (noteObj.durationStepsOrBeats || 1)
+   * 3. The TransportManager will later use activeNotes to send appropriate noteOff commands
    */
   tick(stepIndex, deltaTime) {
     // 1) Apply any queued changes if we're at loop boundary
@@ -99,8 +117,8 @@ export class LiveLoop {
     // 3) Always get notes from the pattern for this step, even when muted
     const notes = this.pattern.getNotes(stepIndex, effectiveContext);
 
-    // 4) Send noteOn only if not muted
-    if (!this.muted && notes && notes.length) {
+    // 4) Process notes (with or without noteOn)
+    if (notes && notes.length) {
       for (const noteObj of notes) {
         // Convert note name (e.g. 'C4') to a MIDI note number
         let midiNote = this._convertNoteNameToMidi(noteObj.note);
@@ -110,12 +128,29 @@ export class LiveLoop {
 
         // Safety clamp in [0..127] (MIDI range) if desired
         midiNote = Math.max(0, Math.min(127, midiNote));
+        
+        // Calculate endStep based on duration (default to 1 if not specified)
+        const endStep = stepIndex + (noteObj.durationStepsOrBeats || 1);
+        
+        // Velocity (use default if not specified)
+        const velocity = noteObj.velocity ?? 100;
 
-        this.midiBus.noteOn({
-          channel: this.midiChannel,
+        // 1) Send noteOn immediately if not muted
+        if (!this.muted) {
+          this.midiBus.noteOn({
+            channel: this.midiChannel,
+            note: midiNote,
+            velocity: velocity,
+            // No duration scheduling here—TransportManager handles that.
+          });
+        }
+        
+        // 2) Record it in activeNotes (even if muted, for future noteOff)
+        this.activeNotes.push({
           note: midiNote,
-          velocity: noteObj.velocity ?? 100,
-          // No duration scheduling here—TransportManager handles that.
+          velocity: velocity,
+          endStep: endStep,
+          channel: this.midiChannel
         });
       }
     }

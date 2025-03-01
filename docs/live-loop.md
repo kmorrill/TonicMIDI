@@ -264,3 +264,35 @@ setInterval(() => {
 - Testing: Rely on mocking the MIDI Bus, Pattern, and LFO. Validate correct calls in tick().
 
 With this LiveLoop design, you have a clean domain object that handles pattern-based note triggers and LFO-based parameter modulation while respecting external transport control and TransportManager responsibilities.
+
+## Note Duration Management (New in v1.1)
+
+LiveLoop now features enhanced note duration management through the `activeNotes` array:
+
+1. **Active Notes Storage**: Each LiveLoop maintains an `activeNotes` array that tracks notes that have been sent but not yet turned off.
+
+2. **End Step Calculation**: For each note played, the LiveLoop records:
+   - The MIDI note number
+   - The velocity 
+   - The calculated `endStep` (when the note should end)
+   - The MIDI channel
+
+3. **Duration Specification**: Notes returned by patterns can now specify their duration via the `durationStepsOrBeats` property. If not provided, a default duration of 1 step is used.
+
+Example of activeNotes data structure:
+```javascript
+// After playing a quarter note C4 at step 8 and a half note E4
+liveLoop.activeNotes = [
+  { note: 60, velocity: 100, endStep: 9, channel: 1 },  // C4 quarter note 
+  { note: 64, velocity: 80, endStep: 10, channel: 1 }   // E4 half note
+];
+```
+
+4. **Implementation Details**:
+   - Note objects are added to `activeNotes` even when the loop is muted
+   - The transpose value is applied to the stored note values
+   - The TransportManager will later use this data to properly schedule noteOff messages
+
+5. **Pattern Interface Update**:
+   - Patterns can now return notes with a `durationStepsOrBeats` property
+   - Example: `{ note: 'C4', velocity: 80, durationStepsOrBeats: 2 }`

@@ -10,6 +10,9 @@
  * 6. (New) Respect 'muted' and 'transpose' fields for hype/tension layering:
  *    - If muted, should not send noteOn.
  *    - If transpose != 0, should shift note values by that many semitones.
+ * 7. (New) Track active notes with endStep:
+ *    - Store notes with appropriate endStep in activeNotes array
+ *    - Handle durations properly (using durationStepsOrBeats if provided)
  */
 
 import { jest } from "@jest/globals"; // Needed for ES module jest usage
@@ -272,6 +275,110 @@ describe("LiveLoop", () => {
         channel: 1,
         note: 127, // clamped
         velocity: 80,
+      });
+    });
+  });
+  
+  describe("activeNotes tracking", () => {
+    it("adds notes to activeNotes array with default endStep (stepIndex + 1)", () => {
+      patternMock.getNotes.mockReturnValue([
+        { note: "C4", velocity: 80 }
+      ]);
+      
+      liveLoop.tick(5, 0.25); // stepIndex = 5
+      
+      expect(liveLoop.activeNotes).toHaveLength(1);
+      expect(liveLoop.activeNotes[0]).toEqual({
+        note: 60, // C4 is MIDI 60
+        velocity: 80,
+        endStep: 6, // stepIndex(5) + 1
+        channel: 1
+      });
+    });
+    
+    it("uses durationStepsOrBeats to calculate endStep when provided", () => {
+      patternMock.getNotes.mockReturnValue([
+        { note: "D4", velocity: 90, durationStepsOrBeats: 4 }
+      ]);
+      
+      liveLoop.tick(10, 0.25); // stepIndex = 10
+      
+      expect(liveLoop.activeNotes).toHaveLength(1);
+      expect(liveLoop.activeNotes[0]).toEqual({
+        note: 62, // D4 is MIDI 62
+        velocity: 90,
+        endStep: 14, // stepIndex(10) + durationStepsOrBeats(4)
+        channel: 1
+      });
+    });
+    
+    it("adds multiple notes to activeNotes with correct endSteps", () => {
+      patternMock.getNotes.mockReturnValue([
+        { note: "C4", velocity: 80, durationStepsOrBeats: 2 },
+        { note: "E4", velocity: 90, durationStepsOrBeats: 1 },
+        { note: "G4", velocity: 100, durationStepsOrBeats: 3 }
+      ]);
+      
+      liveLoop.tick(8, 0.25); // stepIndex = 8
+      
+      expect(liveLoop.activeNotes).toHaveLength(3);
+      expect(liveLoop.activeNotes[0]).toEqual({
+        note: 60, // C4
+        velocity: 80,
+        endStep: 10, // stepIndex(8) + durationStepsOrBeats(2)
+        channel: 1
+      });
+      expect(liveLoop.activeNotes[1]).toEqual({
+        note: 64, // E4
+        velocity: 90,
+        endStep: 9, // stepIndex(8) + durationStepsOrBeats(1)
+        channel: 1
+      });
+      expect(liveLoop.activeNotes[2]).toEqual({
+        note: 67, // G4
+        velocity: 100,
+        endStep: 11, // stepIndex(8) + durationStepsOrBeats(3)
+        channel: 1
+      });
+    });
+    
+    it("adds notes to activeNotes even when muted", () => {
+      liveLoop.setMuted(true);
+      
+      patternMock.getNotes.mockReturnValue([
+        { note: "A4", velocity: 85, durationStepsOrBeats: 2 }
+      ]);
+      
+      liveLoop.tick(4, 0.25);
+      
+      // Should not send noteOn
+      expect(midiBusMock.noteOn).not.toHaveBeenCalled();
+      
+      // But should still add to activeNotes
+      expect(liveLoop.activeNotes).toHaveLength(1);
+      expect(liveLoop.activeNotes[0]).toEqual({
+        note: 69, // A4
+        velocity: 85,
+        endStep: 6, // stepIndex(4) + durationStepsOrBeats(2)
+        channel: 1
+      });
+    });
+    
+    it("applies transpose to notes stored in activeNotes", () => {
+      liveLoop.setTranspose(3); // Up 3 semitones
+      
+      patternMock.getNotes.mockReturnValue([
+        { note: "C4", velocity: 100, durationStepsOrBeats: 2 }
+      ]);
+      
+      liveLoop.tick(2, 0.25);
+      
+      expect(liveLoop.activeNotes).toHaveLength(1);
+      expect(liveLoop.activeNotes[0]).toEqual({
+        note: 63, // C4(60) + transpose(3)
+        velocity: 100,
+        endStep: 4, // stepIndex(2) + durationStepsOrBeats(2)
+        channel: 1
       });
     });
   });
