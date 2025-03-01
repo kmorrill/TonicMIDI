@@ -390,6 +390,173 @@ describe("LiveLoop", () => {
         channel: 1
       });
     });
+    
+    it("handles zero-step durations by immediately turning notes off", () => {
+      // Set up a pattern that returns a note with zero duration
+      patternMock.getNotes.mockReturnValue([
+        { note: "C4", velocity: 80, durationStepsOrBeats: 0 }
+      ]);
+      
+      // Execute tick and capture noteOn/noteOff order
+      liveLoop.tick(5, 0.25);
+      
+      // Should still send noteOn
+      expect(midiBusMock.noteOn).toHaveBeenCalledWith({
+        channel: 1,
+        note: 60, // C4
+        velocity: 80
+      });
+      
+      // Should send noteOff immediately since endStep would be 5 (same as current step)
+      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
+        channel: 1,
+        note: 60
+      });
+      
+      // Should not keep the note in activeNotes
+      expect(liveLoop.activeNotes).toHaveLength(0);
+    });
+    
+    it("handles multiple notes with different durations across multiple steps", () => {
+      // Reset activeNotes
+      liveLoop.activeNotes = [];
+      
+      // Step 0: Add 3 notes with different durations
+      patternMock.getNotes.mockReturnValue([
+        { note: "C4", velocity: 80, durationStepsOrBeats: 2 }, // Ends at step 2
+        { note: "E4", velocity: 90, durationStepsOrBeats: 3 }, // Ends at step 3
+        { note: "G4", velocity: 100, durationStepsOrBeats: 4 } // Ends at step 4
+      ]);
+      
+      liveLoop.tick(0, 0.25); // stepIndex = 0
+      
+      // Should have 3 notes in activeNotes
+      expect(liveLoop.activeNotes).toHaveLength(3);
+      
+      // Clear mocks for next step
+      midiBusMock.noteOn.mockClear();
+      midiBusMock.noteOff.mockClear();
+      
+      // Step 1: Add a new overlapping note
+      patternMock.getNotes.mockReturnValue([
+        { note: "D4", velocity: 85, durationStepsOrBeats: 2 } // Ends at step 3
+      ]);
+      
+      liveLoop.tick(1, 0.25); // stepIndex = 1
+      
+      // Should still have 4 active notes (all from steps 0 and 1)
+      expect(liveLoop.activeNotes).toHaveLength(4);
+      
+      // Clear mocks for next step
+      midiBusMock.noteOn.mockClear();
+      midiBusMock.noteOff.mockClear();
+      
+      // Step 2: First note (C4) should turn off
+      patternMock.getNotes.mockReturnValue([]);
+      
+      liveLoop.tick(2, 0.25); // stepIndex = 2
+      
+      // Should turn off C4
+      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
+        channel: 1,
+        note: 60 // C4
+      });
+      
+      // Should now have 3 active notes (E4, G4, D4)
+      expect(liveLoop.activeNotes).toHaveLength(3);
+      expect(liveLoop.activeNotes.map(n => n.note)).toEqual([64, 67, 62]); // E4, G4, D4
+      
+      // Clear mocks for next step
+      midiBusMock.noteOn.mockClear();
+      midiBusMock.noteOff.mockClear();
+      
+      // Step 3: E4 and D4 should turn off
+      patternMock.getNotes.mockReturnValue([]);
+      
+      liveLoop.tick(3, 0.25); // stepIndex = 3
+      
+      // Should turn off E4 and D4
+      expect(midiBusMock.noteOff).toHaveBeenCalledTimes(2);
+      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
+        channel: 1,
+        note: 64 // E4
+      });
+      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
+        channel: 1,
+        note: 62 // D4
+      });
+      
+      // Should now have just 1 active note (G4)
+      expect(liveLoop.activeNotes).toHaveLength(1);
+      expect(liveLoop.activeNotes[0].note).toBe(67); // G4
+      
+      // Clear mocks for next step
+      midiBusMock.noteOn.mockClear();
+      midiBusMock.noteOff.mockClear();
+      
+      // Step 4: Last note (G4) should turn off
+      patternMock.getNotes.mockReturnValue([]);
+      
+      liveLoop.tick(4, 0.25); // stepIndex = 4
+      
+      // Should turn off G4
+      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
+        channel: 1,
+        note: 67 // G4
+      });
+      
+      // No active notes should remain
+      expect(liveLoop.activeNotes).toHaveLength(0);
+    });
+    
+    it("handles the case where same note is retriggered before its previous instance ends", () => {
+      // Reset activeNotes
+      liveLoop.activeNotes = [];
+      
+      // Step 0: Add a C4 note with 3-step duration
+      patternMock.getNotes.mockReturnValue([
+        { note: "C4", velocity: 80, durationStepsOrBeats: 3 } // Ends at step 3
+      ]);
+      
+      liveLoop.tick(0, 0.25); // stepIndex = 0
+      
+      // Should have 1 note in activeNotes
+      expect(liveLoop.activeNotes).toHaveLength(1);
+      expect(liveLoop.activeNotes[0].endStep).toBe(3);
+      
+      // Clear mocks for next step
+      midiBusMock.noteOn.mockClear();
+      midiBusMock.noteOff.mockClear();
+      
+      // Step 1: Retrigger the same C4 note with 2-step duration
+      patternMock.getNotes.mockReturnValue([
+        { note: "C4", velocity: 90, durationStepsOrBeats: 2 } // Ends at step 3
+      ]);
+      
+      liveLoop.tick(1, 0.25); // stepIndex = 1
+      
+      // Should have turned off the previous C4 when triggering the new one
+      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
+        channel: 1,
+        note: 60 // C4
+      });
+      
+      // Should have sent a new noteOn with the new velocity
+      expect(midiBusMock.noteOn).toHaveBeenCalledWith({
+        channel: 1,
+        note: 60, // C4
+        velocity: 90
+      });
+      
+      // Should still have 1 active note (the new C4)
+      expect(liveLoop.activeNotes).toHaveLength(1);
+      expect(liveLoop.activeNotes[0]).toEqual({
+        note: 60, // C4
+        velocity: 90,
+        endStep: 3, // stepIndex(1) + durationStepsOrBeats(2)
+        channel: 1
+      });
+    });
   });
   
   describe("noteOff scheduling", () => {

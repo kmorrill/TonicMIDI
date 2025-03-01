@@ -159,4 +159,25 @@ describe("MidiBus (Unit Tests)", () => {
     midiBus.noteOn({ channel: 1, note: 64 });
     expect(callCount).toBe(1); // still 1, no additional calls
   });
+  
+  it("should update active note when the same note is retriggered", () => {
+    // First note with velocity 80
+    midiBus.noteOn({ channel: 1, note: 60, velocity: 80 });
+    
+    // Check initial state
+    const key = "1_60";
+    expect(midiBus.activeNotes.has(key)).toBe(true);
+    expect(midiBus.activeNotes.get(key)).toEqual({ channel: 1, note: 60, velocity: 80 });
+    
+    // Retrigger the same note with different velocity
+    midiBus.noteOn({ channel: 1, note: 60, velocity: 100 });
+    
+    // The active note should be updated with the new velocity
+    expect(midiBus.activeNotes.has(key)).toBe(true);
+    expect(midiBus.activeNotes.get(key)).toEqual({ channel: 1, note: 60, velocity: 100 });
+    
+    // Verify two noteOn events were emitted
+    const noteOnEvents = events.filter(e => e.type === "noteOn");
+    expect(noteOnEvents).toHaveLength(2);
+  });
 });

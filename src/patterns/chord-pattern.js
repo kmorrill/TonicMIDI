@@ -113,22 +113,35 @@ export class ChordPattern extends AbstractPattern {
   
   /**
    * Internal method to generate note objects from a chord
+   * Each note in the chord can have its own duration if specified in the chord object
    * 
    * @private
    * @param {Object} chord - Chord object from ChordManager
    * @param {number} velocity - MIDI velocity for the notes
-   * @returns {Array<{ note: string, velocity: number }>} Array of note objects
+   * @returns {Array<{ note: string, velocity: number, durationStepsOrBeats: number }>} Array of note objects
    */
   _generateChordNotes(chord, velocity) {
     const notes = [];
     
     // If chord has predefined notes, use those
     if (chord.notes && chord.notes.length) {
-      return chord.notes.map(note => ({
-        note,
-        velocity,
-        durationStepsOrBeats: 1
-      }));
+      // Handle case where chord.notes contains objects with note and duration
+      return chord.notes.map(noteItem => {
+        if (typeof noteItem === 'string') {
+          return {
+            note: noteItem,
+            velocity,
+            durationStepsOrBeats: chord.duration || 1 // Use chord's global duration if available
+          };
+        } else {
+          // Note item is an object with its own properties
+          return {
+            note: noteItem.note,
+            velocity: noteItem.velocity || velocity,
+            durationStepsOrBeats: noteItem.durationStepsOrBeats || chord.duration || 1
+          };
+        }
+      });
     }
     
     // Otherwise, construct notes based on chord type and root
@@ -156,12 +169,28 @@ export class ChordPattern extends AbstractPattern {
         break;
     }
     
-    // Convert MIDI note numbers back to note names and include default duration
-    return chordNotes.map(midiNote => ({
-      note: this._getMidiNoteName(midiNote),
-      velocity,
-      durationStepsOrBeats: 1
-    }));
+    // Get chord duration if specified, or default to 1
+    const chordDuration = chord.duration || 1;
+    
+    // Handle individual note durations if provided
+    const noteDurations = chord.noteDurations || {};
+    
+    // Convert MIDI note numbers back to note names and include duration
+    return chordNotes.map((midiNote, index) => {
+      const noteName = this._getMidiNoteName(midiNote);
+      
+      // Use note-specific duration if available, otherwise use chord duration
+      const duration = 
+        noteDurations[noteName] || // Look for duration by note name
+        noteDurations[index] ||    // Or by position in chord
+        chordDuration;             // Or fall back to chord duration
+        
+      return {
+        note: noteName,
+        velocity,
+        durationStepsOrBeats: duration
+      };
+    });
   }
   
   /**

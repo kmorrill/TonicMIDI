@@ -132,10 +132,50 @@ export class LiveLoop {
         midiNote = Math.max(0, Math.min(127, midiNote));
         
         // Calculate endStep based on duration (default to 1 if not specified)
-        const endStep = stepIndex + (noteObj.durationStepsOrBeats || 1);
+        const duration = noteObj.durationStepsOrBeats ?? 1;
+        const endStep = stepIndex + duration;
         
         // Velocity (use default if not specified)
         const velocity = noteObj.velocity ?? 100;
+
+        // Check if this note is already active (same channel and note number)
+        const noteKey = `${this.midiChannel}_${midiNote}`;
+        const existingNoteIndex = this.activeNotes.findIndex(
+          n => n.channel === this.midiChannel && n.note === midiNote
+        );
+        
+        // If the same note is already active, turn it off first (retrigger behavior)
+        if (existingNoteIndex >= 0) {
+          // Send noteOff for the existing note
+          this.midiBus.noteOff({
+            channel: this.midiChannel,
+            note: midiNote
+          });
+          
+          // Remove it from activeNotes
+          this.activeNotes.splice(existingNoteIndex, 1);
+        }
+        
+        // Handle zero-duration case
+        if (duration <= 0) {
+          // For zero duration, send noteOn and immediately noteOff
+          if (!this.muted) {
+            this.midiBus.noteOn({
+              channel: this.midiChannel,
+              note: midiNote,
+              velocity: velocity,
+            });
+            
+            // Immediate noteOff
+            this.midiBus.noteOff({
+              channel: this.midiChannel,
+              note: midiNote
+            });
+          }
+          
+          // No need to add to activeNotes since it's already turned off
+          continue;
+        }
 
         // 1) Send noteOn immediately if not muted
         if (!this.muted) {

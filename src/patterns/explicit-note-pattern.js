@@ -3,54 +3,85 @@
  *
  * Example pattern that cycles through a fixed array of notes.
  * It extends AbstractPattern, ensuring we implement getNotes() and getLength().
+ * 
+ * Now supports multiple notes per step:
+ * - Each element in notesArray can be a single note or an array of notes
+ * - If an array, all notes in the array will be triggered on the same step
+ * - Each note can have its own duration
  */
 
 import { AbstractPattern } from "./pattern-interface.js";
 
 export class ExplicitNotePattern extends AbstractPattern {
   /**
-   * @param {Array<string|{note: string, durationStepsOrBeats?: number}>} notesArray
+   * @param {Array<string|{note: string, durationStepsOrBeats?: number, velocity?: number}|Array<string|{note: string, durationStepsOrBeats?: number, velocity?: number}>>} notesArray
    *   An array of note definitions. Each item can be:
    *     - A string like "C4" (will be converted internally to { note: "C4" })
    *     - An object like { note: "C4", durationStepsOrBeats: 2 }
+   *     - An array of strings or objects for multiple notes per step: ["C4", "E4", "G4"]
+   *     - An array of note objects: [{ note: "C4", durationStepsOrBeats: 2 }, { note: "E4", durationStepsOrBeats: 3 }]
    *
    * @example
+   *   // Simple sequence of single notes
    *   new ExplicitNotePattern(["C4", "E4", "G4"]);
-   *   // or
+   *   
+   *   // Single notes with durations
    *   new ExplicitNotePattern([
    *     { note: "C4" },
    *     { note: "E4", durationStepsOrBeats: 1 },
    *     { note: "G4" }
+   *   ]);
+   *   
+   *   // Multiple notes per step (chords)
+   *   new ExplicitNotePattern([
+   *     [{ note: "C4", durationStepsOrBeats: 2 }, { note: "E4", durationStepsOrBeats: 2 }, { note: "G4", durationStepsOrBeats: 2 }],
+   *     [{ note: "F4", durationStepsOrBeats: 3 }, { note: "A4", durationStepsOrBeats: 3 }, { note: "C5", durationStepsOrBeats: 3 }]
+   *   ]);
+   *   
+   *   // Mixed single notes and chords
+   *   new ExplicitNotePattern([
+   *     { note: "C4", durationStepsOrBeats: 1 },
+   *     [{ note: "E4", durationStepsOrBeats: 2 }, { note: "G4", durationStepsOrBeats: 2 }],
+   *     "B4"
    *   ]);
    */
   constructor(notesArray) {
     // Call the abstract parent constructor (throws if instantiated directly).
     super();
 
-    // Normalize items: if string, wrap in { note: string }
-    this.notes = notesArray.map((item) =>
-      typeof item === "string" ? { note: item } : item
-    );
+    // Normalize the notes array to handle mixed formats
+    this.notes = notesArray.map((item) => {
+      // If it's an array, it represents multiple notes for this step
+      if (Array.isArray(item)) {
+        // Normalize each item in the array
+        return item.map(noteItem => 
+          typeof noteItem === "string" ? { note: noteItem } : noteItem
+        );
+      } 
+      // If it's a single item, it represents one note for this step
+      else {
+        return [typeof item === "string" ? { note: item } : item];
+      }
+    });
   }
 
   /**
-   * Returns an array with a single note object for the current stepIndex.
+   * Returns an array of note objects for the current stepIndex.
+   * May return multiple notes if the pattern has multiple notes for this step.
    *
    * @param {number} stepIndex - Which step we are on (0-based).
    * @param {any} [context] - Unused in this pattern, but could be chord info, etc.
-   * @returns {Array<{ note: string, durationStepsOrBeats: number }>}
+   * @returns {Array<{ note: string, durationStepsOrBeats: number, velocity?: number }>}
    */
   getNotes(stepIndex, context) {
     const index = stepIndex % this.getLength();
-    const noteObj = this.notes[index];
-    // Provide a default if durationStepsOrBeats doesn't exist
-    const duration = noteObj.durationStepsOrBeats ?? 1;
-
-    // Return an array with the extended object
-    return [{
+    const noteObjects = this.notes[index];
+    
+    // Ensure each note object has a valid durationStepsOrBeats value
+    return noteObjects.map(noteObj => ({
       ...noteObj,
-      durationStepsOrBeats: duration
-    }];
+      durationStepsOrBeats: noteObj.durationStepsOrBeats ?? 1
+    }));
   }
 
   /**
