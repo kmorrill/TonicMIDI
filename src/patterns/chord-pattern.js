@@ -44,8 +44,11 @@ export class ChordPattern extends AbstractPattern {
    * @returns {Array<{ note: string, velocity: number, durationSteps: number }>} Array of note objects
    */
   getNotes(stepIndex, context) {
-    // If no context or no chord manager, return empty array
+    // If no context or no chord manager, log a warning and return empty array
     if (!context || !context.chordManager) {
+      console.warn(
+        "[ChordPattern] No chordManager in context. Returning no notes."
+      );
       return [];
     }
 
@@ -94,6 +97,10 @@ export class ChordPattern extends AbstractPattern {
 
       // Generate chord notes from the chord data
       const notes = this._generateChordNotes(chord, adjustedVelocity);
+      console.log(
+        `Sending chord notes on channel=${this.midiChannel} chord=${chord.root} ${chord.type}`,
+        notes
+      );
       return notes;
     }
 
@@ -143,7 +150,11 @@ export class ChordPattern extends AbstractPattern {
           };
         } else {
           // Note item is an object with its own properties
-          const duration = noteItem.durationSteps ?? noteItem.durationStepsOrBeats ?? chord.duration ?? 1;
+          const duration =
+            noteItem.durationSteps ??
+            noteItem.durationStepsOrBeats ??
+            chord.duration ??
+            1;
           return {
             note: noteItem.note,
             velocity: noteItem.velocity || velocity,
