@@ -96,10 +96,8 @@ export class LiveLoop {
 
   /**
    * Called by TransportManager each "tick" or time subdivision.
-   * stepIndex could be a step counter or pulse counter.
-   * deltaTime is time since last tick (beats or seconds), for LFO updates.
-   * absoluteTime is the global time position in beats for continuous time LFO updates.
-   *
+   * With the updated TransportManager, this is only called at integer step boundaries.
+   * 
    * On each tick, we:
    * 1. Apply any queued changes if at loop boundary
    * 2. Get notes from the pattern for this step
@@ -110,7 +108,7 @@ export class LiveLoop {
    * 4. Check activeNotes for expired notes and send noteOff for any where endStep <= stepIndex
    * 5. Update LFOs and send controlChange events
    * 
-   * @param {number} stepIndex - Current step index in the sequence (may include fractional part)
+   * @param {number} stepIndex - Current step index in the sequence (always an integer)
    * @param {number} deltaTime - Time elapsed since last update in beats
    * @param {number|null} absoluteTime - Optional absolute time position in beats
    */
@@ -217,7 +215,31 @@ export class LiveLoop {
     }
     this.activeNotes = stillActive;
 
-    // 6) Update each LFO and send controlChange
+    // 6) Update LFOs (also happens on every pulse through updateLFOsOnly)
+    this._updateLFOs(deltaTime, absoluteTime);
+  }
+  
+  /**
+   * Called by TransportManager on every pulse for high-resolution LFO updates.
+   * This separates the LFO updates from the note pattern logic.
+   * 
+   * @param {number} deltaTime - Time elapsed since last update in beats
+   * @param {number|null} absoluteTime - Optional absolute time position in beats
+   */
+  updateLFOsOnly(deltaTime, absoluteTime = null) {
+    this._updateLFOs(deltaTime, absoluteTime);
+  }
+  
+  /**
+   * Helper method to update LFOs and send CC messages.
+   * Used by both tick() and updateLFOsOnly().
+   * 
+   * @private
+   * @param {number} deltaTime - Time elapsed since last update in beats
+   * @param {number|null} absoluteTime - Optional absolute time position in beats
+   */
+  _updateLFOs(deltaTime, absoluteTime = null) {
+    // Update each LFO and send controlChange
     for (const lfo of this.lfos) {
       let waveValue;
       

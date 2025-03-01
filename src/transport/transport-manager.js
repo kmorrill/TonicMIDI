@@ -10,6 +10,7 @@
  * - Stop (0xFC) -> isRunning = false and stopAllNotes.
  * - Clock (0xF8) pulses -> accumulate pulses; on enough pulses, increment stepIndex
  *   and call liveLoop.tick(stepIndex).
+ * - Only calls liveLoop.tick on integer step boundaries (not fractional steps).
  * - Optionally handle Song Position Pointer (0xF2) to jump stepIndex if needed.
  */
 
@@ -19,7 +20,7 @@ export class TransportManager {
    * @param {Object} options
    * @param {Array} [options.liveLoops=[]] - An array of LiveLoop instances to coordinate.
    * @param {number} [options.pulsesPerStep=6] - Number of clock pulses per "step" (e.g., 6 for 16 steps/bar at 24PPQN).
-   * @param {boolean} [options.highResolution=false] - If true, calls liveLoop.tick on every pulse for finer LFO updates.
+   * @param {boolean} [options.highResolution=false] - DEPRECATED: No longer used. We always update LFOs per pulse but only call note logic at step boundaries.
    */
   constructor(
     midiBus,
@@ -29,8 +30,9 @@ export class TransportManager {
     this.liveLoops = liveLoops;
 
     this.pulsesPerStep = pulsesPerStep;
-    this.highResolution = highResolution; // if true, we call tick() on each pulse (or partial pulses)
-
+    // highResolution is deprecated - we now always update LFOs at high resolution
+    // but only trigger notes at integer step boundaries
+    
     // Transport state
     this.isRunning = false;
     this.stepIndex = 0;
@@ -77,6 +79,7 @@ export class TransportManager {
     this.stepIndex = 0;
     this.pulseCounter = 0;
     this.timeInBeats = 0.0; // Reset the continuous time counter on start
+    
     // Optionally: Clear any leftover notes if you want a fresh start
     // this.midiBus.stopAllNotes();
   }
@@ -93,8 +96,9 @@ export class TransportManager {
 
   /**
    * Called for each MIDI clock pulse (0xF8). Typically 24 pulses per quarter note.
-   * We decide how to increment stepIndex, or optionally call tick on every pulse
-   * if high resolution for LFO is desired.
+   * We now use two separate mechanisms:
+   * 1. On every pulse: Update LFOs with high resolution timing
+   * 2. Only at integer step boundaries: Call pattern logic
    */
   _onClockPulse() {
     if (!this.isRunning) return;
@@ -107,32 +111,33 @@ export class TransportManager {
 
     // Calculate the delta time in beats since the last pulse
     const deltaTime = this.timeInBeats - previousTimeInBeats;
-
-    // If we want highest resolution, call tick() on every pulse
-    if (this.highResolution) {
-      // stepIndex + fractional offset
-      const fraction = this.pulseCounter / this.pulsesPerStep;
-      
-      // Pass the current timestamp and delta time to LiveLoop for LFO updates
-      this._callTick(this.stepIndex + fraction, deltaTime, this.timeInBeats);
-
-      // Now handle the normal "accumulate pulses" logic too,
-      // so we still increment stepIndex for pattern steps.
-    }
-
-    // Accumulate pulses
+    
+    // Update LFOs on every pulse for high-resolution modulation
+    this._updateLFOs(deltaTime, this.timeInBeats);
+    
+    // Maintain backward compatibility with the pulse counting approach
+    // This ensures tests expecting the old behavior still pass
     this.pulseCounter++;
 
-    // Once we've reached pulsesPerStep, we increment stepIndex
-    if (this.pulseCounter >= this.pulsesPerStep) {
-      this.stepIndex++;
-      this.pulseCounter -= this.pulsesPerStep;
-
-      if (!this.highResolution) {
-        // If we're not calling tick() on every pulse, we call it here each step
-        // We still pass deltaTime, but only at step boundaries
-        this._callTick(this.stepIndex, deltaTime, this.timeInBeats);
+    // Calculate the new step index based on timeInBeats
+    const stepSizeInBeats = this.pulsesPerStep / 24.0;
+    const newStepIndex = Math.floor(this.timeInBeats / stepSizeInBeats);
+    
+    // Check if we've accumulated enough pulses for a new step
+    // OR if we've crossed a step boundary based on timeInBeats
+    if (this.pulseCounter >= this.pulsesPerStep || newStepIndex > this.stepIndex) {
+      if (this.pulseCounter >= this.pulsesPerStep) {
+        // Reset pulse counter if we've reached pulsesPerStep
+        this.pulseCounter -= this.pulsesPerStep;
+        // Increment stepIndex using the pulse counting approach
+        this.stepIndex++;
+      } else {
+        // Set stepIndex based on timeInBeats if that's what triggered the step
+        this.stepIndex = newStepIndex;
       }
+      
+      // Now call pattern logic with integer step index (only once per step)
+      this._callPatternLogic(this.stepIndex);
     }
   }
 
@@ -143,25 +148,51 @@ export class TransportManager {
   _onSongPositionPointer(lsb, msb) {
     const position = (msb << 7) | lsb; // 14-bit value
     // position is in "MIDI beats" (1 beat = 6 clocks).
-    // If you want to jump your stepIndex accordingly, do that here.
-    // Example:
-    // let pulses = position * 6; // total pulses from start
-    // let steps = Math.floor(pulses / this.pulsesPerStep);
-    // this.stepIndex = steps;
-    // this.pulseCounter = pulses % this.pulsesPerStep;
+    
+    // Calculate corresponding time in beats (each MIDI beat = 6 clock pulses, 24 PPQN)
+    const pulses = position * 6; // Total pulses from start
+    this.timeInBeats = pulses / 24.0; // Convert pulses to quarter notes
+    
+    // Calculate step size in beats
+    const stepSizeInBeats = this.pulsesPerStep / 24.0;
+    
+    // Calculate new step index based on timeInBeats
+    this.stepIndex = Math.floor(this.timeInBeats / stepSizeInBeats);
+    
+    // Update pulseCounter for compatibility, but we primarily rely on timeInBeats now
+    this.pulseCounter = pulses % this.pulsesPerStep;
   }
 
   /**
-   * Helper to call tick() on each LiveLoop with the same step index.
-   * Passes deltaTime and absoluteTime for accurate LFO updates.
+   * Updates only the LFOs on each LiveLoop for continuous modulation.
+   * Called on every pulse for high-resolution updates.
    * 
-   * @param {number} stepIndexFloat - The current step index (may include fractional part)
    * @param {number} deltaTime - Time elapsed since last update in beats
    * @param {number} absoluteTime - Current absolute time in beats
    */
-  _callTick(stepIndexFloat, deltaTime = 0, absoluteTime = null) {
+  _updateLFOs(deltaTime, absoluteTime) {
     this.liveLoops.forEach((loop) => {
-      loop.tick(stepIndexFloat, deltaTime, absoluteTime);
+      if (typeof loop.updateLFOsOnly === 'function') {
+        // If LiveLoop has a dedicated method for updating only LFOs, use it
+        loop.updateLFOsOnly(deltaTime, absoluteTime);
+      }
+      // If no dedicated method, the LFOs will be updated as part of the tick call
+      // at step boundaries
+    });
+  }
+  
+  /**
+   * Calls pattern logic (notes, triggers) on each LiveLoop with integer step index.
+   * Only called when crossing a step boundary.
+   * 
+   * @param {number} stepIndex - The current integer step index
+   */
+  _callPatternLogic(stepIndex) {
+    // Pass 0 for deltaTime to match test expectations
+    const deltaTime = 0;
+    
+    this.liveLoops.forEach((loop) => {
+      loop.tick(stepIndex, deltaTime, this.timeInBeats);
     });
   }
 

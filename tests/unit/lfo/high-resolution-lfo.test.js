@@ -83,9 +83,9 @@ describe("High-Resolution LFO Updates", () => {
     // Replace the handler to directly call the method
     const clockHandler = midiBusMock.on.mock.calls[0][1];
     
-    // Save the original LiveLoop tick method to spy on it
-    const originalTick = liveLoop.tick;
-    liveLoop.tick = jest.fn(originalTick);
+    // Add updateLFOsOnly method to LiveLoop for our test
+    const updateLFOsOnlySpy = jest.fn();
+    liveLoop.updateLFOsOnly = updateLFOsOnlySpy;
     
     // Start the transport
     transportManager._onStart();
@@ -95,19 +95,23 @@ describe("High-Resolution LFO Updates", () => {
       clockHandler({ data: [0xF8] });
     }
     
-    // After 4 pulses, tick should have been called 4 times
-    expect(liveLoop.tick).toHaveBeenCalledTimes(4);
+    // After 4 pulses, updateLFOsOnly should have been called 4 times
+    expect(updateLFOsOnlySpy).toHaveBeenCalledTimes(4);
     
-    // And each time with increasingly larger timeInBeats values (1/24th increments)
-    expect(liveLoop.tick).toHaveBeenNthCalledWith(1, 0, expect.any(Number), 1/24);
-    expect(liveLoop.tick).toHaveBeenNthCalledWith(2, expect.any(Number), expect.any(Number), 2/24);
-    expect(liveLoop.tick).toHaveBeenNthCalledWith(3, expect.any(Number), expect.any(Number), 3/24);
-    expect(liveLoop.tick).toHaveBeenNthCalledWith(4, expect.any(Number), expect.any(Number), 4/24);
+    // The LFO updates should happen continuously with each pulse
+    expect(updateLFOsOnlySpy).toHaveBeenNthCalledWith(1, expect.any(Number), 1/24);
+    expect(updateLFOsOnlySpy).toHaveBeenNthCalledWith(2, expect.any(Number), 2/24);
+    expect(updateLFOsOnlySpy).toHaveBeenNthCalledWith(3, expect.any(Number), 3/24);
+    expect(updateLFOsOnlySpy).toHaveBeenNthCalledWith(4, expect.any(Number), 4/24);
   });
 
   it("calculates the correct deltaTime from transport timing", () => {
     // Replace the handler to directly call the method
     const clockHandler = midiBusMock.on.mock.calls[0][1];
+    
+    // Add updateLFOsOnly method to LiveLoop for our test
+    const updateLFOsOnlySpy = jest.fn();
+    liveLoop.updateLFOsOnly = updateLFOsOnlySpy;
     
     // Start the transport
     transportManager._onStart();
@@ -118,15 +122,11 @@ describe("High-Resolution LFO Updates", () => {
     // deltaTime should be 1/24 after first pulse
     expect(transportManager.timeInBeats).toBeCloseTo(1/24, 5);
     
-    // Create a spy so we can check the actual deltaTime passed to tick
-    const tickSpy = jest.spyOn(liveLoop, 'tick');
-    
     // Simulate another clock pulse
     clockHandler({ data: [0xF8] });
     
     // Should have received a delta equal to the clock pulse time (1/24 beat)
-    expect(tickSpy).toHaveBeenCalledWith(
-      expect.any(Number),
+    expect(updateLFOsOnlySpy).toHaveBeenLastCalledWith(
       expect.closeTo(1/24, 5),
       expect.any(Number)
     );

@@ -4,9 +4,10 @@
  * Unit tests for the TransportManager, ensuring:
  * 1) Start (0xFA) sets isRunning, resets stepIndex.
  * 2) Stop (0xFC) calls stopAllNotes.
- * 3) Clock (0xF8) accumulates pulses -> increments stepIndex at pulsesPerStep if highResolution=false.
- * 4) If highResolution=true, calls LiveLoop.tick() on every pulse as well as each step boundary if you choose.
- * 5) (Optional) Song Position Pointer sets stepIndex if implemented.
+ * 3) Clock (0xF8) accumulates pulses -> increments stepIndex at pulsesPerStep.
+ * 4) Only calls pattern logic at integer step boundaries, not on fractional steps.
+ * 5) Updates LFOs on every pulse for high-resolution modulation.
+ * 6) (Optional) Song Position Pointer sets stepIndex if implemented.
  */
 
 import { TransportManager } from "../../../src/transport/transport-manager.js";
@@ -99,53 +100,42 @@ describe("TransportManager", () => {
     );
   });
 
-  it("should call tick on every pulse if highResolution=true", () => {
+  it("should ignore the highResolution flag (deprecated)", () => {
     // Rebuild the transportManager with highResolution = true
+    // This flag should be ignored in the new implementation
     transportManager = new TransportManager(midiBusMock, {
       liveLoops: [liveLoop1, liveLoop2],
       pulsesPerStep: 6,
-      highResolution: true,
+      highResolution: true, // This should be ignored
     });
 
     simulateMidiMessage([0xfa]); // Start
     expect(transportManager.isRunning).toBe(true);
 
-    // Now let's send 3 pulses
-    simulateMidiMessage([0xf8]);
-    simulateMidiMessage([0xf8]);
-    simulateMidiMessage([0xf8]);
-
-    // We expect tick was called 3 times (once per pulse),
-    // plus we haven't yet reached pulsesPerStep, so stepIndex hasn't advanced
-    // but we do a partial call with fraction stepIndex + fraction?
-    // Our code calls: fraction = pulseCounter/pulsesPerStep
-    // but let's just check calls happen:
-    expect(liveLoop1.tick).toHaveBeenCalledTimes(3);
-    expect(liveLoop2.tick).toHaveBeenCalledTimes(3);
-
-    // stepIndex still 0 because pulseCounter < 6
-    expect(transportManager.stepIndex).toBe(0);
-  });
-
-  it("should increment stepIndex after pulsesPerStep, even if highResolution=true", () => {
-    // Rebuild with highResolution = true
-    transportManager = new TransportManager(midiBusMock, {
-      liveLoops: [liveLoop1, liveLoop2],
-      pulsesPerStep: 6,
-      highResolution: true,
-    });
-
-    simulateMidiMessage([0xfa]); // start
-    expect(transportManager.stepIndex).toBe(0);
-
-    // Send 6 pulses
-    for (let i = 0; i < 6; i++) {
+    // Send 3 pulses (half a step)
+    for (let i = 0; i < 3; i++) {
       simulateMidiMessage([0xf8]);
     }
+
+    // We should NOT call tick for pattern logic yet (no step boundary crossed)
+    // In the old implementation, this would have called tick 3 times with fractional steps
+    expect(liveLoop1.tick).not.toHaveBeenCalled();
+    expect(liveLoop2.tick).not.toHaveBeenCalled();
+
+    // stepIndex still 0 because we haven't crossed a step boundary
+    expect(transportManager.stepIndex).toBe(0);
+    
+    // Send 3 more pulses to complete the step
+    for (let i = 0; i < 3; i++) {
+      simulateMidiMessage([0xf8]);
+    }
+    
+    // Now we should have called tick once at the step boundary
+    expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
+    expect(liveLoop2.tick).toHaveBeenCalledTimes(1);
+    
     // stepIndex should now be 1
     expect(transportManager.stepIndex).toBe(1);
-    // We've called tick once each pulse => 6 times
-    expect(liveLoop1.tick).toHaveBeenCalledTimes(6);
   });
 
   it("should handle Song Position Pointer (0xF2) if implemented", () => {
@@ -206,5 +196,154 @@ describe("TransportManager", () => {
     
     // Verify timeInBeats has been reset to 0
     expect(transportManager.timeInBeats).toBe(0.0);
+  });
+  
+  describe("Integer step boundaries", () => {
+    let liveLoopWithUpdateLFO;
+    
+    beforeEach(() => {
+      // Create mock LiveLoop with updateLFOsOnly method
+      liveLoopWithUpdateLFO = { 
+        tick: jest.fn(),
+        updateLFOsOnly: jest.fn()
+      };
+      
+      transportManager = new TransportManager(midiBusMock, {
+        liveLoops: [liveLoopWithUpdateLFO],
+        pulsesPerStep: 6
+      });
+      
+      // Start the transport
+      simulateMidiMessage([0xfa]);
+    });
+    
+    it("should call tick only at integer step boundaries", () => {
+      // Send 6 pulses (exactly 1 step)
+      for (let i = 0; i < 6; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // Should have called tick exactly once at the step boundary
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledWith(1, 0, expect.any(Number));
+      
+      // Send 5 more pulses (not enough for another step)
+      for (let i = 0; i < 5; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // tick should still have only been called once
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      
+      // Send 1 more pulse to reach the next step boundary
+      simulateMidiMessage([0xf8]);
+      
+      // Now tick should have been called twice
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenLastCalledWith(2, 0, expect.any(Number));
+    });
+    
+    it("should update LFOs on every pulse for high-resolution modulation", () => {
+      // Send 3 pulses (half a step)
+      for (let i = 0; i < 3; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // updateLFOsOnly should have been called 3 times (once per pulse)
+      expect(liveLoopWithUpdateLFO.updateLFOsOnly).toHaveBeenCalledTimes(3);
+      
+      // tick should not have been called yet (no step boundary crossed)
+      expect(liveLoopWithUpdateLFO.tick).not.toHaveBeenCalled();
+      
+      // Send 3 more pulses to complete the step
+      for (let i = 0; i < 3; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // updateLFOsOnly should now have been called 6 times
+      expect(liveLoopWithUpdateLFO.updateLFOsOnly).toHaveBeenCalledTimes(6);
+      
+      // tick should have been called once at the step boundary
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+    });
+    
+    it("should calculate step boundaries based on timeInBeats", () => {
+      // Calculate step size in beats
+      const stepSizeInBeats = 6 / 24; // pulsesPerStep / 24 PPQN = 0.25 beats
+      
+      // Send 8 pulses (a bit more than 1 step)
+      for (let i = 0; i < 8; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // timeInBeats should be 8/24 = 0.333...
+      expect(transportManager.timeInBeats).toBeCloseTo(8/24, 5);
+      
+      // We should have crossed 1 step boundary (0.333/0.25 = 1.333 => floor = 1)
+      expect(transportManager.stepIndex).toBe(1);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      
+      // Send 4 more pulses to reach the next step boundary
+      for (let i = 0; i < 4; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // timeInBeats should now be 12/24 = 0.5
+      expect(transportManager.timeInBeats).toBeCloseTo(0.5, 5);
+      
+      // We should have crossed the 2nd step boundary (0.5/0.25 = 2)
+      expect(transportManager.stepIndex).toBe(2);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2);
+    });
+    
+    it("should handle Song Position Pointer by updating timeInBeats and stepIndex", () => {
+      // SPP with position = 4 (4 MIDI beats = 4*6 = 24 pulses = 1 beat = 4 steps at 6 pulses/step)
+      simulateMidiMessage([0xf2, 4, 0]); // LSB=4, MSB=0
+      
+      // timeInBeats should be 24/24 = 1.0
+      expect(transportManager.timeInBeats).toBeCloseTo(1.0, 5);
+      
+      // stepIndex should be floor(1.0 / (6/24)) = floor(4) = 4
+      expect(transportManager.stepIndex).toBe(4);
+      
+      // Send 1 pulse
+      simulateMidiMessage([0xf8]);
+      
+      // Should have updateLFOsOnly called but not tick (not a new step boundary yet)
+      expect(liveLoopWithUpdateLFO.updateLFOsOnly).toHaveBeenCalled();
+      expect(liveLoopWithUpdateLFO.tick).not.toHaveBeenCalled();
+      
+      // Send 5 more pulses to reach a new step boundary
+      for (let i = 0; i < 5; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // Now we should have crossed to step 5
+      expect(transportManager.stepIndex).toBe(5);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+    });
+    
+    it("should handle LiveLoops that don't implement updateLFOsOnly", () => {
+      // Create a LiveLoop without the updateLFOsOnly method
+      const legacyLiveLoop = { tick: jest.fn() };
+      
+      transportManager = new TransportManager(midiBusMock, {
+        liveLoops: [legacyLiveLoop],
+        pulsesPerStep: 6
+      });
+      
+      // Start the transport
+      simulateMidiMessage([0xfa]);
+      
+      // Send pulses (no errors should occur due to missing updateLFOsOnly)
+      for (let i = 0; i < 6; i++) {
+        simulateMidiMessage([0xf8]);
+      }
+      
+      // Should still call tick at step boundary
+      expect(legacyLiveLoop.tick).toHaveBeenCalledTimes(1);
+      
+      // LFOs in legacy LiveLoops will only be updated at step boundaries through tick
+    });
   });
 });
