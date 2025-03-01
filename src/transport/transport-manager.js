@@ -99,14 +99,22 @@ export class TransportManager {
   _onClockPulse() {
     if (!this.isRunning) return;
 
+    // Store previous time for calculating delta
+    const previousTimeInBeats = this.timeInBeats;
+    
     // Increment the continuous time counter (assuming 24 PPQ standard MIDI clock)
     this.timeInBeats += 1.0 / 24.0;
+
+    // Calculate the delta time in beats since the last pulse
+    const deltaTime = this.timeInBeats - previousTimeInBeats;
 
     // If we want highest resolution, call tick() on every pulse
     if (this.highResolution) {
       // stepIndex + fractional offset
       const fraction = this.pulseCounter / this.pulsesPerStep;
-      this._callTick(this.stepIndex + fraction);
+      
+      // Pass the current timestamp and delta time to LiveLoop for LFO updates
+      this._callTick(this.stepIndex + fraction, deltaTime, this.timeInBeats);
 
       // Now handle the normal "accumulate pulses" logic too,
       // so we still increment stepIndex for pattern steps.
@@ -122,7 +130,8 @@ export class TransportManager {
 
       if (!this.highResolution) {
         // If we're not calling tick() on every pulse, we call it here each step
-        this._callTick(this.stepIndex);
+        // We still pass deltaTime, but only at step boundaries
+        this._callTick(this.stepIndex, deltaTime, this.timeInBeats);
       }
     }
   }
@@ -144,13 +153,15 @@ export class TransportManager {
 
   /**
    * Helper to call tick() on each LiveLoop with the same step index.
-   * If you track real time, you could pass a deltaTime argument to each tick().
-   * For now, we pass 0 or a placeholder.
+   * Passes deltaTime and absoluteTime for accurate LFO updates.
+   * 
+   * @param {number} stepIndexFloat - The current step index (may include fractional part)
+   * @param {number} deltaTime - Time elapsed since last update in beats
+   * @param {number} absoluteTime - Current absolute time in beats
    */
-  _callTick(stepIndexFloat) {
-    const deltaTime = 0; // or measure with performance.now() between pulses
+  _callTick(stepIndexFloat, deltaTime = 0, absoluteTime = null) {
     this.liveLoops.forEach((loop) => {
-      loop.tick(stepIndexFloat, deltaTime);
+      loop.tick(stepIndexFloat, deltaTime, absoluteTime);
     });
   }
 

@@ -91,8 +91,12 @@ describe("TransportManager", () => {
     // Should have called tick on both loops
     expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
     expect(liveLoop2.tick).toHaveBeenCalledTimes(1);
-    // The stepIndex passed in is 1
-    expect(liveLoop1.tick).toHaveBeenCalledWith(1, 0);
+    // The stepIndex passed in is 1, should also get a deltaTime and absoluteTime
+    expect(liveLoop1.tick).toHaveBeenCalledWith(
+      1, 
+      expect.any(Number), 
+      expect.any(Number)
+    );
   });
 
   it("should call tick on every pulse if highResolution=true", () => {

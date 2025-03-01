@@ -8,6 +8,8 @@
  *   const lfo = new LFO({ frequency: 1, shape: 'sine', amplitude: 1, offset: 0, phase: 0 });
  *   // Called each "tick" (deltaTime might be in beats or seconds, your choice).
  *   const value = lfo.update(deltaTime);
+ *   // Or use absolute time for more accurate high-resolution updates:
+ *   const value = lfo.updateContinuousTime(absoluteTimeInBeats);
  *   // value is typically in the range [-amplitude..+amplitude], shifted by offset.
  */
 
@@ -47,9 +49,15 @@ export class LFO {
     /**
      * Tracks the current phase of the oscillator.
      * If useRadians = true, this is in radians [0..2π).
-     * If useRadians = false, it’s a normalized cycle [0..1).
+     * If useRadians = false, it's a normalized cycle [0..1).
      */
     this.phase = phase;
+    
+    /**
+     * Tracks the last absolute time value used in updateContinuousTime
+     * Only used when tracking absolute time rather than delta time
+     */
+    this.lastAbsoluteTime = null;
   }
 
   /**
@@ -90,6 +98,34 @@ export class LFO {
     }
 
     return this._computeWaveValue(this.phase);
+  }
+  
+  /**
+   * Update the LFO using absolute time value, for more accurate high-resolution updates.
+   * The phase is set based on the absolute time rather than incrementally.
+   * 
+   * @param {number} absoluteTime - The absolute time in beats or seconds
+   * @returns {number} - The LFO output, typically in the range [-amplitude..+amplitude] + offset
+   */
+  updateContinuousTime(absoluteTime) {
+    if (absoluteTime === undefined || absoluteTime === null) {
+      return this._computeWaveValue(this.phase);
+    }
+    
+    // If this is the first call, treat it as a reset point
+    if (this.lastAbsoluteTime === null) {
+      this.lastAbsoluteTime = absoluteTime;
+      return this._computeWaveValue(this.phase);
+    }
+    
+    // Calculate the delta time between the current and last absolute time
+    const deltaTime = absoluteTime - this.lastAbsoluteTime;
+    
+    // Store the current time for the next call
+    this.lastAbsoluteTime = absoluteTime;
+    
+    // Use the regular update with the calculated delta
+    return this.update(deltaTime);
   }
 
   /**
@@ -164,6 +200,7 @@ export class LFO {
    */
   reset(phase = 0) {
     this.phase = phase;
+    this.lastAbsoluteTime = null; // Also reset the absolute time tracking
   }
 
   // --- Getters & Setters ---

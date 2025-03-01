@@ -98,6 +98,7 @@ export class LiveLoop {
    * Called by TransportManager each "tick" or time subdivision.
    * stepIndex could be a step counter or pulse counter.
    * deltaTime is time since last tick (beats or seconds), for LFO updates.
+   * absoluteTime is the global time position in beats for continuous time LFO updates.
    *
    * On each tick, we:
    * 1. Apply any queued changes if at loop boundary
@@ -108,8 +109,12 @@ export class LiveLoop {
    *      (endStep = stepIndex + (noteObj.durationStepsOrBeats || 1))
    * 4. Check activeNotes for expired notes and send noteOff for any where endStep <= stepIndex
    * 5. Update LFOs and send controlChange events
+   * 
+   * @param {number} stepIndex - Current step index in the sequence (may include fractional part)
+   * @param {number} deltaTime - Time elapsed since last update in beats
+   * @param {number|null} absoluteTime - Optional absolute time position in beats
    */
-  tick(stepIndex, deltaTime) {
+  tick(stepIndex, deltaTime, absoluteTime = null) {
     // 1) Apply any queued changes if we're at loop boundary
     this._applyQueuedChangesIfNeeded(stepIndex);
 
@@ -214,7 +219,17 @@ export class LiveLoop {
 
     // 6) Update each LFO and send controlChange
     for (const lfo of this.lfos) {
-      const waveValue = lfo.update(deltaTime);
+      let waveValue;
+      
+      // Check if we're using absolute time-based updates or delta time
+      if (absoluteTime !== null && typeof lfo.updateContinuousTime === 'function') {
+        // Use the high-resolution continuous time approach
+        waveValue = lfo.updateContinuousTime(absoluteTime);
+      } else {
+        // Fallback to the standard delta-time based approach
+        waveValue = lfo.update(deltaTime);
+      }
+      
       // For example, map [-1..1] => [0..127]
       const ccValue = Math.max(
         0,
