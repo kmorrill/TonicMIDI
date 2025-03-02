@@ -351,11 +351,18 @@ export class LiveLoop {
    * @returns {number} MIDI note number
    */
   _convertNoteNameToMidi(noteName) {
-    // Handle numeric note values (already MIDI numbers)
-    if (!isNaN(noteName)) {
-      return parseInt(noteName, 10);
+    if (typeof noteName === "number") {
+      // We already have a MIDI number
+      return noteName;
     }
-
+    if (typeof noteName !== "string") {
+      console.warn(
+        "Unexpected noteName:",
+        noteName,
+        "— defaulting to MIDI 60."
+      );
+      return 60;
+    }
     // Parse note name and octave
     const match = noteName.match(/^([A-G][b#]?)(\d+)$/i);
 
