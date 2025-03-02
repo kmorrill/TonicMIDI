@@ -13,5 +13,7 @@ export { RhythmManager } from "./rhythm-manager.js";
 export { GlobalContext } from "./global-context.js";
 export { ChordPattern } from "./patterns/chord-pattern.js";
 
+// Exporting LFO module
+export { LFO } from "./lfo.js";
+
 // These exports will be implemented as the project progresses
-// export { TransportManager } from "./transport/TransportManager.js";

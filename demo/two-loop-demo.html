@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>op-xy-live Two-Loop Demo (Drums + Melody)</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      #replContainer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      .repl-box {
+        flex: 1;
+        min-width: 350px;
+        max-width: 600px;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+      }
+      button {
+        margin-top: 5px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      #output {
+        width: 90%;
+        height: 200px;
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 8px;
+        overflow-y: auto;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>op-xy-live Two-Loop Demo</h1>
+    <p>This page sets up:</p>
+    <ul>
+      <li>A <strong>drum loop</strong> on MIDI channel <code>1</code>.</li>
+      <li>A <strong>melody loop</strong> on MIDI channel <code>5</code>.</li>
+      <li>
+        Listens to <em>external MIDI clock</em> from the first MIDI input (so
+        you must press Start on your DAW/hardware).
+      </li>
+      <li>Sends notes to the first MIDI output device found.</li>
+      <li>
+        Two REPL textareas: <strong>Drums</strong> and <strong>Melody</strong>.
+        Each has an <code>Eval</code> button for live updates.
+      </li>
+    </ul>
+
+    <p>
+      Once your external clock starts, you should hear both loops (default
+      patterns). Then you can paste or type new code in the REPL boxes and click
+      <strong>Eval</strong>
+      to alter the loops in real time.
+    </p>
+
+    <div id="replContainer">
+      <!-- DRUM REPL -->
+      <div class="repl-box">
+        <h2>Drum REPL</h2>
+        <textarea id="drumRepl"></textarea><br />
+        <button id="drumEvalBtn">Eval Drums</button>
+      </div>
+
+      <!-- MELODY REPL -->
+      <div class="repl-box">
+        <h2>Melody REPL</h2>
+        <textarea id="melodyRepl"></textarea><br />
+        <button id="melodyEvalBtn">Eval Melody</button>
+      </div>
+    </div>
+
+    <h3>Console Output</h3>
+    <div id="output"></div>
+
+    <script type="module">
+      /***************************************************************************
+       * 1) Import the library
+       ***************************************************************************/
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        ChordManager,
+        ChordPattern,
+        GlobalContext,
+        RhythmManager,
+        ExplicitNotePattern,
+      } from "../src/index.js";
+
+      /***************************************************************************
+       * 2) Mirror console logs to #output
+       ***************************************************************************/
+      const outputEl = document.getElementById("output");
+      function logToOutput(...msgs) {
+        outputEl.textContent += msgs.join(" ") + "\n";
+        outputEl.scrollTop = outputEl.scrollHeight;
+      }
+      const origLog = console.log;
+      console.log = (...args) => {
+        origLog(...args);
+        logToOutput(...args);
+      };
+      console.warn = (...args) => {
+        origLog("WARNING:", ...args);
+        logToOutput("WARNING:", ...args);
+      };
+      console.error = (...args) => {
+        origLog("ERROR:", ...args);
+        logToOutput("ERROR:", ...args);
+      };
+
+      /***************************************************************************
+       * 3) Setup the MIDI Bus and RealPlaybackEngine for *outputs*
+       ***************************************************************************/
+      const midiBus = new MidiBus();
+      const realEngine = new RealPlaybackEngine(midiBus);
+      await realEngine.init();
+
+      // We'll also handle MIDI input manually to get clock
+      let midiAccess = null;
+      async function initMIDIInputs() {
+        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // OUTPUTS: pick first output for RealPlaybackEngine
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length > 0) {
+          realEngine.midiOutputs = [outputs[0]];
+          console.log("Using MIDI Output:", outputs[0].name);
+        } else {
+          console.warn("No MIDI outputs found. No audible notes will be sent.");
+        }
+
+        // INPUTS: pick first input for external clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length > 0) {
+          const firstInput = inputs[0];
+          console.log("Listening for MIDI clock on input:", firstInput.name);
+          firstInput.onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn(
+            "No MIDI inputs found. Transport won't see external Start/Stop/Clock."
+          );
+        }
+      }
+      await initMIDIInputs();
+
+      /***************************************************************************
+       * 4) Create a global context & transport manager
+       ***************************************************************************/
+      const globalContext = new GlobalContext({
+        chordManager: new ChordManager(),
+        rhythmManager: new RhythmManager(),
+      });
+      const transport = new TransportManager(midiBus, {
+        liveLoops: [],
+        pulsesPerStep: 6,
+      });
+
+      /***************************************************************************
+       * 5) Define DRUM notes map
+       ***************************************************************************/
+      const DRUM_NOTES = {
+        KICK: 53,
+        KICK_ALT: 54,
+        SNARE: 55,
+        SNARE_ALT: 56,
+        RIM: 57,
+        CLAP: 58,
+        TAMBOURINE: 59,
+        SHAKER: 60,
+        CLOSED_HAT: 61,
+        OPEN_HAT: 62,
+        PEDAL_HAT: 63,
+        LOW_TOM: 65,
+        CRASH: 66,
+        MID_TOM: 67,
+        RIDE: 68,
+        HIGH_TOM: 69,
+        CONGA_LOW: 71,
+        CONGA_HIGH: 72,
+        COWBELL: 73,
+        GUIRO: 74,
+        METAL: 75,
+        CHI: 76,
+      };
+
+      /***************************************************************************
+       * 6) Create a default DRUM loop (channel 1)
+       ***************************************************************************/
+      // We'll do a simple 16-step pattern:
+      // Kick on 0,4,8,12; Snare on 4,12; Closed hat every 2 steps
+      const defaultDrumPattern = new ExplicitNotePattern([
+        // step 0
+        [{ note: DRUM_NOTES.KICK }, { note: DRUM_NOTES.CLOSED_HAT }],
+        // step 1
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 2
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 3
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 4
+        [
+          { note: DRUM_NOTES.KICK },
+          { note: DRUM_NOTES.SNARE },
+          { note: DRUM_NOTES.CLOSED_HAT },
+        ],
+        // step 5
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 6
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 7
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 8
+        [{ note: DRUM_NOTES.KICK }, { note: DRUM_NOTES.CLOSED_HAT }],
+        // step 9
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 10
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 11
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 12
+        [
+          { note: DRUM_NOTES.KICK },
+          { note: DRUM_NOTES.SNARE },
+          { note: DRUM_NOTES.CLOSED_HAT },
+        ],
+        // step 13
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 14
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 15
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+      ]);
+
+      const drumLoop = new LiveLoop(midiBus, {
+        pattern: defaultDrumPattern,
+        midiChannel: 1,
+        globalContext,
+        name: "DrumLoop",
+      });
+      transport.addLiveLoop(drumLoop);
+
+      /***************************************************************************
+       * 7) Create a default MELODY loop (channel 5)
+       ***************************************************************************/
+      // We'll do a simple 8-step melodic pattern
+      const defaultMelodyPattern = new ExplicitNotePattern([
+        "C4",
+        "D4",
+        "E4",
+        "G4",
+        "G4",
+        "E4",
+        "D4",
+        "C4",
+      ]);
+
+      const melodyLoop = new LiveLoop(midiBus, {
+        pattern: defaultMelodyPattern,
+        midiChannel: 5,
+        globalContext,
+        name: "MelodyLoop",
+      });
+      transport.addLiveLoop(melodyLoop);
+
+      console.log(
+        "Default Drum (ch1) + Melody (ch5) loops created. Waiting for external MIDI clock..."
+      );
+
+      /***************************************************************************
+       * 8) Expose references in `api` for the REPL
+       ***************************************************************************/
+      window.api = {
+        midiBus,
+        realEngine,
+        transport,
+        globalContext,
+        drumLoop,
+        melodyLoop,
+        DRUM_NOTES,
+        ExplicitNotePattern,
+        // You can also add ChordPattern, LFO, etc. if you want:
+        // ChordPattern
+      };
+
+      /***************************************************************************
+       * 9) Provide two REPL textareas, one for Drums and one for Melody
+       ***************************************************************************/
+      const drumRepl = document.getElementById("drumRepl");
+      const melodyRepl = document.getElementById("melodyRepl");
+
+      // Default snippet for Drums: create a new pattern with your custom kit usage
+      const defaultDrumSnippet = `
+// EXAMPLE: Rebuild a 16-step drum pattern 
+// using notes from api.DRUM_NOTES on channel 1
+
+const newDrumPattern = new api.ExplicitNotePattern([
+  // Kick + closed hat
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.CLOSED_HAT }],
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  // Kick + snare
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.SNARE }],
+  [],
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  [],
+  // Kick + open hat
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.OPEN_HAT }],
+  [],
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  [],
+  // Kick + snare + crash
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.SNARE }, { note: api.DRUM_NOTES.CRASH }],
+  [],
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  []
+]);
+
+// Switch pattern immediately
+api.drumLoop.setPattern(newDrumPattern, true);
+
+console.log("Drum pattern updated on channel 1!");
+`.trim();
+
+      // Default snippet for Melody: 8-step pattern on channel 5
+      const defaultMelodySnippet = `
+// EXAMPLE: Create a new 8-step melody 
+// on channel 5 using explicit notes
+
+const newMelodyPattern = new api.ExplicitNotePattern([
+  "C4", "D4", 
+  { note: "E4", durationSteps: 2 }, 
+  "G4",
+  "A4", "B4",
+  "C5", "D5"
+]);
+
+// Update the melody loop pattern immediately
+api.melodyLoop.setPattern(newMelodyPattern, true);
+
+console.log("Melody loop updated on channel 5!");
+`.trim();
+
+      drumRepl.value = defaultDrumSnippet;
+      melodyRepl.value = defaultMelodySnippet;
+
+      // Buttons
+      document.getElementById("drumEvalBtn").addEventListener("click", () => {
+        const code = drumRepl.value;
+        try {
+          const result = eval(code);
+          if (result !== undefined) {
+            console.log("=>", result);
+          }
+        } catch (err) {
+          console.error("Eval error:", err);
+        }
+      });
+
+      document.getElementById("melodyEvalBtn").addEventListener("click", () => {
+        const code = melodyRepl.value;
+        try {
+          const result = eval(code);
+          if (result !== undefined) {
+            console.log("=>", result);
+          }
+        } catch (err) {
+          console.error("Eval error:", err);
+        }
+      });
+    </script>
+  </body>
+</html>

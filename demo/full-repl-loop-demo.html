@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>
+      op-xy-live Multi-Loop Demo (Drums, Melody, Chords, Bass, Hype)
+    </title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      #replContainer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-bottom: 20px;
+      }
+      .repl-box {
+        flex: 1;
+        min-width: 350px;
+        max-width: 580px;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+        font-family: monospace;
+      }
+      button {
+        margin-top: 5px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      #output {
+        width: 90%;
+        height: 220px;
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 8px;
+        overflow-y: auto;
+        white-space: pre;
+      }
+      h1,
+      h2,
+      h3 {
+        margin-top: 1em;
+        margin-bottom: 0.4em;
+      }
+      p,
+      ul {
+        margin-bottom: 1em;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>op-xy-live Multi-Loop Demo</h1>
+    <p>
+      This page sets up five loops (drums, melody, chords, bass, plus a
+      dedicated hype manager) listening to external MIDI clock from your first
+      MIDI input. Notes and control changes are sent to your first MIDI output.
+    </p>
+    <p>
+      Press <strong>Start</strong> on your external device or DAW, and you
+      should hear all loops playing. Then you can paste or modify code in any of
+      the REPL boxes below, click <strong>Eval</strong>, and the loops/managers
+      will update in real-time.
+    </p>
+
+    <div id="replContainer">
+      <!-- REPL #1: Drums -->
+      <div class="repl-box">
+        <h2>Drum Loop (channel 1)</h2>
+        <textarea id="drumRepl"></textarea><br />
+        <button id="drumEvalBtn">Eval Drums</button>
+      </div>
+
+      <!-- REPL #2: Melody -->
+      <div class="repl-box">
+        <h2>Melody Loop (channel 5)</h2>
+        <textarea id="melodyRepl"></textarea><br />
+        <button id="melodyEvalBtn">Eval Melody</button>
+      </div>
+
+      <!-- REPL #3: Chords -->
+      <div class="repl-box">
+        <h2>Chord Loop (channel 8)</h2>
+        <textarea id="chordRepl"></textarea><br />
+        <button id="chordEvalBtn">Eval Chords</button>
+      </div>
+
+      <!-- REPL #4: Bass -->
+      <div class="repl-box">
+        <h2>Bass Loop (channel 3)</h2>
+        <textarea id="bassRepl"></textarea><br />
+        <button id="bassEvalBtn">Eval Bass</button>
+      </div>
+
+      <!-- REPL #5: Hype / Energy Manager -->
+      <div class="repl-box">
+        <h2>Hype / Energy Manager</h2>
+        <textarea id="hypeRepl"></textarea><br />
+        <button id="hypeEvalBtn">Eval Hype</button>
+      </div>
+    </div>
+
+    <h3>Console Output</h3>
+    <div id="output"></div>
+
+    <script type="module">
+      /***************************************************************************
+       * 1) Import from our op-xy-live library
+       ***************************************************************************/
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        ChordManager,
+        ChordPattern,
+        GlobalContext,
+        RhythmManager,
+        ExplicitNotePattern,
+        LFO,
+        EnergyManager,
+      } from "../src/index.js";
+
+      /***************************************************************************
+       * 2) Mirror console logs to #output
+       ***************************************************************************/
+      const outputEl = document.getElementById("output");
+      function logToOutput(...msgs) {
+        outputEl.textContent += msgs.join(" ") + "\n";
+        outputEl.scrollTop = outputEl.scrollHeight;
+      }
+      const origLog = console.log;
+      console.log = (...args) => {
+        origLog(...args);
+        logToOutput(...args);
+      };
+      console.warn = (...args) => {
+        origLog("WARNING:", ...args);
+        logToOutput("WARNING:", ...args);
+      };
+      console.error = (...args) => {
+        origLog("ERROR:", ...args);
+        logToOutput("ERROR:", ...args);
+      };
+
+      /***************************************************************************
+       * 3) Setup MIDI Bus and RealPlaybackEngine
+       ***************************************************************************/
+      const midiBus = new MidiBus();
+      const realEngine = new RealPlaybackEngine(midiBus);
+      await realEngine.init();
+
+      let midiAccess = null;
+      async function initMIDIInputs() {
+        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // OUTPUTS: pick the first output for RealPlaybackEngine
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length > 0) {
+          realEngine.midiOutputs = [outputs[0]];
+          console.log("Using MIDI Output:", outputs[0].name);
+        } else {
+          console.warn("No MIDI outputs found - no audible playback.");
+        }
+
+        // INPUTS: pick the first input for external clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length > 0) {
+          const firstInput = inputs[0];
+          console.log("Listening for MIDI clock on input:", firstInput.name);
+          firstInput.onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn(
+            "No MIDI inputs found - no external clock or Start/Stop messages."
+          );
+        }
+      }
+      await initMIDIInputs();
+
+      /***************************************************************************
+       * 4) Create a GlobalContext (chords, rhythm) and an EnergyManager
+       ***************************************************************************/
+      const globalContext = new GlobalContext({
+        chordManager: new ChordManager({
+          // A default chord progression for the chord loop
+          progression: [
+            { root: "C", type: "maj7" },
+            { root: "D", type: "min7" },
+            { root: "G", type: "7" },
+            { root: "E", type: "min7" },
+          ],
+          tensionLevel: "none",
+        }),
+        rhythmManager: new RhythmManager({
+          // Adjust steps if you like
+          stepsPerBar: 16,
+          stepsPerBeat: 4,
+        }),
+      });
+
+      // An EnergyManager that can manipulate hype, tension, etc.
+      const energyManager = new EnergyManager({
+        chordManager: globalContext.chordManager,
+        rhythmManager: globalContext.rhythmManager,
+      });
+
+      /***************************************************************************
+       * 5) Create a TransportManager to respond to MIDI clock
+       ***************************************************************************/
+      const transport = new TransportManager(midiBus, {
+        pulsesPerStep: 6, // e.g. 16 steps per bar at 24 PPQN
+      });
+
+      /***************************************************************************
+       * 6a) DRUM LOOP (channel 1)
+       ***************************************************************************/
+      const DRUM_NOTES = {
+        KICK: 35,
+        SNARE: 38,
+        CLOSED_HAT: 42,
+        OPEN_HAT: 46,
+        CRASH: 49,
+      };
+
+      const defaultDrumPattern = new ExplicitNotePattern([
+        // step 0
+        [{ note: DRUM_NOTES.KICK }, { note: DRUM_NOTES.CLOSED_HAT }],
+        // step 1
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 2
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 3
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 4
+        [
+          { note: DRUM_NOTES.KICK },
+          { note: DRUM_NOTES.SNARE },
+          { note: DRUM_NOTES.CLOSED_HAT },
+        ],
+        // step 5
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 6
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 7
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 8
+        [{ note: DRUM_NOTES.KICK }, { note: DRUM_NOTES.CLOSED_HAT }],
+        // step 9
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 10
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 11
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 12
+        [
+          { note: DRUM_NOTES.KICK },
+          { note: DRUM_NOTES.SNARE },
+          { note: DRUM_NOTES.CLOSED_HAT },
+        ],
+        // step 13
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 14
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+        // step 15
+        [{ note: DRUM_NOTES.CLOSED_HAT }],
+      ]);
+
+      const drumLoop = new LiveLoop(midiBus, {
+        pattern: defaultDrumPattern,
+        midiChannel: 1,
+        globalContext,
+        name: "DrumLoop",
+      });
+      transport.addLiveLoop(drumLoop);
+
+      /***************************************************************************
+       * 6b) MELODY LOOP (channel 5) + an LFO on CC 32
+       ***************************************************************************/
+      const defaultMelodyPattern = new ExplicitNotePattern([
+        "C4",
+        "D4",
+        "E4",
+        "G4",
+        "G4",
+        "E4",
+        "D4",
+        "C4",
+      ]);
+
+      // Create an LFO that modulates CC 32 on this channel
+      const melodyLFO = new LFO({
+        frequency: 0.5,
+        shape: "sine",
+        amplitude: 1.0,
+        offset: 0.0,
+      });
+
+      const melodyLoop = new LiveLoop(midiBus, {
+        pattern: defaultMelodyPattern,
+        midiChannel: 5,
+        globalContext,
+        name: "MelodyLoop",
+        lfos: [melodyLFO],
+      });
+
+      // Override default to send CC 32
+      const originalMelodyUpdateLFOsOnly =
+        melodyLoop.updateLFOsOnly.bind(melodyLoop);
+      melodyLoop.updateLFOsOnly = (deltaTime, absoluteTime) => {
+        // Parent logic (sends CC 74 by default)
+        originalMelodyUpdateLFOsOnly(deltaTime, absoluteTime);
+
+        // Also send CC 32 with the same wave value
+        if (melodyLoop.lfos.length > 0) {
+          const waveValue = melodyLoop.lfos[0]._computeWaveValue(
+            melodyLoop.lfos[0].phase
+          );
+          const ccValue = Math.max(
+            0,
+            Math.min(127, Math.floor((waveValue + 1) * 63.5))
+          );
+          midiBus.controlChange({
+            channel: melodyLoop.midiChannel,
+            cc: 32,
+            value: ccValue,
+          });
+        }
+      };
+      transport.addLiveLoop(melodyLoop);
+
+      /***************************************************************************
+       * 6c) CHORD LOOP (channel 8) – uses ChordPattern referencing chordManager
+       ***************************************************************************/
+      const defaultChordPattern = new ChordPattern({
+        length: 16,
+        voicingType: "close",
+        octave: 4,
+      });
+
+      const chordLoop = new LiveLoop(midiBus, {
+        pattern: defaultChordPattern,
+        midiChannel: 8,
+        globalContext,
+        name: "ChordLoop",
+      });
+      transport.addLiveLoop(chordLoop);
+
+      /***************************************************************************
+       * 6d) BASS LOOP (channel 3) – demonstrate enqueued pattern changes
+       ***************************************************************************/
+      const defaultBassPattern = new ExplicitNotePattern([
+        "C2",
+        null,
+        null,
+        null,
+        "C2",
+        null,
+        null,
+        null,
+        "G2",
+        null,
+        null,
+        null,
+        "G2",
+        null,
+        null,
+        null,
+      ]);
+
+      const bassLoop = new LiveLoop(midiBus, {
+        pattern: defaultBassPattern,
+        midiChannel: 3,
+        globalContext,
+        name: "BassLoop",
+      });
+      transport.addLiveLoop(bassLoop);
+
+      /***************************************************************************
+       * 7) Provide references in window.api for REPL usage
+       ***************************************************************************/
+      window.api = {
+        midiBus,
+        realEngine,
+        transport,
+        globalContext,
+        chordLoop,
+        melodyLoop,
+        drumLoop,
+        bassLoop,
+        energyManager,
+        DRUM_NOTES,
+        ExplicitNotePattern,
+        ChordPattern,
+        LFO,
+      };
+
+      console.log("All loops set up. Waiting for external MIDI clock...");
+
+      /***************************************************************************
+       * 8) Preload example snippets into each REPL
+       ***************************************************************************/
+      const drumRepl = document.getElementById("drumRepl");
+      const melodyRepl = document.getElementById("melodyRepl");
+      const chordRepl = document.getElementById("chordRepl");
+      const bassRepl = document.getElementById("bassRepl");
+      const hypeRepl = document.getElementById("hypeRepl");
+
+      // DRUM snippet (ch1)
+      drumRepl.value = `
+// Example: Overwrite the drum pattern with new steps on channel 1.
+// Evaluate to hear changes immediately.
+
+const newDrumPattern = new api.ExplicitNotePattern([
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.CLOSED_HAT }],
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  null,
+  [{ note: api.DRUM_NOTES.OPEN_HAT }],
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.SNARE }],
+  null,
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  null,
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.CLOSED_HAT }],
+  null,
+  [{ note: api.DRUM_NOTES.OPEN_HAT }],
+  null,
+  [{ note: api.DRUM_NOTES.KICK }, { note: api.DRUM_NOTES.SNARE }, { note: api.DRUM_NOTES.CRASH }],
+  null,
+  [{ note: api.DRUM_NOTES.CLOSED_HAT }],
+  null
+]);
+
+api.drumLoop.setPattern(newDrumPattern, true);
+console.log("Drum pattern updated!");
+`;
+
+      // MELODY snippet (ch5)
+      melodyRepl.value = `
+// Example: Change melody pattern or LFO frequency (for CC 32) on channel 5.
+// Evaluate to apply immediately.
+
+const newMelodyPattern = new api.ExplicitNotePattern([
+  "E4", "F4", 
+  { note: "G4", durationSteps: 2 }, 
+  "B4",
+  "C5", "B4",
+  "A4", "G4"
+]);
+
+// Also tweak the LFO (index=0). Double freq from 0.5 to 1.0:
+api.melodyLoop.updateLFO(0, { frequency: 1.0, amplitude: 1.0 }, true);
+
+// Update the pattern now:
+api.melodyLoop.setPattern(newMelodyPattern, true);
+console.log("Melody + LFO updated!");
+`;
+
+      // CHORD snippet (ch8)
+      chordRepl.value = `
+// Example: Change the chord progression or tension level.
+// The chordLoop on channel 8 uses chordManager from globalContext.
+
+api.globalContext.chordManager.setProgression([
+  { root: "F", type: "maj7" },
+  { root: "Dm", type: "min7" },
+  { root: "G", type: "7" },
+  { root: "C", type: "maj7" }
+]);
+
+// Increase tension:
+api.globalContext.chordManager.setTensionLevel("mid");
+// Options: "none", "low", "mid", "high"
+
+console.log("Chord progression + tension updated!");
+`;
+
+      // BASS snippet (ch3)
+      bassRepl.value = `
+// Example: Create new bass pattern on channel 3 with an ENQUEUED change
+// for next boundary (use 'false' as second argument).
+
+const newBassPattern = new api.ExplicitNotePattern([
+  "C2", null, null, null,
+  "Eb2", null, null, null,
+  "F2", null, null, null,
+  "G2", null, null, null
+]);
+
+// Enqueue for next boundary so it switches seamlessly:
+api.bassLoop.setPattern(newBassPattern, false);
+
+console.log("Queued bass pattern change for next cycle!");
+`;
+
+      // HYPE snippet
+      hypeRepl.value = `
+// Example: Use the EnergyManager to set a hype level ("low", "medium", or "full").
+api.energyManager.setHypeLevel("full");
+console.log("Hype level => full!");
+`;
+
+      /***************************************************************************
+       * 9) Wire up the 5 “Eval” buttons
+       ***************************************************************************/
+      document.getElementById("drumEvalBtn").addEventListener("click", () => {
+        const code = drumRepl.value;
+        try {
+          const result = eval(code);
+          if (result !== undefined) console.log("=>", result);
+        } catch (err) {
+          console.error("Drum Eval error:", err);
+        }
+      });
+
+      document.getElementById("melodyEvalBtn").addEventListener("click", () => {
+        const code = melodyRepl.value;
+        try {
+          const result = eval(code);
+          if (result !== undefined) console.log("=>", result);
+        } catch (err) {
+          console.error("Melody Eval error:", err);
+        }
+      });
+
+      document.getElementById("chordEvalBtn").addEventListener("click", () => {
+        const code = chordRepl.value;
+        try {
+          const result = eval(code);
+          if (result !== undefined) console.log("=>", result);
+        } catch (err) {
+          console.error("Chord Eval error:", err);
+        }
+      });
+
+      document.getElementById("bassEvalBtn").addEventListener("click", () => {
+        const code = bassRepl.value;
+        try {
+          const result = eval(code);
+          if (result !== undefined) console.log("=>", result);
+        } catch (err) {
+          console.error("Bass Eval error:", err);
+        }
+      });
+
+      document.getElementById("hypeEvalBtn").addEventListener("click", () => {
+        const code = hypeRepl.value;
+        try {
+          const result = eval(code);
+          if (result !== undefined) console.log("=>", result);
+        } catch (err) {
+          console.error("Hype Eval error:", err);
+        }
+      });
+    </script>
+  </body>
+</html>
