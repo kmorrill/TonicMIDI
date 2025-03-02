@@ -161,13 +161,12 @@
 
       /**************************************************************
        * 5) Create a chord loop on ch=8
-       *    We'll make ChordPattern length=64, gatePct=0.95 so it holds notes
+       *    We'll make ChordPattern length=64
        **************************************************************/
       const chordLoop = new LiveLoop(midiBus, {
         pattern: new ChordPattern({
           length: 64, // matches the total steps of the progression
           voicingType: "open", // can be 'open', 'close', 'spread', etc.
-          gatePct: 0.95, // hold chord for 95% of the step
         }),
         midiChannel: 8,
         globalContext,
@@ -213,7 +212,6 @@
 const newChordPattern = new api.ChordPattern({
   length: 16,
   voicingType: "spread",
-  gatePct: 0.8,
   octave: 4
 });
 api.chordLoop.setPattern(newChordPattern, true);

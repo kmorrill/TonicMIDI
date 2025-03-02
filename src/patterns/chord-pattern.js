@@ -7,11 +7,6 @@
  *
  * Note: You may still want to give each chord a "duration" property in your chord
  * objects. If not present, we'll assume 16 steps by default.
- *
- * Regarding "gatePct" (seen elsewhere in your code):
- *   The ARP pattern might be trying to specify that notes only play for some fraction
- *   of their nominal duration, i.e. staccato vs. legato. You could integrate that
- *   concept here by adjusting 'durationSteps', but we haven't done so yet.
  */
 
 import { AbstractPattern } from "./pattern-interface.js";
