@@ -2,8 +2,16 @@
  * src/patterns/chord-pattern.js
  *
  * A pattern that generates notes based on chord information from the ChordManager.
- * Demonstrates how to use the GlobalContext's ChordManager to get harmonic information,
- * and RhythmManager to sync with rhythmic structures.
+ * In this version, it only triggers once at the start of each chord's duration
+ * (i.e. stepIndex % chord.duration === 0).
+ *
+ * Note: You may still want to give each chord a "duration" property in your chord
+ * objects. If not present, we'll assume 16 steps by default.
+ *
+ * Regarding "gatePct" (seen elsewhere in your code):
+ *   The ARP pattern might be trying to specify that notes only play for some fraction
+ *   of their nominal duration, i.e. staccato vs. legato. You could integrate that
+ *   concept here by adjusting 'durationSteps', but we haven't done so yet.
  */
 
 import { AbstractPattern } from "./pattern-interface.js";
@@ -11,10 +19,13 @@ import { AbstractPattern } from "./pattern-interface.js";
 export class ChordPattern extends AbstractPattern {
   /**
    * @param {Object} options
-   * @param {number} [options.length=16] - Pattern length in steps
+   * @param {number} [options.length=16] - Pattern length in steps (for internal reference)
    * @param {string} [options.voicingType="close"] - Chord voicing type ("close", "open", "spread")
-   * @param {number} [options.octave=4] - Base octave for the chord
-   * @param {number[]} [options.velocityPattern] - Optional velocity pattern to apply
+   * @param {number} [options.octave=4] - Base octave for fallback chord building
+   * @param {number[]} [options.velocityPattern] - Optional velocity pattern for each step
+   *
+   * Note: Even though we only trigger once, we can still read from velocityPattern
+   * to vary velocity from chord to chord (e.g., step 0 vs. step 16 vs. step 32).
    */
   constructor({
     length = 16,
@@ -28,7 +39,7 @@ export class ChordPattern extends AbstractPattern {
     this.voicingType = voicingType;
     this.octave = octave;
 
-    // Default velocity pattern if none provided (accent on downbeat)
+    // Default velocity pattern if none is provided (accent on the first step)
     this.velocityPattern =
       velocityPattern ||
       Array(length)
@@ -40,11 +51,10 @@ export class ChordPattern extends AbstractPattern {
    * Returns chord notes for the current step based on the chord manager's information
    *
    * @param {number} stepIndex - Current step index
-   * @param {Object} context - Context object including chordManager and rhythmManager
+   * @param {Object} context - Context object including chordManager (and optionally rhythmManager)
    * @returns {Array<{ note: string, velocity: number, durationSteps: number }>} Array of note objects
    */
   getNotes(stepIndex, context) {
-    // If no context or no chord manager, log a warning and return empty array
     if (!context || !context.chordManager) {
       console.warn(
         "[ChordPattern] No chordManager in context. Returning no notes."
@@ -52,75 +62,43 @@ export class ChordPattern extends AbstractPattern {
       return [];
     }
 
-    const { chordManager, rhythmManager } = context;
-
-    // Get the chord for this step from the chord manager
+    const chordManager = context.chordManager;
     const chord = chordManager.getChord(stepIndex);
     if (!chord) return [];
 
-    // Get current step's velocity from pattern
-    const velocity = this.velocityPattern[stepIndex % this.patternLength];
-
-    // Check if we should play the chord on this step
-    // This allows for rhythmic patterns based on RhythmManager
-    if (rhythmManager) {
-      // Only play on beats (quarter notes)
-      const intStep = Math.floor(stepIndex); // Floor the step index for rhythm checks
-      if (!rhythmManager.isBeat(intStep)) {
-        return [];
-      }
-
-      // Adjust velocity based on rhythmic position
-      const subdivision = rhythmManager.getSubdivision(intStep);
-      let velocityFactor = 1.0;
-
-      // Emphasize downbeats, de-emphasize offbeats
-      switch (subdivision) {
-        case 0: // Downbeat
-          velocityFactor = 1.2;
-          break;
-        case 1: // Other beats
-          velocityFactor = 1.0;
-          break;
-        case 2: // Offbeats
-          velocityFactor = 0.8;
-          break;
-        default:
-          velocityFactor = 0.7;
-      }
-
-      // Apply velocity factor
-      const adjustedVelocity = Math.min(
-        127,
-        Math.floor(velocity * velocityFactor)
-      );
-
-      // Generate chord notes from the chord data
-      const notes = this._generateChordNotes(chord, adjustedVelocity);
-      console.log(
-        `Sending chord notes on channel=${this.midiChannel} chord=${chord.root} ${chord.type}`,
-        notes
-      );
-      return notes;
+    // Only trigger once at the start of the chord's duration:
+    // e.g., if chord.duration=16, only return notes when stepIndex % 16===0
+    const chordDuration = chord.duration || 16;
+    if (stepIndex % chordDuration !== 0) {
+      // Not the chord boundary, so no notes this step
+      return [];
     }
 
-    // If no rhythm manager, just return the chord notes with the pattern velocity
-    return this._generateChordNotes(chord, velocity);
+    // Use velocity pattern to differentiate each chord (optional)
+    const velocity = this.velocityPattern[stepIndex % this.patternLength];
+
+    // Generate chord notes from chord data
+    const notes = this._generateChordNotes(chord, velocity);
+
+    console.log(
+      `[ChordPattern] Triggering chord at step=${stepIndex}`,
+      chord,
+      "notes:",
+      notes
+    );
+    return notes;
   }
 
   /**
-   * Returns the pattern length
-   *
-   * @returns {number} Pattern length in steps
+   * Returns the pattern length in steps
+   * (Used by the LiveLoop to know how many steps before repeating.)
    */
   getLength() {
     return this.patternLength;
   }
 
   /**
-   * Sets the voicing type for the chord pattern
-   *
-   * @param {string} voicingType - "close", "open", "spread", etc.
+   * Set the voicing type ("close", "open", "spread", etc.)
    */
   setVoicingType(voicingType) {
     this.voicingType = voicingType;
@@ -128,28 +106,24 @@ export class ChordPattern extends AbstractPattern {
 
   /**
    * Internal method to generate note objects from a chord
-   * Each note in the chord can have its own duration if specified in the chord object
    *
    * @private
-   * @param {Object} chord - Chord object from ChordManager
+   * @param {Object} chord - The chord object (root, type, notes[], duration, etc.)
    * @param {number} velocity - MIDI velocity for the notes
-   * @returns {Array<{ note: string, velocity: number, durationSteps: number }>} Array of note objects
    */
   _generateChordNotes(chord, velocity) {
-    const notes = [];
-
-    // If chord has predefined notes, use those
+    // If chord.notes is already populated by the ChordManager, just use that
     if (chord.notes && chord.notes.length) {
-      // Handle case where chord.notes contains objects with note and duration
       return chord.notes.map((noteItem) => {
         if (typeof noteItem === "string") {
+          // Use chord.duration as fallback for each note's duration
           return {
             note: noteItem,
             velocity,
-            durationSteps: Math.floor(chord.duration || 1), // Use chord's global duration if available, ensure integer
+            durationSteps: Math.floor(chord.duration || 1),
           };
         } else {
-          // Note item is an object with its own properties
+          // If chord.notes[] had objects like { note: "C4", durationSteps: 3, ... }
           const duration =
             noteItem.durationSteps ??
             noteItem.durationStepsOrBeats ??
@@ -158,24 +132,21 @@ export class ChordPattern extends AbstractPattern {
           return {
             note: noteItem.note,
             velocity: noteItem.velocity || velocity,
-            durationSteps: Math.floor(duration), // Ensure integer steps
+            durationSteps: Math.floor(duration),
           };
         }
       });
     }
 
-    // Otherwise, construct notes based on chord type and root
+    // Otherwise, construct chord notes manually (if needed).
+    // Typically your ChordManager might already fill chord.notes,
+    // so you might not even reach this code.
     const { root, type } = chord;
-
-    // Get intervals based on chord type
     const intervals = this._getIntervalsForChordType(type);
 
-    // Get MIDI note for root
     const rootMidi = this._getNoteNumber(root, this.octave);
 
-    // Apply the appropriate voicing based on voicingType
     let chordNotes = [];
-
     switch (this.voicingType) {
       case "open":
         chordNotes = this._createOpenVoicing(rootMidi, intervals);
@@ -189,39 +160,27 @@ export class ChordPattern extends AbstractPattern {
         break;
     }
 
-    // Get chord duration if specified, or default to 1
+    const noteDurations = chord.noteDurations || {};
     const chordDuration = chord.duration || 1;
 
-    // Handle individual note durations if provided
-    const noteDurations = chord.noteDurations || {};
-
-    // Convert MIDI note numbers back to note names and include duration
     return chordNotes.map((midiNote, index) => {
       const noteName = this._getMidiNoteName(midiNote);
-
-      // Use note-specific duration if available, otherwise use chord duration
-      const duration =
-        noteDurations[noteName] || // Look for duration by note name
-        noteDurations[index] || // Or by position in chord
-        chordDuration; // Or fall back to chord duration
+      const specificDuration =
+        noteDurations[noteName] || noteDurations[index] || chordDuration;
 
       return {
         note: noteName,
         velocity,
-        durationSteps: Math.floor(duration),
+        durationSteps: Math.floor(specificDuration),
       };
     });
   }
 
   /**
    * Returns semitone intervals for a given chord type
-   *
    * @private
-   * @param {string} chordType - The chord type (e.g., "maj", "min", "7", etc.)
-   * @returns {number[]} Array of semitone intervals from the root
    */
   _getIntervalsForChordType(chordType) {
-    // Define intervals for common chord types
     const chordIntervals = {
       // Triads
       maj: [0, 4, 7],
@@ -257,90 +216,52 @@ export class ChordPattern extends AbstractPattern {
       min6: [0, 3, 7, 9],
     };
 
-    // Return the intervals for the requested chord type or a major triad as fallback
-    return chordIntervals[chordType] || chordIntervals["maj"];
+    return chordIntervals[chordType] || chordIntervals.maj;
   }
 
-  /**
-   * Creates a close voicing (notes packed tightly together)
-   *
-   * @private
-   * @param {number} rootMidi - MIDI note number for root
-   * @param {number[]} intervals - Semitone intervals for the chord
-   * @returns {number[]} Array of MIDI note numbers for the chord
-   */
+  // -- helper voicing methods (same as before) --
+
   _createCloseVoicing(rootMidi, intervals) {
     return intervals.map((interval) => rootMidi + interval);
   }
 
-  /**
-   * Creates an open voicing (some notes spread to higher octaves)
-   *
-   * @private
-   * @param {number} rootMidi - MIDI note number for root
-   * @param {number[]} intervals - Semitone intervals for the chord
-   * @returns {number[]} Array of MIDI note numbers for the chord
-   */
   _createOpenVoicing(rootMidi, intervals) {
-    // Simple algorithm: move 3rd up an octave in triads, or distribute extensions
     const voicing = [];
     intervals.forEach((interval, index) => {
       if (intervals.length <= 3 && index === 1) {
-        // Move 3rd up an octave in triads
+        // move 3rd up an octave
         voicing.push(rootMidi + interval + 12);
       } else if (index >= 3) {
-        // Move extensions up an octave
         voicing.push(rootMidi + interval);
       } else {
         voicing.push(rootMidi + interval);
       }
     });
-
     return voicing;
   }
 
-  /**
-   * Creates a spread voicing (notes spread across multiple octaves)
-   *
-   * @private
-   * @param {number} rootMidi - MIDI note number for root
-   * @param {number[]} intervals - Semitone intervals for the chord
-   * @returns {number[]} Array of MIDI note numbers for the chord
-   */
   _createSpreadVoicing(rootMidi, intervals) {
     if (intervals.length <= 3) {
-      // For triads, spread each note by an octave
       return [
         rootMidi,
         rootMidi + intervals[1] + 12,
         rootMidi + intervals[2] + 24,
       ];
     } else {
-      // For 7th chords and extensions, distribute across octaves
       const voicing = [rootMidi];
-
       intervals.slice(1).forEach((interval, idx) => {
-        // Add octave shifts based on position
         const octaveShift = Math.floor((idx + 1) / 2) * 12;
         voicing.push(rootMidi + interval + octaveShift);
       });
-
       return voicing;
     }
   }
 
   /**
-   * Converts a note name and octave to MIDI note number
-   * This is a simplified conversion for demonstration
-   *
-   * @private
-   * @param {string} noteName - Note name (e.g., "C", "F#", "Bb")
-   * @param {number} octave - Octave number
-   * @returns {number} MIDI note number
+   * Converts note name + octave to MIDI note number.
+   * Simplified for demonstration.
    */
   _getNoteNumber(noteName, octave) {
-    // This is a simplified version - a real implementation would have
-    // proper handling of all note names, accidentals, etc.
     const noteMap = {
       C: 0,
       "C#": 1,
@@ -360,25 +281,16 @@ export class ChordPattern extends AbstractPattern {
       Bb: 10,
       B: 11,
     };
-
-    // Extract the note name (could be one or two characters)
-    const noteBase = noteName.charAt(0).toUpperCase();
-    const hasAccidental = noteName.length > 1;
-    const accidental = hasAccidental ? noteName.substring(1) : "";
-
-    const fullNoteName = noteBase + accidental;
-    const noteValue = noteMap[fullNoteName] || 0;
-
-    return (octave + 1) * 12 + noteValue;
+    const name = noteName.charAt(0).toUpperCase();
+    const accidental = noteName.slice(1); // might be # or b
+    const fullNoteName = name + accidental;
+    const semitone = noteMap[fullNoteName] || 0;
+    return (octave + 1) * 12 + semitone;
   }
 
   /**
-   * Converts a MIDI note number to note name and octave
-   * This is a simplified conversion for demonstration
-   *
-   * @private
-   * @param {number} midiNote - MIDI note number
-   * @returns {string} Note name with octave (e.g., "C4", "F#3")
+   * Converts a MIDI note number to note name.
+   * Simplified for demonstration.
    */
   _getMidiNoteName(midiNote) {
     const noteNames = [
@@ -395,9 +307,8 @@ export class ChordPattern extends AbstractPattern {
       "A#",
       "B",
     ];
-    const octave = Math.floor(midiNote / 12) - 1;
     const noteIndex = midiNote % 12;
-
-    return noteNames[noteIndex] + octave;
+    const noteOctave = Math.floor(midiNote / 12) - 1;
+    return noteNames[noteIndex] + noteOctave;
   }
 }

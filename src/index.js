@@ -2,7 +2,6 @@
 export { MidiBus } from "./midi-bus.js";
 export { RealPlaybackEngine } from "./engines/real-playback-engine.js";
 export { MockPlaybackEngine } from "./engines/mock-playback-engine.js";
-export { ExplicitNotePattern } from "./patterns/explicit-note-pattern.js";
 export { LiveLoop } from "./live-loop.js";
 export { EnergyManager } from "./energy-manager.js";
 export { TransportManager } from "./transport/transport-manager.js";
@@ -11,7 +10,13 @@ export { TransportManager } from "./transport/transport-manager.js";
 export { ChordManager } from "./chord-manager.js";
 export { RhythmManager } from "./rhythm-manager.js";
 export { GlobalContext } from "./global-context.js";
-export { ChordPattern } from "./patterns/chord-pattern.js";
+
+// Correcting the export statement for patterns
+export * from "./patterns/drum-pattern.js";
+export * from "./patterns/chance-step-arp.js";
+export * from "./patterns/syncopated-bass.js";
+export * from "./patterns/chord-pattern.js";
+export * from "./patterns/explicit-note-pattern.js";
 
 // Exporting LFO module
 export { LFO } from "./lfo.js";

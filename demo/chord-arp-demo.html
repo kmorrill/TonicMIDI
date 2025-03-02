@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>op-xy-live ARP & Chord Pattern Demo</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      #replContainer {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .repl-box {
+        flex: 1;
+        min-width: 350px;
+        max-width: 600px;
+      }
+      textarea {
+        width: 100%;
+        height: 200px;
+      }
+      button {
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      #output {
+        width: 90%;
+        height: 200px;
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 8px;
+        overflow-y: auto;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>op-xy-live ARP & Chord Pattern Demo</h1>
+
+    <p>This demo features:</p>
+    <ul>
+      <li>
+        A <strong>Chord Pattern</strong> loop on MIDI channel <code>8</code>,
+        holding notes almost the entire measure.
+      </li>
+      <li>
+        A <strong>Chance Step Arpeggiator</strong> loop on MIDI channel
+        <code>5</code>.
+      </li>
+      <li>Listening to external MIDI clock from your DAW/hardware.</li>
+      <li>Two REPL boxes for live editing.</li>
+    </ul>
+
+    <div id="replContainer">
+      <div class="repl-box">
+        <h2>Chord Pattern REPL (Ch 8)</h2>
+        <textarea id="chordRepl"></textarea>
+        <button id="chordEvalBtn">Eval Chords</button>
+      </div>
+
+      <div class="repl-box">
+        <h2>Chance Step ARP REPL (Ch 5)</h2>
+        <textarea id="arpRepl"></textarea>
+        <button id="arpEvalBtn">Eval ARP</button>
+      </div>
+    </div>
+
+    <h3>Console Output</h3>
+    <div id="output"></div>
+
+    <script type="module">
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        ChordManager,
+        ChordPattern,
+        ChanceStepArp,
+        GlobalContext,
+        RhythmManager,
+      } from "../src/index.js";
+
+      /**************************************************************
+       * 1) Mirror all console logs to #output for debugging
+       **************************************************************/
+      const outputEl = document.getElementById("output");
+      const origLog = console.log;
+      console.log = (...args) => {
+        origLog(...args);
+        outputEl.textContent += args.join(" ") + "\n";
+        outputEl.scrollTop = outputEl.scrollHeight;
+      };
+
+      /**************************************************************
+       * 2) Create MidiBus + RealPlaybackEngine
+       **************************************************************/
+      const midiBus = new MidiBus();
+      const realEngine = new RealPlaybackEngine(midiBus);
+
+      // We'll wire up external clock below
+      let midiAccess = null;
+      async function initMidiIO() {
+        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // INPUT: pick first input to receive Start/Stop/Clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length > 0) {
+          const firstInput = inputs[0];
+          console.log("Listening for MIDI clock on input:", firstInput.name);
+          firstInput.onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn(
+            "No MIDI inputs found. No external clock will be received."
+          );
+        }
+
+        // OUTPUT: pick first output to send notes
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length > 0) {
+          console.log("Using MIDI output:", outputs[0].name);
+          realEngine.midiOutputs = [outputs[0]];
+        } else {
+          console.warn("No MIDI outputs found. No audible notes will be sent.");
+        }
+      }
+
+      // Initialize output, then input
+      await realEngine.init();
+      await initMidiIO();
+
+      /**************************************************************
+       * 3) Setup global context + chord manager + default progression
+       *    We'll have 4 chords, each lasting 16 steps => total 64 steps
+       **************************************************************/
+      const globalContext = new GlobalContext({
+        chordManager: new ChordManager(),
+        rhythmManager: new RhythmManager(),
+      });
+
+      // Example chord progression, each chord lasts 16 steps => total 64
+      globalContext.chordManager.setProgression([
+        { root: "C", type: "maj", duration: 16 },
+        { root: "F", type: "maj", duration: 16 },
+        { root: "G", type: "7", duration: 16 },
+        { root: "E", type: "min7", duration: 16 },
+      ]);
+
+      /**************************************************************
+       * 4) Transport Manager: pulsesPerStep=6 => 4 steps/quarter @24PPQN
+       **************************************************************/
+      const transport = new TransportManager(midiBus, {
+        liveLoops: [],
+        pulsesPerStep: 6,
+      });
+
+      /**************************************************************
+       * 5) Create a chord loop on ch=8
+       *    We'll make ChordPattern length=64, gatePct=0.95 so it holds notes
+       **************************************************************/
+      const chordLoop = new LiveLoop(midiBus, {
+        pattern: new ChordPattern({
+          length: 64, // matches the total steps of the progression
+          voicingType: "open", // can be 'open', 'close', 'spread', etc.
+          gatePct: 0.95, // hold chord for 95% of the step
+        }),
+        midiChannel: 8,
+        globalContext,
+        name: "ChordLoop",
+      });
+      transport.addLiveLoop(chordLoop);
+
+      /**************************************************************
+       * 6) Create a chance-step ARP on ch=5
+       **************************************************************/
+      const arpLoop = new LiveLoop(midiBus, {
+        pattern: new ChanceStepArp({
+          probabilityToAdvance: 80,
+          avoidRepeats: true,
+          restProbability: 10,
+        }),
+        midiChannel: 5,
+        globalContext,
+        name: "ArpLoop",
+      });
+      transport.addLiveLoop(arpLoop);
+
+      /**************************************************************
+       * 7) Expose references for the REPL
+       **************************************************************/
+      window.api = {
+        midiBus,
+        realEngine,
+        transport,
+        globalContext,
+        chordLoop,
+        arpLoop,
+        ChordPattern,
+        ChanceStepArp,
+      };
+
+      /**************************************************************
+       * 8) Preload example code in the REPL textareas
+       **************************************************************/
+      document.getElementById("chordRepl").value = `
+// Example: Rebuild ChordPattern
+// Let's do 16 steps total with a bigger voicing:
+const newChordPattern = new api.ChordPattern({
+  length: 16,
+  voicingType: "spread",
+  gatePct: 0.8,
+  octave: 4
+});
+api.chordLoop.setPattern(newChordPattern, true);
+console.log("Chord pattern updated (16-step, spread voicing)!");
+      `.trim();
+
+      document.getElementById("arpRepl").value = `
+// Example: Tweak the ARP probabilities
+const newArpPattern = new api.ChanceStepArp({
+  probabilityToAdvance: 90,
+  restProbability: 5,
+  avoidRepeats: false,
+});
+api.arpLoop.setPattern(newArpPattern, true);
+console.log("ARP updated with higher chance of movement!");
+      `.trim();
+
+      // Hook up "Eval" buttons
+      document.getElementById("chordEvalBtn").onclick = () => {
+        eval(document.getElementById("chordRepl").value);
+      };
+      document.getElementById("arpEvalBtn").onclick = () => {
+        eval(document.getElementById("arpRepl").value);
+      };
+
+      console.log(
+        "Chord loop (ch 8) + ARP loop (ch 5) ready. Awaiting MIDI clock..."
+      );
+    </script>
+  </body>
+</html>
