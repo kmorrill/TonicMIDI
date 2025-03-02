@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>op-xy-live Melody Demo + REPL</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      #repl {
+        width: 80%;
+        height: 200px;
+      }
+      #output {
+        width: 80%;
+        height: 180px;
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 8px;
+        overflow-y: auto;
+        white-space: pre;
+      }
+      button {
+        margin-top: 5px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>op-xy-live Melody Demo + REPL</h1>
+
+    <p>This page automatically:</p>
+    <ul>
+      <li>Requests Web MIDI access for both inputs and outputs.</li>
+      <li>Selects the first MIDI output for sending notes.</li>
+      <li>
+        Selects the first MIDI input to receive external clock
+        (Start/Stop/Clock).
+      </li>
+      <li>
+        Creates a default chord-based loop on channel 1. Once your external
+        device sends <code>Start (0xFA)</code>, you'll hear chords each bar.
+      </li>
+      <li>
+        Provides a REPL to modify the existing loop in real time (channel,
+        pattern, etc.).
+      </li>
+    </ul>
+
+    <!-- REPL interface -->
+    <textarea id="repl"></textarea><br />
+    <button id="evalBtn">Eval code</button>
+
+    <h3>Console Output</h3>
+    <div id="output"></div>
+
+    <script type="module">
+      /****************************************************************
+       * 1) Import from the op-xy-live library
+       ****************************************************************/
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        ChordManager,
+        ChordPattern,
+        GlobalContext,
+        RhythmManager,
+        ExplicitNotePattern,
+      } from "../src/index.js";
+
+      /****************************************************************
+       * 2) Mirror console logs to #output
+       ****************************************************************/
+      const outputEl = document.getElementById("output");
+      function logToOutput(...msgs) {
+        outputEl.textContent += msgs.join(" ") + "\n";
+        outputEl.scrollTop = outputEl.scrollHeight;
+      }
+      const origLog = console.log;
+      console.log = (...args) => {
+        origLog(...args);
+        logToOutput(...args);
+      };
+      console.warn = (...args) => {
+        origLog("WARNING:", ...args);
+        logToOutput("WARNING:", ...args);
+      };
+      console.error = (...args) => {
+        origLog("ERROR:", ...args);
+        logToOutput("ERROR:", ...args);
+      };
+
+      /****************************************************************
+       * 3) Setup the MIDI Bus and RealPlaybackEngine for outputs
+       ****************************************************************/
+      const midiBus = new MidiBus();
+      const realEngine = new RealPlaybackEngine(midiBus);
+
+      // We'll also handle MIDI *input* manually for receiving clock
+      let midiAccess = null;
+
+      async function initMIDI() {
+        // Request input & output
+        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // OUTPUTS: pick first output for RealPlaybackEngine
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length > 0) {
+          realEngine.midiOutputs = [outputs[0]];
+          console.log("Using MIDI Output:", outputs[0].name);
+        } else {
+          console.warn("No MIDI outputs found. No audible notes will be sent.");
+        }
+
+        // INPUTS: pick first input for external clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length > 0) {
+          const firstInput = inputs[0];
+          console.log("Listening for MIDI clock on input:", firstInput.name);
+          firstInput.onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn(
+            "No MIDI inputs found. Transport won't see external Start/Stop/Clock."
+          );
+        }
+      }
+
+      // Init the output device
+      await realEngine.init();
+      // Then init input listening
+      await initMIDI();
+
+      /****************************************************************
+       * 4) GlobalContext & TransportManager
+       ****************************************************************/
+      const globalContext = new GlobalContext({
+        chordManager: new ChordManager(),
+        rhythmManager: new RhythmManager(),
+      });
+      const transport = new TransportManager(midiBus, {
+        liveLoops: [],
+        pulsesPerStep: 6,
+      });
+
+      /****************************************************************
+       * 5) Create a default chord-based loop on channel 1
+       ****************************************************************/
+      globalContext.chordManager.setProgression([
+        { root: "C", type: "maj" },
+        { root: "F", type: "maj" },
+        { root: "G", type: "7" },
+        { root: "E", type: "min7" },
+      ]);
+
+      const chordPattern = new ChordPattern({
+        length: 16, // 16 steps per chord
+        voicingType: "close",
+        octave: 4,
+      });
+
+      const defaultLoop = new LiveLoop(midiBus, {
+        pattern: chordPattern,
+        midiChannel: 1,
+        globalContext,
+        name: "DefaultChordLoop",
+      });
+
+      transport.addLiveLoop(defaultLoop);
+
+      console.log(
+        "Default chord loop created (ch1). External MIDI Start (0xFA) will play it."
+      );
+
+      /****************************************************************
+       * 6) Expose everything in `api` for the REPL
+       ****************************************************************/
+      window.api = {
+        midiBus,
+        realEngine,
+        transport,
+        globalContext,
+        defaultLoop,
+        ChordPattern,
+        ExplicitNotePattern,
+      };
+
+      /****************************************************************
+       * 7) Provide a REPL text area
+       ****************************************************************/
+      const replArea = document.getElementById("repl");
+
+      // The REPL snippet that modifies the existing loop (channel, patterns, queueing)
+      const defaultSnippet = `
+// REPL EXAMPLE: Modify existing defaultLoop's channel & pattern
+
+console.log("----- REPL Example: Setting a new pattern & channel -----");
+
+// 1) Change MIDI channel (e.g. 3). 
+//    Make sure your synth is listening on this channel!
+api.defaultLoop.midiChannel = 3;
+
+// 2) Create an 8-step melody. Some steps have durations of 2 steps.
+const newMelodyPattern = new api.ExplicitNotePattern([
+  { note: "C4", durationSteps: 2 },
+  { note: "E4" },
+  { note: "F4", durationSteps: 2 },
+  { note: "G4" },
+  "A4",
+  { note: "G4" },
+  { note: "F4" },
+  "E4"
+]);
+
+// 3) Replace the default loop's pattern immediately
+api.defaultLoop.setPattern(newMelodyPattern, true);
+
+console.log("Now using an 8-step melody on channel 3. Immediate switch.");
+
+// 4) Create a second pattern to queue at next boundary
+const secondPattern = new api.ExplicitNotePattern([
+  "C4", "E4", "G4", "B4",
+  "C5", "B4", "G4", "E4"
+]);
+
+// 5) Queue this second pattern for the next cycle boundary
+api.defaultLoop.setPattern(secondPattern, false);
+
+console.log("Queued second pattern for next cycle boundary (8 steps).");
+  `.trim();
+
+      replArea.value = defaultSnippet;
+
+      document.getElementById("evalBtn").addEventListener("click", () => {
+        const userCode = replArea.value;
+        try {
+          const result = eval(userCode);
+          if (result !== undefined) {
+            console.log("=>", result);
+          }
+        } catch (err) {
+          console.error("Eval error:", err);
+        }
+      });
+    </script>
+  </body>
+</html>
