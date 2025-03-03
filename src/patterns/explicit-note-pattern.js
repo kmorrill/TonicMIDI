@@ -13,7 +13,7 @@
  *    or you can specify it per note.
  * 4. **RhythmManager integration** (optional): If `context.rhythmManager` is provided, and
  *    `rhythmManager.isBeat()` returns `false` for the current step, no notes are returned.
- *    This is an example usage—feel free to remove or customize if you want every step to trigger.
+ *    (This is just an example of filtering logic.)
  *
  * ### Example Usage
  * ```js
@@ -32,12 +32,13 @@
  *
  * // In a LiveLoop:
  * const loop = new LiveLoop(midiBus, { pattern: chordLine });
- * // Now step calls to loop.tick() will retrieve these notes.
+ * // Now calls to loop.tick() will retrieve these notes on each step.
  * ```
  */
-import { AbstractPattern } from "./pattern-interface.js";
 
-export class ExplicitNotePattern extends AbstractPattern {
+import { BasePattern } from "./base-pattern.js";
+
+export class ExplicitNotePattern extends BasePattern {
   /**
    * Constructs a new ExplicitNotePattern with an array describing each step's notes.
    *
@@ -75,7 +76,7 @@ export class ExplicitNotePattern extends AbstractPattern {
    * ```
    */
   constructor(notesArray) {
-    super();
+    super({ notesArray });
 
     /**
      * @private
@@ -111,14 +112,11 @@ export class ExplicitNotePattern extends AbstractPattern {
    * @returns {Array<{ note: string, durationSteps: number, velocity?: number }>}
    *   The list of notes to be played on this step. May contain multiple note objects
    *   if the step had a chord. If none, returns an empty array.
-   *
-   * @private
-   *
    */
   getNotes(stepIndex, context) {
     const intStep = Math.floor(stepIndex);
 
-    // Check optional rhythmManager for "only trigger on beats" logic
+    // Example: skip if there's a rhythmManager and it's not a beat
     if (
       context &&
       context.rhythmManager &&
@@ -127,6 +125,7 @@ export class ExplicitNotePattern extends AbstractPattern {
       return [];
     }
 
+    // Wrap around the pattern's length
     const index = intStep % this.getLength();
     const noteObjects = this.notes[index] || [];
 
@@ -149,10 +148,21 @@ export class ExplicitNotePattern extends AbstractPattern {
    * If your `notesArray` has length N, we repeat after N steps.
    *
    * @returns {number} Number of steps in the pattern.
-   *
-   * @private
    */
   getLength() {
     return this.notes.length;
+  }
+
+  /**
+   * Optional serialization method. We override the base to include the full note array.
+   *
+   * @returns {Object} A representation of this pattern, including all notes.
+   */
+  toConfig() {
+    const base = super.toConfig(); // { patternType, options: {...} }
+    return {
+      ...base,
+      notes: this.notes,
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { AbstractPattern } from "./pattern-interface.js";
+import { BasePattern } from "./base-pattern.js";
 
 /**
  * DrumPattern is a Pattern class that automatically generates "low", "medium",
@@ -36,7 +36,7 @@ import { AbstractPattern } from "./pattern-interface.js";
  * });
  * ```
  */
-export class DrumPattern extends AbstractPattern {
+export class DrumPattern extends BasePattern {
   /**
    * Creates a new DrumPattern with automatic "low", "medium", and "high" variants
    * derived from a single "medium" pattern. The "medium" pattern is used as the

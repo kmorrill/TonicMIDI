@@ -14,9 +14,10 @@
  * - Velocity can be varied by `velocityVariation`.
  * - You can also randomize which octave a note appears in within `octaveRange`.
  */
-import { AbstractPattern } from "./pattern-interface.js";
 
-export class ChanceStepArp extends AbstractPattern {
+import { BasePattern } from "./base-pattern.js";
+
+export class ChanceStepArp extends BasePattern {
   /**
    * Create a ChanceStepArp pattern with a set of probabilistic rules.
    *
@@ -54,9 +55,19 @@ export class ChanceStepArp extends AbstractPattern {
     baseVelocity = 100,
     randomFn = Math.random,
   } = {}) {
-    super();
+    // Pass all constructor params to the BasePattern's `options`.
+    super({
+      probabilityToAdvance,
+      restProbability,
+      avoidRepeats,
+      rootJump,
+      velocityVariation,
+      octaveRange,
+      baseVelocity,
+      randomFn,
+    });
 
-    /** @private */
+    // Store them as direct fields (private or otherwise) for internal use.
     this.probabilityToAdvance = probabilityToAdvance;
 
     /** @private */

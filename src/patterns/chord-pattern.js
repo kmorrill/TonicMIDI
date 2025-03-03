@@ -39,9 +39,9 @@
  * });
  * ```
  */
-import { AbstractPattern } from "./pattern-interface.js";
+import { BasePattern } from "./base-pattern.js";
 
-export class ChordPattern extends AbstractPattern {
+export class ChordPattern extends BasePattern {
   /**
    * Constructs a ChordPattern that looks up chords from the provided `chordManager`
    * in the pattern's context. It only triggers at the start of each chord's duration

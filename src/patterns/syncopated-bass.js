@@ -1,4 +1,4 @@
-import { AbstractPattern } from "./pattern-interface.js";
+import { BasePattern } from "./base-pattern.js";
 import { RhythmManager } from "../rhythm-manager.js";
 
 /**
@@ -34,7 +34,7 @@ import { RhythmManager } from "../rhythm-manager.js";
  * });
  * ```
  */
-export class SyncopatedBass extends AbstractPattern {
+export class SyncopatedBass extends BasePattern {
   /**
    * Constructs a SyncopatedBass pattern instance.
    *
