@@ -171,7 +171,7 @@ should adapt automatically on their next cycle.
 
 ## SyncopatedBass
 
-**Extends AbstractPattern**
+**Extends BasePattern**
 
 A Pattern class that generates a syncopated bass line based on:
 
@@ -220,7 +220,7 @@ const loop = new LiveLoop(midiBus, {
 
 ## DrumPattern
 
-**Extends AbstractPattern**
+**Extends BasePattern**
 
 DrumPattern is a Pattern class that automatically generates "low", "medium",
 and "high" intensity versions of a specified drum pattern. By default, it
@@ -268,7 +268,7 @@ const drumPattern = new DrumPattern({
 
 ## ExplicitNotePattern
 
-**Extends AbstractPattern**
+**Extends BasePattern**
 
 ### Parameters
 

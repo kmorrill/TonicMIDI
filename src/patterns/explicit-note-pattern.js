@@ -112,6 +112,8 @@ export class ExplicitNotePattern extends BasePattern {
    * @returns {Array<{ note: string, durationSteps: number, velocity?: number }>}
    *   The list of notes to be played on this step. May contain multiple note objects
    *   if the step had a chord. If none, returns an empty array.
+   *
+   * @private
    */
   getNotes(stepIndex, context) {
     const intStep = Math.floor(stepIndex);
@@ -148,6 +150,8 @@ export class ExplicitNotePattern extends BasePattern {
    * If your `notesArray` has length N, we repeat after N steps.
    *
    * @returns {number} Number of steps in the pattern.
+   *
+   * @private
    */
   getLength() {
     return this.notes.length;
@@ -157,6 +161,8 @@ export class ExplicitNotePattern extends BasePattern {
    * Optional serialization method. We override the base to include the full note array.
    *
    * @returns {Object} A representation of this pattern, including all notes.
+   *
+   * @private
    */
   toConfig() {
     const base = super.toConfig(); // { patternType, options: {...} }
