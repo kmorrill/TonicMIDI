@@ -72,9 +72,16 @@ describe("TransportManager", () => {
   });
 
   it("should accumulate clock pulses and increment stepIndex when pulsesPerStep reached", () => {
-    // Start transport
+    // Start transport => immediate tick(0)
     simulateMidiMessage([0xfa]);
-    // highResolution = false, so we only call tick after pulsesPerStep (6 pulses)
+    // We now expect exactly ONE tick call from the immediate start
+    expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
+    expect(liveLoop1.tick).toHaveBeenCalledWith(
+      0, 
+      expect.any(Number), 
+      expect.any(Number)
+    );
+    expect(liveLoop2.tick).toHaveBeenCalledTimes(1);
 
     // We send 5 pulses => stepIndex should remain 0
     for (let i = 0; i < 5; i++) {
@@ -82,18 +89,18 @@ describe("TransportManager", () => {
     }
     expect(transportManager.stepIndex).toBe(0);
     expect(transportManager.pulseCounter).toBe(5);
-    // No tick calls yet
-    expect(liveLoop1.tick).not.toHaveBeenCalled();
+    // Still only the 1 tick call from start
+    expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
 
     // 6th pulse => triggers step increment to 1
     simulateMidiMessage([0xf8]);
     expect(transportManager.stepIndex).toBe(1);
     expect(transportManager.pulseCounter).toBe(0);
-    // Should have called tick on both loops
-    expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
-    expect(liveLoop2.tick).toHaveBeenCalledTimes(1);
+    // Should have called tick again on both loops (2 calls total now)
+    expect(liveLoop1.tick).toHaveBeenCalledTimes(2);
+    expect(liveLoop2.tick).toHaveBeenCalledTimes(2);
     // The stepIndex passed in is 1, should also get a deltaTime and absoluteTime
-    expect(liveLoop1.tick).toHaveBeenCalledWith(
+    expect(liveLoop1.tick).toHaveBeenLastCalledWith(
       1, 
       expect.any(Number), 
       expect.any(Number)
@@ -111,16 +118,25 @@ describe("TransportManager", () => {
 
     simulateMidiMessage([0xfa]); // Start
     expect(transportManager.isRunning).toBe(true);
+    
+    // We now expect exactly ONE tick call from the immediate start
+    expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
+    expect(liveLoop1.tick).toHaveBeenCalledWith(
+      0, 
+      expect.any(Number), 
+      expect.any(Number)
+    );
+    expect(liveLoop2.tick).toHaveBeenCalledTimes(1);
 
     // Send 3 pulses (half a step)
     for (let i = 0; i < 3; i++) {
       simulateMidiMessage([0xf8]);
     }
 
-    // We should NOT call tick for pattern logic yet (no step boundary crossed)
-    // In the old implementation, this would have called tick 3 times with fractional steps
-    expect(liveLoop1.tick).not.toHaveBeenCalled();
-    expect(liveLoop2.tick).not.toHaveBeenCalled();
+    // No new tick calls beyond the initial one (no step boundary crossed)
+    // In the old implementation, this would have called tick 3 additional times with fractional steps
+    expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
+    expect(liveLoop2.tick).toHaveBeenCalledTimes(1);
 
     // stepIndex still 0 because we haven't crossed a step boundary
     expect(transportManager.stepIndex).toBe(0);
@@ -130,9 +146,9 @@ describe("TransportManager", () => {
       simulateMidiMessage([0xf8]);
     }
     
-    // Now we should have called tick once at the step boundary
-    expect(liveLoop1.tick).toHaveBeenCalledTimes(1);
-    expect(liveLoop2.tick).toHaveBeenCalledTimes(1);
+    // Now we should have called tick a second time at the step boundary
+    expect(liveLoop1.tick).toHaveBeenCalledTimes(2);
+    expect(liveLoop2.tick).toHaveBeenCalledTimes(2);
     
     // stepIndex should now be 1
     expect(transportManager.stepIndex).toBe(1);
@@ -218,32 +234,39 @@ describe("TransportManager", () => {
     });
     
     it("should call tick only at integer step boundaries", () => {
+      // Start already called tick(0) once
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledWith(0, 0, expect.any(Number));
+      
       // Send 6 pulses (exactly 1 step)
       for (let i = 0; i < 6; i++) {
         simulateMidiMessage([0xf8]);
       }
       
-      // Should have called tick exactly once at the step boundary
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledWith(1, 0, expect.any(Number));
+      // Should have called tick a second time at the step boundary
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenLastCalledWith(1, 0, expect.any(Number));
       
       // Send 5 more pulses (not enough for another step)
       for (let i = 0; i < 5; i++) {
         simulateMidiMessage([0xf8]);
       }
       
-      // tick should still have only been called once
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      // tick should still have only been called twice
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2);
       
       // Send 1 more pulse to reach the next step boundary
       simulateMidiMessage([0xf8]);
       
-      // Now tick should have been called twice
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2);
+      // Now tick should have been called three times
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(3);
       expect(liveLoopWithUpdateLFO.tick).toHaveBeenLastCalledWith(2, 0, expect.any(Number));
     });
     
     it("should update LFOs on every pulse for high-resolution modulation", () => {
+      // Start already called tick(0) once
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      
       // Send 3 pulses (half a step)
       for (let i = 0; i < 3; i++) {
         simulateMidiMessage([0xf8]);
@@ -252,8 +275,8 @@ describe("TransportManager", () => {
       // updateLFOsOnly should have been called 3 times (once per pulse)
       expect(liveLoopWithUpdateLFO.updateLFOsOnly).toHaveBeenCalledTimes(3);
       
-      // tick should not have been called yet (no step boundary crossed)
-      expect(liveLoopWithUpdateLFO.tick).not.toHaveBeenCalled();
+      // tick should still only have been called once from the Start message
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
       
       // Send 3 more pulses to complete the step
       for (let i = 0; i < 3; i++) {
@@ -263,11 +286,14 @@ describe("TransportManager", () => {
       // updateLFOsOnly should now have been called 6 times
       expect(liveLoopWithUpdateLFO.updateLFOsOnly).toHaveBeenCalledTimes(6);
       
-      // tick should have been called once at the step boundary
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      // tick should have been called a second time at the step boundary
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2);
     });
     
     it("should calculate step boundaries based on timeInBeats", () => {
+      // Start already called tick(0) once
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      
       // Calculate step size in beats
       const stepSizeInBeats = 6 / 24; // pulsesPerStep / 24 PPQN = 0.25 beats
       
@@ -281,7 +307,7 @@ describe("TransportManager", () => {
       
       // We should have crossed 1 step boundary (0.333/0.25 = 1.333 => floor = 1)
       expect(transportManager.stepIndex).toBe(1);
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2); // Initial + 1 step boundary
       
       // Send 4 more pulses to reach the next step boundary
       for (let i = 0; i < 4; i++) {
@@ -293,10 +319,13 @@ describe("TransportManager", () => {
       
       // We should have crossed the 2nd step boundary (0.5/0.25 = 2)
       expect(transportManager.stepIndex).toBe(2);
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(3); // Initial + 2 step boundaries
     });
     
     it("should handle Song Position Pointer by updating timeInBeats and stepIndex", () => {
+      // Start already called tick(0) once
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      
       // SPP with position = 4 (4 MIDI beats = 4*6 = 24 pulses = 1 beat = 4 steps at 6 pulses/step)
       simulateMidiMessage([0xf2, 4, 0]); // LSB=4, MSB=0
       
@@ -309,9 +338,9 @@ describe("TransportManager", () => {
       // Send 1 pulse
       simulateMidiMessage([0xf8]);
       
-      // Should have updateLFOsOnly called but not tick (not a new step boundary yet)
+      // Should have updateLFOsOnly called but no additional tick (not a new step boundary yet)
       expect(liveLoopWithUpdateLFO.updateLFOsOnly).toHaveBeenCalled();
-      expect(liveLoopWithUpdateLFO.tick).not.toHaveBeenCalled();
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1); // Still just the initial call
       
       // Send 5 more pulses to reach a new step boundary
       for (let i = 0; i < 5; i++) {
@@ -320,7 +349,7 @@ describe("TransportManager", () => {
       
       // Now we should have crossed to step 5
       expect(transportManager.stepIndex).toBe(5);
-      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(1);
+      expect(liveLoopWithUpdateLFO.tick).toHaveBeenCalledTimes(2); // Initial call + step boundary
     });
     
     it("should handle LiveLoops that don't implement updateLFOsOnly", () => {
@@ -335,13 +364,18 @@ describe("TransportManager", () => {
       // Start the transport
       simulateMidiMessage([0xfa]);
       
+      // Start called tick(0) immediately
+      expect(legacyLiveLoop.tick).toHaveBeenCalledTimes(1);
+      expect(legacyLiveLoop.tick).toHaveBeenCalledWith(0, 0, expect.any(Number));
+      
       // Send pulses (no errors should occur due to missing updateLFOsOnly)
       for (let i = 0; i < 6; i++) {
         simulateMidiMessage([0xf8]);
       }
       
-      // Should still call tick at step boundary
-      expect(legacyLiveLoop.tick).toHaveBeenCalledTimes(1);
+      // Should call tick again at step boundary, now 2 times total
+      expect(legacyLiveLoop.tick).toHaveBeenCalledTimes(2);
+      expect(legacyLiveLoop.tick).toHaveBeenLastCalledWith(1, 0, expect.any(Number));
       
       // LFOs in legacy LiveLoops will only be updated at step boundaries through tick
     });

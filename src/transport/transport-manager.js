@@ -32,7 +32,7 @@ export class TransportManager {
     this.pulsesPerStep = pulsesPerStep;
     // highResolution is deprecated - we now always update LFOs at high resolution
     // but only trigger notes at integer step boundaries
-    
+
     // Transport state
     this.isRunning = false;
     this.stepIndex = 0;
@@ -79,7 +79,10 @@ export class TransportManager {
     this.stepIndex = 0;
     this.pulseCounter = 0;
     this.timeInBeats = 0.0; // Reset the continuous time counter on start
-    
+
+    // Immediately call pattern logic at step 0
+    this._callPatternLogic(this.stepIndex);
+
     // Optionally: Clear any leftover notes if you want a fresh start
     // this.midiBus.stopAllNotes();
   }
@@ -105,16 +108,16 @@ export class TransportManager {
 
     // Store previous time for calculating delta
     const previousTimeInBeats = this.timeInBeats;
-    
+
     // Increment the continuous time counter (assuming 24 PPQ standard MIDI clock)
     this.timeInBeats += 1.0 / 24.0;
 
     // Calculate the delta time in beats since the last pulse
     const deltaTime = this.timeInBeats - previousTimeInBeats;
-    
+
     // Update LFOs on every pulse for high-resolution modulation
     this._updateLFOs(deltaTime, this.timeInBeats);
-    
+
     // Maintain backward compatibility with the pulse counting approach
     // This ensures tests expecting the old behavior still pass
     this.pulseCounter++;
@@ -122,10 +125,13 @@ export class TransportManager {
     // Calculate the new step index based on timeInBeats
     const stepSizeInBeats = this.pulsesPerStep / 24.0;
     const newStepIndex = Math.floor(this.timeInBeats / stepSizeInBeats);
-    
+
     // Check if we've accumulated enough pulses for a new step
     // OR if we've crossed a step boundary based on timeInBeats
-    if (this.pulseCounter >= this.pulsesPerStep || newStepIndex > this.stepIndex) {
+    if (
+      this.pulseCounter >= this.pulsesPerStep ||
+      newStepIndex > this.stepIndex
+    ) {
       if (this.pulseCounter >= this.pulsesPerStep) {
         // Reset pulse counter if we've reached pulsesPerStep
         this.pulseCounter -= this.pulsesPerStep;
@@ -135,7 +141,7 @@ export class TransportManager {
         // Set stepIndex based on timeInBeats if that's what triggered the step
         this.stepIndex = newStepIndex;
       }
-      
+
       // Now call pattern logic with integer step index (only once per step)
       this._callPatternLogic(this.stepIndex);
     }
@@ -148,17 +154,17 @@ export class TransportManager {
   _onSongPositionPointer(lsb, msb) {
     const position = (msb << 7) | lsb; // 14-bit value
     // position is in "MIDI beats" (1 beat = 6 clocks).
-    
+
     // Calculate corresponding time in beats (each MIDI beat = 6 clock pulses, 24 PPQN)
     const pulses = position * 6; // Total pulses from start
     this.timeInBeats = pulses / 24.0; // Convert pulses to quarter notes
-    
+
     // Calculate step size in beats
     const stepSizeInBeats = this.pulsesPerStep / 24.0;
-    
+
     // Calculate new step index based on timeInBeats
     this.stepIndex = Math.floor(this.timeInBeats / stepSizeInBeats);
-    
+
     // Update pulseCounter for compatibility, but we primarily rely on timeInBeats now
     this.pulseCounter = pulses % this.pulsesPerStep;
   }
@@ -166,13 +172,13 @@ export class TransportManager {
   /**
    * Updates only the LFOs on each LiveLoop for continuous modulation.
    * Called on every pulse for high-resolution updates.
-   * 
+   *
    * @param {number} deltaTime - Time elapsed since last update in beats
    * @param {number} absoluteTime - Current absolute time in beats
    */
   _updateLFOs(deltaTime, absoluteTime) {
     this.liveLoops.forEach((loop) => {
-      if (typeof loop.updateLFOsOnly === 'function') {
+      if (typeof loop.updateLFOsOnly === "function") {
         // If LiveLoop has a dedicated method for updating only LFOs, use it
         loop.updateLFOsOnly(deltaTime, absoluteTime);
       }
@@ -180,17 +186,17 @@ export class TransportManager {
       // at step boundaries
     });
   }
-  
+
   /**
    * Calls pattern logic (notes, triggers) on each LiveLoop with integer step index.
    * Only called when crossing a step boundary.
-   * 
+   *
    * @param {number} stepIndex - The current integer step index
    */
   _callPatternLogic(stepIndex) {
     // Pass 0 for deltaTime to match test expectations
     const deltaTime = 0;
-    
+
     this.liveLoops.forEach((loop) => {
       loop.tick(stepIndex, deltaTime, this.timeInBeats);
     });
