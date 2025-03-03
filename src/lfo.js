@@ -118,6 +118,8 @@ export class LFO {
    * @returns {number}
    *   The LFO's current output value, after updating its phase. If `targetParam`
    *   is set, the value may already be mapped into a CC range (e.g. 0..127).
+   *
+   * @private
    */
   update(deltaTime) {
     if (!deltaTime || deltaTime < 0) {
@@ -155,6 +157,8 @@ export class LFO {
    *   The current time in the same units you treat `frequency` with (e.g. seconds).
    * @returns {number}
    *   The updated wave output (same range/logic as `update()`).
+   *
+   * @private
    */
   updateContinuousTime(absoluteTime) {
     if (absoluteTime == null) {
@@ -260,108 +264,144 @@ export class LFO {
 
   /**
    * @param {number} freq - New LFO frequency (cycles per time unit).
+   * @private
    */
   setFrequency(freq) {
     this.frequency = freq;
   }
 
-  /** @returns {number} The current LFO frequency. */
+  /**
+   * @returns {number} The current LFO frequency.
+   * @private
+   */
   getFrequency() {
     return this.frequency;
   }
 
   /**
    * @param {number} amp - New LFO amplitude.
+   * @private
    */
   setAmplitude(amp) {
     this.amplitude = amp;
   }
 
-  /** @returns {number} The current LFO amplitude. */
+  /**
+   * @returns {number} The current LFO amplitude.
+   * @private
+   */
   getAmplitude() {
     return this.amplitude;
   }
 
   /**
    * @param {number} off - New DC offset for the LFO wave.
+   * @private
    */
   setOffset(off) {
     this.offset = off;
   }
 
-  /** @returns {number} The current LFO offset. */
+  /**
+   * @returns {number} The current LFO offset.
+   * @private
+   */
   getOffset() {
     return this.offset;
   }
 
   /**
    * @param {string} shape - New wave shape ("sine", "triangle", "square", etc.).
+   * @private
    */
   setShape(shape) {
     this.shape = shape;
   }
 
-  /** @returns {string} The current wave shape. */
+  /**
+   * @returns {string} The current wave shape.
+   * @private
+   */
   getShape() {
     return this.shape;
   }
 
   /**
    * @param {number} p - New phase (useRadians ? 0..2π : 0..1).
+   * @private
    */
   setPhase(p) {
     this.phase = p;
   }
 
-  /** @returns {number} The current oscillator phase. */
+  /**
+   * @returns {number} The current oscillator phase.
+   * @private
+   */
   getPhase() {
     return this.phase;
   }
 
   /**
    * @param {boolean} bool - True if phase calculations are in radians, false if normalized 0..1.
+   * @private
    */
   setUseRadians(bool) {
     this.useRadians = bool;
   }
 
-  /** @returns {boolean} Whether the LFO uses radians for phase. */
+  /**
+   * @returns {boolean} Whether the LFO uses radians for phase.
+   * @private
+   */
   getUseRadians() {
     return this.useRadians;
   }
 
   /**
    * @param {string|null} param - If set, wave output maps to CC range for that param name.
+   * @private
    */
   setTargetParam(param) {
     this.targetParam = param;
   }
 
-  /** @returns {string|null} The parameter targeted by this LFO. */
+  /**
+   * @returns {string|null} The parameter targeted by this LFO.
+   * @private
+   */
   getTargetParam() {
     return this.targetParam;
   }
 
   /**
    * @param {number} value - New minimum CC value for wave's lower bound.
+   * @private
    */
   setMinCcValue(value) {
     this.minCcValue = value;
   }
 
-  /** @returns {number} The min CC value used when targetParam is set. */
+  /**
+   * @returns {number} The min CC value used when targetParam is set.
+   * @private
+   */
   getMinCcValue() {
     return this.minCcValue;
   }
 
   /**
    * @param {number} value - New maximum CC value for wave's upper bound.
+   * @private
    */
   setMaxCcValue(value) {
     this.maxCcValue = value;
   }
 
-  /** @returns {number} The max CC value used when targetParam is set. */
+  /**
+   * @returns {number} The max CC value used when targetParam is set.
+   * @private
+   */
   getMaxCcValue() {
     return this.maxCcValue;
   }

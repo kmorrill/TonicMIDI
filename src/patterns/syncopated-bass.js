@@ -50,12 +50,17 @@ export class SyncopatedBass extends AbstractPattern {
    *   @property {number} [options.probabilities.fifth=30] Weight for the fifth.
    *   @property {number} [options.probabilities.third=10]  Weight for the third.
    * @param {string} [options.rhythmPreset="funk"]
-   *   Which preset rhythmic pattern to use: "funk", "latin", or "reggae".
+   *   Which preset rhythmic pattern to use: "funk", "latin", or "reggae". This determines the
+   *   rhythmic feel of the bass line. For example, "funk" might emphasize offbeats, while "latin"
+   *   might have a more driving rhythm.
    * @param {number} [options.probabilityToAdvance=50]
    *   (Reserved for advanced usage) Probability of advancing note selection step.
    *   Lower values might repeat notes more frequently.
    * @param {number} [options.restProbability=30]
    *   (Reserved for advanced usage) Probability of inserting a rest instead of playing a note.
+   *
+   * @throws {Error} If the sum of probabilities is not 100 or less.
+   * @throws {Error} If the rhythm preset is not one of "funk", "latin", or "reggae".
    */
   constructor({
     length = 16,
@@ -88,6 +93,24 @@ export class SyncopatedBass extends AbstractPattern {
       latin: [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0],
       reggae: [0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
     };
+
+    if (rhythmPreset && !this.rhythmPatterns[rhythmPreset]) {
+      throw new Error(
+        `Invalid rhythm preset: ${rhythmPreset}. Must be one of "funk", "latin", or "reggae".`
+      );
+    }
+
+    if (probabilities) {
+      const totalWeight = Object.values(probabilities).reduce(
+        (a, b) => a + b,
+        0
+      );
+      if (totalWeight > 100) {
+        throw new Error(
+          `Invalid probabilities: The sum of probabilities must be 100 or less.`
+        );
+      }
+    }
 
     /** @private */
     this.rhythmPattern =

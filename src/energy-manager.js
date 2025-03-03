@@ -275,7 +275,6 @@ export class EnergyManager {
 
   /**
    * Adds a LiveLoop instance so that it can be controlled by this EnergyManager.
-   * Useful if new loops are created or loaded dynamically.
    *
    * @param {object} loop
    *   The LiveLoop instance to add.

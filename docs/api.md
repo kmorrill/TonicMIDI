@@ -32,7 +32,7 @@ const value = myLfo.update(deltaTime);
 
 ### Parameters
 
-*   `$0` **[Object][78]**  (optional, default `{}`)
+*   `$0` **[Object][47]**  (optional, default `{}`)
 
     *   `$0.frequency`   (optional, default `1.0`)
     *   `$0.amplitude`   (optional, default `1.0`)
@@ -44,131 +44,14 @@ const value = myLfo.update(deltaTime);
     *   `$0.minCcValue`   (optional, default `0`)
     *   `$0.maxCcValue`   (optional, default `127`)
 
-### update
-
-Advance the LFO by a given time increment.
-
-**Typically called by your engine or loop** to move the oscillator forward in time.
-
-#### Parameters
-
-*   `deltaTime` **[number][79]** The time elapsed since the last LFO update. This could be in seconds (if
-    frequency is cycles/second) or in beats (if frequency is cycles/beat).
-
-Returns **[number][79]** The LFO's current output value, after updating its phase. If `targetParam`
-is set, the value may already be mapped into a CC range (e.g. 0..127).
-
-### updateContinuousTime
-
-Update the LFO based on an absolute time, rather than an incremental delta.
-This is **advanced usage** for scenarios where you want more precise control
-in a timeline. The phase is derived from the difference between this call's
-`absoluteTime` and the previous one.
-
-#### Parameters
-
-*   `absoluteTime` **[number][79]** The current time in the same units you treat `frequency` with (e.g. seconds).
-
-Returns **[number][79]** The updated wave output (same range/logic as `update()`).
-
 ### reset
 
 Reset the oscillator's phase (and clears any memory of absolute time).
 
 #### Parameters
 
-*   `phase` **[number][79]** If `useRadians=true`, a value in \[0..2π).
+*   `phase` **[number][48]** If `useRadians=true`, a value in \[0..2π).
     If `useRadians=false`, a value in \[0..1). (optional, default `0`)
-
-### setFrequency
-
-#### Parameters
-
-*   `freq` **[number][79]** New LFO frequency (cycles per time unit).
-
-### getFrequency
-
-Returns **[number][79]** The current LFO frequency.
-
-### setAmplitude
-
-#### Parameters
-
-*   `amp` **[number][79]** New LFO amplitude.
-
-### getAmplitude
-
-Returns **[number][79]** The current LFO amplitude.
-
-### setOffset
-
-#### Parameters
-
-*   `off` **[number][79]** New DC offset for the LFO wave.
-
-### getOffset
-
-Returns **[number][79]** The current LFO offset.
-
-### setShape
-
-#### Parameters
-
-*   `shape` **[string][80]** New wave shape ("sine", "triangle", "square", etc.).
-
-### getShape
-
-Returns **[string][80]** The current wave shape.
-
-### setPhase
-
-#### Parameters
-
-*   `p` **[number][79]** New phase (useRadians ? 0..2π : 0..1).
-
-### getPhase
-
-Returns **[number][79]** The current oscillator phase.
-
-### setUseRadians
-
-#### Parameters
-
-*   `bool` **[boolean][81]** True if phase calculations are in radians, false if normalized 0..1.
-
-### getUseRadians
-
-Returns **[boolean][81]** Whether the LFO uses radians for phase.
-
-### setTargetParam
-
-#### Parameters
-
-*   `param` **([string][80] | null)** If set, wave output maps to CC range for that param name.
-
-### getTargetParam
-
-Returns **([string][80] | null)** The parameter targeted by this LFO.
-
-### setMinCcValue
-
-#### Parameters
-
-*   `value` **[number][79]** New minimum CC value for wave's lower bound.
-
-### getMinCcValue
-
-Returns **[number][79]** The min CC value used when targetParam is set.
-
-### setMaxCcValue
-
-#### Parameters
-
-*   `value` **[number][79]** New maximum CC value for wave's upper bound.
-
-### getMaxCcValue
-
-Returns **[number][79]** The max CC value used when targetParam is set.
 
 ## EnergyManager
 
@@ -208,7 +91,7 @@ manager.setTensionLevel("high");
 
 ### Parameters
 
-*   `$0` **[Object][78]**  (optional, default `{}`)
+*   `$0` **[Object][47]**  (optional, default `{}`)
 
     *   `$0.liveLoops`   (optional, default `[]`)
     *   `$0.chordManager`   (optional, default `null`)
@@ -231,7 +114,7 @@ adjust subdivisions accordingly (e.g. halfTime, normal, doubleTime).
 
 #### Parameters
 
-*   `level` **[string][80]** A label for the desired energy state (e.g. "low", "medium", "full").
+*   `level` **[string][49]** A label for the desired energy state (e.g. "low", "medium", "full").
 
 ### setTensionLevel
 
@@ -248,16 +131,15 @@ Examples:
 
 #### Parameters
 
-*   `level` **[string][80]** The desired tension level ("none", "low", "mid", "high").
+*   `level` **[string][49]** The desired tension level ("none", "low", "mid", "high").
 
 ### addLiveLoop
 
 Adds a LiveLoop instance so that it can be controlled by this EnergyManager.
-Useful if new loops are created or loaded dynamically.
 
 #### Parameters
 
-*   `loop` **[object][78]** The LiveLoop instance to add.
+*   `loop` **[object][47]** The LiveLoop instance to add.
 
 ### removeLiveLoop
 
@@ -265,7 +147,7 @@ Removes a previously added LiveLoop from EnergyManager control.
 
 #### Parameters
 
-*   `loop` **[object][78]** The LiveLoop instance to remove.
+*   `loop` **[object][47]** The LiveLoop instance to remove.
 
 ### setArrangementStyle
 
@@ -275,7 +157,7 @@ or drastically different patterns. The exact implementation is up to you.
 
 #### Parameters
 
-*   `style` **[string][80]** A label for the arrangement style (e.g. "wide", "minimal", etc.).
+*   `style` **[string][49]** A label for the arrangement style (e.g. "wide", "minimal", etc.).
 
 ### setChordProgression
 
@@ -285,7 +167,7 @@ should adapt automatically on their next cycle.
 
 #### Parameters
 
-*   `progression` **[Array][82]** An array of chord objects (e.g. \[{ root: "C", type: "maj7" }, ...]).
+*   `progression` **[Array][50]** An array of chord objects (e.g. \[{ root: "C", type: "maj7" }, ...]).
 
 ## SyncopatedBass
 
@@ -327,7 +209,7 @@ const loop = new LiveLoop(midiBus, {
 
 ### Parameters
 
-*   `$0` **[Object][78]**  (optional, default `{}`)
+*   `$0` **[Object][47]**  (optional, default `{}`)
 
     *   `$0.length`   (optional, default `16`)
     *   `$0.octave`   (optional, default `2`)
@@ -378,7 +260,7 @@ const drumPattern = new DrumPattern({
 
 ### Parameters
 
-*   `$0` **[Object][78]**  (optional, default `{}`)
+*   `$0` **[Object][47]**  (optional, default `{}`)
 
     *   `$0.mediumPattern` &#x20;
     *   `$0.drumMap`   (optional, default `{}`)
@@ -445,7 +327,7 @@ myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
 ### Parameters
 
 *   `midiBus` &#x20;
-*   `$1` **[Object][78]**  (optional, default `{}`)
+*   `$1` **[Object][47]**  (optional, default `{}`)
 
     *   `$1.pattern` &#x20;
     *   `$1.lfos`   (optional, default `[]`)
@@ -466,8 +348,8 @@ at the next pattern boundary (start of pattern).
 
 #### Parameters
 
-*   `newPattern` **[object][78]** The new pattern, which must implement `getNotes()` and `getLength()`.
-*   `immediate` **[boolean][81]** If true, replace the pattern right away; if false, wait until the next
+*   `newPattern` **[object][47]** The new pattern, which must implement `getNotes()` and `getLength()`.
+*   `immediate` **[boolean][51]** If true, replace the pattern right away; if false, wait until the next
     time `stepIndex` modulo pattern length = 0. (optional, default `false`)
 
 ### addLFO
@@ -476,7 +358,7 @@ Add an LFO immediately (no enqueuing needed).
 
 #### Parameters
 
-*   `lfo` **[object][78]** An LFO instance (e.g. new LFO({ ... }))
+*   `lfo` **[object][47]** An LFO instance (e.g. new LFO({ ... }))
 
 ### updateLFO
 
@@ -486,9 +368,9 @@ alter its state mid-cycle.
 
 #### Parameters
 
-*   `index` **[number][79]** The index of the LFO in the `lfos` array.
-*   `newProps` **[object][78]** An object of updated properties, e.g. `{ frequency: 2.0 }`.
-*   `immediate` **[boolean][81]** If true, apply changes now; otherwise, queue them. (optional, default `false`)
+*   `index` **[number][48]** The index of the LFO in the `lfos` array.
+*   `newProps` **[object][47]** An object of updated properties, e.g. `{ frequency: 2.0 }`.
+*   `immediate` **[boolean][51]** If true, apply changes now; otherwise, queue them. (optional, default `false`)
 
 ### setContext
 
@@ -498,8 +380,8 @@ user-defined flags, or anything else to influence note generation.
 
 #### Parameters
 
-*   `context` **[object][78]** The new local context.
-*   `immediate` **[boolean][81]** If true, apply immediately. If false, wait until the pattern boundary. (optional, default `true`)
+*   `context` **[object][47]** The new local context.
+*   `immediate` **[boolean][51]** If true, apply immediately. If false, wait until the pattern boundary. (optional, default `true`)
 
 ### setGlobalContext
 
@@ -509,7 +391,7 @@ want to attach after constructing the loop.
 
 #### Parameters
 
-*   `globalContext` **[object][78]** The new global context object.
+*   `globalContext` **[object][47]** The new global context object.
 
 ### setMuted
 
@@ -518,7 +400,7 @@ although it will still handle durations and eventually send `noteOff`.
 
 #### Parameters
 
-*   `bool` **[boolean][81]** If true, liveLoop is muted.
+*   `bool` **[boolean][51]** If true, liveLoop is muted.
 
 ### setTranspose
 
@@ -528,7 +410,7 @@ might raise all notes by a perfect fifth for tension.
 
 #### Parameters
 
-*   `semitones` **[number][79]** Positive to shift up, negative to shift down.
+*   `semitones` **[number][48]** Positive to shift up, negative to shift down.
 
 ### setName
 
@@ -537,5 +419,5 @@ This can be helpful for orchestration or debugging logs.
 
 #### Parameters
 
-*   `name` **[string][80]** The new name for this loop.
+*   `name` **[string][49]** The new name for this loop.
 
