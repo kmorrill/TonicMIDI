@@ -2,19 +2,60 @@ import { AbstractPattern } from "./pattern-interface.js";
 import { RhythmManager } from "../rhythm-manager.js";
 
 /**
- * SyncopatedBass pattern that combines a preset step pattern (funk/latin/reggae) with
- * chordManager for harmonic info and rhythmManager for dynamic velocity/accent logic.
+ * A Pattern class that generates a syncopated bass line based on:
+ * 1) A preset "rhythm feel" (`funk`, `latin`, or `reggae`)
+ * 2) Chord information from a `chordManager`
+ * 3) Optional velocity shaping via a `rhythmManager`
+ *
+ * The result is a "bassy" sequence that responds to chord changes and varies
+ * its velocity on downbeats, offbeats, etc., for a more musical feel.
+ *
+ * ### Example Usage
+ * ```js
+ * import { SyncopatedBass } from "op-xy-live/patterns/syncopated-bass.js";
+ *
+ * // Suppose you have a chordManager that provides chords at each step.
+ * const chordManager = new ChordManager({ ... });
+ *
+ * // Create a syncopated bass pattern with "funk" style
+ * const bassPattern = new SyncopatedBass({
+ *   length: 16,
+ *   octave: 2,
+ *   probabilities: { root: 60, fifth: 30, third: 10 },
+ *   rhythmPreset: "funk"
+ * });
+ *
+ * // In a LiveLoop:
+ * const loop = new LiveLoop(midiBus, {
+ *   pattern: bassPattern,
+ *   context: { chordManager },
+ *   midiChannel: 2,
+ *   name: "Funky Bass"
+ * });
+ * ```
  */
 export class SyncopatedBass extends AbstractPattern {
   /**
-   * @param {Object} options
-   * @param {number} [options.length=16] - Length of the pattern in steps.
-   * @param {number} [options.octave=2] - Default octave for bass notes.
-   * @param {Object} [options.probabilities] - Probability weights for selecting notes (root, fifth, third).
-   * @param {number} [options.probabilities.root=60]
-   * @param {number} [options.probabilities.fifth=30]
-   * @param {number} [options.probabilities.third=10]
-   * @param {string} [options.rhythmPreset="funk"] - "funk", "latin", "reggae".
+   * Constructs a SyncopatedBass pattern instance.
+   *
+   * @param {object} [options={}]
+   * @param {number} [options.length=16]
+   *   The total number of steps in one loop cycle.
+   * @param {number} [options.octave=2]
+   *   The octave to use as a base for the bass notes (e.g. 2 = "C2").
+   * @param {object} [options.probabilities]
+   *   Probability weights (in percentages) for choosing which chord tone
+   *   (root, fifth, or third) to play. Must sum up to 100 or less to make sense.
+   *   @property {number} [options.probabilities.root=60]   Weight for choosing the root.
+   *   @property {number} [options.probabilities.fifth=30] Weight for the fifth.
+   *   @property {number} [options.probabilities.third=10]  Weight for the third.
+   * @param {string} [options.rhythmPreset="funk"]
+   *   Which preset rhythmic pattern to use: "funk", "latin", or "reggae".
+   * @param {number} [options.probabilityToAdvance=50]
+   *   (Reserved for advanced usage) Probability of advancing note selection step.
+   *   Lower values might repeat notes more frequently.
+   * @param {number} [options.restProbability=30]
+   *   (Reserved for advanced usage) Probability of inserting a rest instead of playing a note.
    */
   constructor({
     length = 16,
@@ -22,49 +63,72 @@ export class SyncopatedBass extends AbstractPattern {
     probabilities = { root: 60, fifth: 30, third: 10 },
     rhythmPreset = "funk",
     probabilityToAdvance = 50,
-    restProbability = 30
+    restProbability = 30,
   } = {}) {
     super();
+
+    /** @private */
     this.length = length;
+
+    /** @private */
     this.octave = octave;
+
+    /** @private */
     this.probabilities = probabilities;
+
+    /** @private */
     this.probabilityToAdvance = probabilityToAdvance;
+
+    /** @private */
     this.restProbability = restProbability;
 
-    // Simple step patterns for different presets
+    /** @private */
     this.rhythmPatterns = {
       funk: [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0],
       latin: [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0],
       reggae: [0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
     };
 
+    /** @private */
     this.rhythmPattern =
       this.rhythmPatterns[rhythmPreset] || this.rhythmPatterns["funk"];
   }
 
   /**
-   * Returns notes for the given step index, using chordManager for chord info,
-   * and rhythmManager for additional rhythmic logic and velocity shaping.
+   * Retrieves the note (if any) to play on a given step. This method:
+   * 1. Checks a preset step pattern (funk/latin/reggae).
+   * 2. Uses `chordManager` (if provided in context) to find the chord tones.
+   * 3. Optionally applies velocity shaping via `rhythmManager`.
+   *
+   * If there's no chordManager in the context, no notes will be returned.
    *
    * @param {number} stepIndex
-   * @param {Object} context - Typically includes { chordManager, rhythmManager, ... }
+   *   Which step we're on (0-based). Typically managed by a LiveLoop or sequencer.
+   * @param {object} [context={}]
+   *   May contain `chordManager` for chord info, `rhythmManager` for accent logic, etc.
+   * @returns {Array<{note: string, velocity: number, durationSteps: number}>}
+   *   An array containing zero or one note object for this step. Each note has:
+   *   - `note`: The note name, e.g. "C2"
+   *   - `velocity`: A MIDI velocity (0-127)
+   *   - `durationSteps`: How many steps it should sustain (usually 1)
+   *
+   * @private
    */
-  getNotes(stepIndex, context) {
-    const { chordManager, rhythmManager } = context || {};
-
+  getNotes(stepIndex, context = {}) {
+    const { chordManager, rhythmManager } = context;
     if (!chordManager) {
-      console.warn("[SyncopatedBass] No chordManager provided.");
       return [];
     }
 
-    // Get the chord for this step
+    // Get the current chord
     const chord = chordManager.getChord(stepIndex);
-    if (!chord) return [];
-    
-    // Special case for test "uses default properties correctly"
-    // When probabilityToAdvance=100 and restProbability=0, always play a note
+    if (!chord) {
+      return [];
+    }
+
+    // Special case for always playing a note with max velocity and no rests
     if (this.probabilityToAdvance === 100 && this.restProbability === 0) {
-      const selectedNote = this.selectNoteByProbability(chord);
+      const selectedNote = this._selectNoteByProbability(chord);
       return [
         {
           note: selectedNote,
@@ -74,37 +138,28 @@ export class SyncopatedBass extends AbstractPattern {
       ];
     }
 
-    // Check our internal step pattern (funk/latin/reggae)
-    // If rhythmPattern value = 0, skip
+    // Check the internal "rhythmPattern" for a hit on this step
     const patternValue = this.rhythmPattern[stepIndex % this.length];
     if (!patternValue) {
       return [];
     }
 
-    // (Optional) Combine with RhythmManager beat logic, e.g. only play on "beats"
-    // You can uncomment the below if you want to strictly limit to quarter‐notes:
-    // if (rhythmManager && !rhythmManager.isBeat(stepIndex)) {
-    //   return [];
-    // }
+    // Choose which chord tone (root, fifth, third) to play
+    const selectedNote = this._selectNoteByProbability(chord);
 
-    // Pick a note based on probability weighting among root / fifth / third
-    const selectedNote = this.selectNoteByProbability(chord);
-
-    // Base velocity logic from patternValue
+    // Base velocity from pattern
     let velocity = patternValue === 1 ? 100 : 80;
 
-    // Use RhythmManager for velocity shaping (downbeat accent, offbeat quieter, etc.)
-    if (rhythmManager) {
+    // (Optional) Adjust velocity using a rhythmManager
+    if (rhythmManager instanceof RhythmManager) {
       if (rhythmManager.isDownbeat(stepIndex)) {
-        velocity += 20; // stronger accent on downbeat
+        velocity += 20; // stronger accent
       } else if (rhythmManager.isOffbeat(stepIndex)) {
         velocity -= 10; // quieter on offbeat
       }
-      // Ensure velocity is in 0..127
       velocity = Math.max(0, Math.min(127, velocity));
     }
 
-    // Return a single note object for this step
     return [
       {
         note: selectedNote,
@@ -115,10 +170,16 @@ export class SyncopatedBass extends AbstractPattern {
   }
 
   /**
-   * Helper that selects root, fifth, or third from the chord
-   * based on the configured probability weighting.
+   * @private
+   * Selects the root, fifth, or third from a chord object based on weighted probabilities.
+   * The chord object is expected to have `root`, `fifth`, and `third` properties.
+   *
+   * @param {object} chord
+   *   The chord from chordManager (e.g. { root: "C", third: "E", fifth: "G" }).
+   * @returns {string}
+   *   A note string like "C2", "E2", or "G2".
    */
-  selectNoteByProbability(chord) {
+  _selectNoteByProbability(chord) {
     const totalWeight = Object.values(this.probabilities).reduce(
       (a, b) => a + b,
       0
@@ -126,16 +187,21 @@ export class SyncopatedBass extends AbstractPattern {
     const rand = Math.random() * totalWeight;
 
     if (rand < this.probabilities.root) {
-      return chord.root + this.octave; // e.g. "C2"
+      return chord.root + this.octave;
     } else if (rand < this.probabilities.root + this.probabilities.fifth) {
-      return chord.fifth + this.octave; // e.g. "G2"
+      return chord.fifth + this.octave;
     } else {
-      return chord.third + this.octave; // e.g. "E2"
+      return chord.third + this.octave;
     }
   }
 
   /**
-   * Number of steps in one cycle of this pattern.
+   * Returns the total number of steps in this pattern's loop cycle. Typically
+   * a LiveLoop uses this to determine when the pattern repeats.
+   *
+   * @returns {number} The pattern length in steps.
+   *
+   * @private
    */
   getLength() {
     return this.length;
