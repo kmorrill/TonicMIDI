@@ -139,13 +139,6 @@ export class ChordPattern extends AbstractPattern {
     // Build chord notes (either from chord.notes or from root/type)
     const notes = this._generateChordNotes(chord, velocity);
 
-    console.log(
-      `[ChordPattern] Triggering chord at step=${stepIndex}`,
-      chord,
-      "notes:",
-      notes
-    );
-
     return notes;
   }
 

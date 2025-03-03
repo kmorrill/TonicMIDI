@@ -197,7 +197,6 @@ export class EnergyManager {
    */
   setTensionLevel(level) {
     this.currentTensionLevel = level;
-    console.log(`EnergyManager: Setting tension level to "${level}"`);
 
     if (this.globalContext) {
       this.globalContext.setTensionLevel(level);
