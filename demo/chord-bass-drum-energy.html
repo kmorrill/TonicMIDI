@@ -41,6 +41,17 @@
         white-space: pre;
         margin-top: 8px;
       }
+
+      /* [ADDED] */
+      #dumpContainer {
+        margin-top: 20px;
+      }
+      #dumpStateTextarea {
+        width: 90%;
+        height: 250px;
+        font-family: monospace;
+        margin-top: 8px;
+      }
     </style>
   </head>
   <body>
@@ -93,6 +104,15 @@
     <h3>Console Output</h3>
     <div id="output"></div>
 
+    <!-- [ADDED] A container for the dump state button and the resulting JSON -->
+    <div id="dumpContainer">
+      <button id="dumpStateBtn">Dump System State</button>
+      <textarea
+        id="dumpStateTextarea"
+        placeholder="System JSON will appear here..."
+      ></textarea>
+    </div>
+
     <script type="module">
       /**********************************************************
        * 1) Import from our library
@@ -110,6 +130,9 @@
         RhythmManager,
         EnergyManager,
       } from "../src/index.js";
+
+      // [ADDED] Import your new dumpSystemState helper
+      import { dumpSystemState } from "../src/dump-system-state.js";
 
       /**********************************************************
        * 2) Mirror console logs to #output for debugging
@@ -163,11 +186,8 @@
        * 4) Global context + chord manager + default progression
        **********************************************************/
       const chordManager = new ChordManager({
-        // We'll start with tension="none" so chords are simple
         tensionLevel: "none",
       });
-
-      // Basic chord progression, each chord 16 steps => 4 chords x 16 = 64 steps
       chordManager.setProgression([
         { root: "C", type: "maj", duration: 16 },
         { root: "F", type: "maj", duration: 16 },
@@ -175,14 +195,8 @@
         { root: "A", type: "min7", duration: 16 },
       ]);
 
-      // RhythmManager defaults: stepsPerBar=16, stepsPerBeat=4 ("normal" mode)
       const rhythmManager = new RhythmManager();
-
-      // Combine into GlobalContext
-      const globalContext = new GlobalContext({
-        chordManager,
-        rhythmManager,
-      });
+      const globalContext = new GlobalContext({ chordManager, rhythmManager });
 
       /**********************************************************
        * 5) An EnergyManager that orchestrates hype/tension
@@ -193,11 +207,11 @@
       });
 
       /**********************************************************
-       * 6) Transport Manager (pulsesPerStep=6 => 16 steps/bar at 24PPQN)
+       * 6) Transport Manager
        **********************************************************/
       const transport = new TransportManager(midiBus, {
         liveLoops: [],
-        pulsesPerStep: 6,
+        pulsesPerStep: 6, // 16 steps per bar at 24 PPQN
       });
 
       /**********************************************************
@@ -206,19 +220,15 @@
        *    - Bass loop (ch 3)
        *    - Chord loop (ch 8)
        **********************************************************/
-
-      // --- DRUM LOOP ---
+      // Drum
       const drumMap = {
-        kick: "C2", // or "C1" depending on your sampler
+        kick: "C2",
         snare: "D2",
         hh: "F#2",
       };
       const mediumPattern = {
-        // hits every beat
         kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-        // typical backbeat on 4,8,12,16
         snare: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-        // 16th hats
         hh: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       };
       const drumPattern = new DrumPattern({
@@ -235,7 +245,7 @@
       transport.addLiveLoop(drumLoop);
       energyManager.addLiveLoop(drumLoop);
 
-      // --- BASS LOOP (ch 3) ---
+      // Bass
       const bassLoop = new LiveLoop(midiBus, {
         pattern: new SyncopatedBass({
           length: 16,
@@ -249,10 +259,10 @@
       transport.addLiveLoop(bassLoop);
       energyManager.addLiveLoop(bassLoop);
 
-      // --- CHORD LOOP (ch 8) ---
+      // Chords
       const chordLoop = new LiveLoop(midiBus, {
         pattern: new ChordPattern({
-          length: 64, // matches total steps of the progression
+          length: 64,
           voicingType: "close",
           octave: 4,
         }),
@@ -267,7 +277,7 @@
        * 8) Expose references for the REPL
        **********************************************************/
       window.api = {
-        // main building blocks
+        // managers:
         midiBus,
         realEngine,
         transport,
@@ -275,7 +285,7 @@
         chordManager,
         rhythmManager,
         energyManager,
-        // loops
+        // loops:
         chordLoop,
         bassLoop,
         drumLoop,
@@ -298,7 +308,7 @@ api.chordManager.setProgression([
   { root: "Bb", type: "7",   duration: 16 }
 ]);
 console.log("ChordManager progression updated!");
-      `.trim();
+`.trim();
 
       // -- BASS REPL --
       document.getElementById("bassRepl").value = `
@@ -310,7 +320,7 @@ const newBassPattern = new api.SyncopatedBass({
 });
 api.bassLoop.setPattern(newBassPattern, true);
 console.log("Bass pattern changed (latin, octave=3)");
-      `.trim();
+`.trim();
 
       // -- DRUM REPL --
       document.getElementById("drumRepl").value = `
@@ -318,7 +328,7 @@ console.log("Bass pattern changed (latin, octave=3)");
 // If you want to do it manually (instead of EnergyManager):
 api.drumLoop.pattern.setHypeLevel("low");
 console.log("Drums set to low hype");
-      `.trim();
+`.trim();
 
       // -- ENERGY REPL --
       document.getElementById("energyRepl").value = `
@@ -326,10 +336,7 @@ console.log("Drums set to low hype");
 api.energyManager.setHypeLevel("full");
 api.energyManager.setTensionLevel("high");
 console.log("Energy: hype=full, tension=high");
-
-// This can cause drum pattern to go 'high', chord manager to go dissonant,
-// and the rhythm manager subdivision to become doubleTime, etc.
-      `.trim();
+`.trim();
 
       // Bind the Eval buttons
       document.getElementById("chordEvalBtn").onclick = () => {
@@ -348,6 +355,30 @@ console.log("Energy: hype=full, tension=high");
       console.log(
         "Drum (ch1), Bass (ch3), and Chord (ch8) loops ready. Awaiting external MIDI clock..."
       );
+
+      // [ADDED] Hook up the "Dump System State" button
+      const dumpBtn = document.getElementById("dumpStateBtn");
+      const dumpTextarea = document.getElementById("dumpStateTextarea");
+
+      dumpBtn.addEventListener("click", () => {
+        // Gather system state
+        const state = dumpSystemState({
+          transportManager: window.api.transport,
+          energyManager: window.api.energyManager,
+          deviceManager: null, // or your deviceManager if you have one
+          chordManager: window.api.chordManager,
+          globalContext: window.api.globalContext,
+          midiBus: window.api.midiBus,
+          liveLoops: [
+            window.api.drumLoop,
+            window.api.bassLoop,
+            window.api.chordLoop,
+          ],
+        });
+
+        // Display in the textarea as JSON
+        dumpTextarea.value = JSON.stringify(state, null, 2);
+      });
     </script>
   </body>
 </html>

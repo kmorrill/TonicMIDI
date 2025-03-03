@@ -56,7 +56,11 @@ export class DrumPattern extends BasePattern {
    *   of the arrays in `mediumPattern`.
    */
   constructor({ mediumPattern, drumMap = {}, patternLength = 16 } = {}) {
-    super();
+    super({
+      mediumPattern,
+      drumMap,
+      patternLength,
+    });
 
     /** @private */
     this.drumMap = drumMap;

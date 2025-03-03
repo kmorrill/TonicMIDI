@@ -70,7 +70,14 @@ export class SyncopatedBass extends BasePattern {
     probabilityToAdvance = 50,
     restProbability = 30,
   } = {}) {
-    super();
+    super({
+      length,
+      octave,
+      probabilities,
+      rhythmPreset,
+      probabilityToAdvance,
+      restProbability,
+    });
 
     /** @private */
     this.length = length;

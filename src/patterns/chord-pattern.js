@@ -68,7 +68,12 @@ export class ChordPattern extends BasePattern {
     octave = 4,
     velocityPattern = null,
   } = {}) {
-    super();
+    super({
+      length,
+      voicingType,
+      octave,
+      velocityPattern,
+    });
 
     /**
      * @private
