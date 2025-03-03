@@ -42,6 +42,8 @@ export class LiveLoop {
    * @property {Array} [activeNotes=[]] - Internally managed array of currently playing notes with their end steps.
    *                                     Each note object contains: {note, velocity, endStep, channel}
    *
+   * @property {object} [deviceDefinition] - The device definition for this loop, used to map LFO target parameters to CC numbers.
+   *
    * Example usage:
    *   const loop = new LiveLoop(midiBus, {
    *     pattern: somePattern,
@@ -51,7 +53,8 @@ export class LiveLoop {
    *     globalContext: sharedGlobalContext,
    *     name: "Chord",
    *     muted: false,
-   *     transpose: 0
+   *     transpose: 0,
+   *     deviceDefinition: someDeviceDefinition
    *   });
    */
 
@@ -70,6 +73,9 @@ export class LiveLoop {
       name = "",
       muted = false,
       transpose = 0,
+      deviceDefinition = null,
+      deviceManager = null,
+      midiOutputId = null,
     } = {}
   ) {
     this.midiBus = midiBus;
@@ -79,6 +85,15 @@ export class LiveLoop {
     this.context = context;
     this.globalContext = globalContext;
     this.name = name;
+    this.deviceDefinition = deviceDefinition;
+    this.deviceManager = deviceManager;
+    this.midiOutputId = midiOutputId;
+
+    // If we have a deviceManager + outputId, get the device definition
+    if (this.deviceManager && this.midiOutputId) {
+      this.deviceDefinition =
+        this.deviceManager.getDeviceForOutput(this.midiOutputId) || null;
+    }
 
     // For controlling hype/tension layering:
     this.muted = muted; // skip noteOn if true
@@ -238,15 +253,23 @@ export class LiveLoop {
       }
 
       // For example, map [-1..1] => [0..127]
-      const ccValue = Math.max(
-        0,
-        Math.min(127, Math.floor((waveValue + 1) * 63.5))
-      );
+      const ccValue = Math.floor(waveValue);
 
-      // Send a CC (just an example CC number, e.g. filter cutoff = 74)
+      // Determine CC number based on device definition or use default (for tests)
+      let ccNum = 74; // Default CC number for tests
+
+      // Look up the CC number for this LFO's target parameter if device definition exists
+      if (lfo.targetParam && this.deviceDefinition) {
+        const deviceCcNum = this.deviceDefinition.getCC(lfo.targetParam);
+        if (deviceCcNum !== null && deviceCcNum !== undefined) {
+          ccNum = deviceCcNum;
+        }
+      }
+
+      // Send a CC message
       this.midiBus.controlChange({
         channel: this.midiChannel,
-        cc: 74,
+        cc: ccNum,
         value: ccValue,
       });
     }

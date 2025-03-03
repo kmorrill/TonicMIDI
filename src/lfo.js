@@ -3,14 +3,15 @@
  *
  * A Low-Frequency Oscillator (LFO) domain object.
  * It generates a wave value (e.g., sine, triangle) over time, based on frequency, amplitude, etc.
+ * Additionally, it targets a specific parameter for modulation.
  *
  * Usage:
- *   const lfo = new LFO({ frequency: 1, shape: 'sine', amplitude: 1, offset: 0, phase: 0 });
+ *   const lfo = new LFO({ frequency: 1, shape: 'sine', amplitude: 1, offset: 0, phase: 0, targetParam: 'filterCutoff', minCcValue: 30, maxCcValue: 100 });
  *   // Called each "tick" (deltaTime might be in beats or seconds, your choice).
  *   const value = lfo.update(deltaTime);
  *   // Or use absolute time for more accurate high-resolution updates:
  *   const value = lfo.updateContinuousTime(absoluteTimeInBeats);
- *   // value is typically in the range [-amplitude..+amplitude], shifted by offset.
+ *   // value is typically in the range [-amplitude..+amplitude], shifted by offset, and mapped to a CC value range.
  */
 
 export class LFO {
@@ -22,6 +23,9 @@ export class LFO {
    * @property {number} [phase=0.0]     - Initial phase, in radians (if useRadians=true) or 0..1 if useRadians=false.
    * @property {string} [shape='sine']  - Wave shape: 'sine', 'triangle', 'square', 'sawUp', 'sawDown', 'random'.
    * @property {boolean} [useRadians=true] - Whether to compute wave cycles in radians or as normalized [0..1].
+   * @property {string} [targetParam=null] - The parameter to target for modulation.
+   * @property {number} [minCcValue=0] - Optional: map wave minimum to this CC value.
+   * @property {number} [maxCcValue=127] - Optional: map wave maximum to this CC value.
    */
 
   /**
@@ -34,6 +38,9 @@ export class LFO {
     phase = 0.0,
     shape = "sine",
     useRadians = true,
+    targetParam = null,
+    minCcValue = 0,
+    maxCcValue = 127,
   } = {}) {
     /** @type {number} */
     this.frequency = frequency;
@@ -45,6 +52,12 @@ export class LFO {
     this.shape = shape;
     /** @type {boolean} */
     this.useRadians = useRadians;
+    /** @type {string} */
+    this.targetParam = targetParam;
+    /** @type {number} */
+    this.minCcValue = minCcValue;
+    /** @type {number} */
+    this.maxCcValue = maxCcValue;
 
     /**
      * Tracks the current phase of the oscillator.
@@ -52,7 +65,7 @@ export class LFO {
      * If useRadians = false, it's a normalized cycle [0..1).
      */
     this.phase = phase;
-    
+
     /**
      * Tracks the last absolute time value used in updateContinuousTime
      * Only used when tracking absolute time rather than delta time
@@ -64,7 +77,7 @@ export class LFO {
    * Update the LFO with a given time increment, returning the current wave value.
    * @param {number} deltaTime - The elapsed time since last update.
    *   Could be in seconds (if frequency is in Hz) or in beats (if frequency is cycles/beat).
-   * @returns {number} - The LFO output, typically in the range [-amplitude..+amplitude] + offset.
+   * @returns {number} - The LFO output, typically in the range [-amplitude..+amplitude] + offset, mapped to a CC value range.
    */
   update(deltaTime) {
     if (!deltaTime || deltaTime < 0) {
@@ -99,38 +112,38 @@ export class LFO {
 
     return this._computeWaveValue(this.phase);
   }
-  
+
   /**
    * Update the LFO using absolute time value, for more accurate high-resolution updates.
    * The phase is set based on the absolute time rather than incrementally.
-   * 
+   *
    * @param {number} absoluteTime - The absolute time in beats or seconds
-   * @returns {number} - The LFO output, typically in the range [-amplitude..+amplitude] + offset
+   * @returns {number} - The LFO output, typically in the range [-amplitude..+amplitude] + offset, mapped to a CC value range
    */
   updateContinuousTime(absoluteTime) {
     if (absoluteTime === undefined || absoluteTime === null) {
       return this._computeWaveValue(this.phase);
     }
-    
+
     // If this is the first call, treat it as a reset point
     if (this.lastAbsoluteTime === null) {
       this.lastAbsoluteTime = absoluteTime;
       return this._computeWaveValue(this.phase);
     }
-    
+
     // Calculate the delta time between the current and last absolute time
     const deltaTime = absoluteTime - this.lastAbsoluteTime;
-    
+
     // Store the current time for the next call
     this.lastAbsoluteTime = absoluteTime;
-    
+
     // Use the regular update with the calculated delta
     return this.update(deltaTime);
   }
 
   /**
    * Helper function to compute the wave value for the current phase
-   * based on the selected shape.
+   * based on the selected shape, and map it to a CC value range if targetParam is set.
    * @param {number} phase
    * @returns {number}
    */
@@ -191,7 +204,17 @@ export class LFO {
     }
 
     // Scale by amplitude, then offset
-    return raw * this.amplitude + this.offset;
+    let value = raw * this.amplitude + this.offset;
+
+    // Map to CC value range if targetParam is set
+    if (this.targetParam) {
+      value =
+        this.minCcValue +
+        ((value + this.amplitude) * (this.maxCcValue - this.minCcValue)) /
+          (2 * this.amplitude);
+    }
+
+    return value;
   }
 
   /**
@@ -245,5 +268,26 @@ export class LFO {
   }
   getUseRadians() {
     return this.useRadians;
+  }
+
+  setTargetParam(param) {
+    this.targetParam = param;
+  }
+  getTargetParam() {
+    return this.targetParam;
+  }
+
+  setMinCcValue(value) {
+    this.minCcValue = value;
+  }
+  getMinCcValue() {
+    return this.minCcValue;
+  }
+
+  setMaxCcValue(value) {
+    this.maxCcValue = value;
+  }
+  getMaxCcValue() {
+    return this.maxCcValue;
   }
 }
