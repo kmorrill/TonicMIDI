@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>op-xy-live Chord, Bass, Drum & Energy Demo</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      #replContainer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+      .repl-box {
+        flex: 1;
+        min-width: 350px;
+        max-width: 500px;
+        display: flex;
+        flex-direction: column;
+      }
+      textarea {
+        width: 100%;
+        height: 180px;
+        font-family: monospace;
+      }
+      button {
+        padding: 6px 12px;
+        cursor: pointer;
+        margin-top: 4px;
+        align-self: flex-start;
+      }
+      #output {
+        width: 90%;
+        height: 250px;
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 8px;
+        overflow-y: auto;
+        white-space: pre;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>op-xy-live: Chord + Bass + Drum + Energy Demo</h1>
+
+    <p>This demo sets up three <code>LiveLoop</code>s:</p>
+    <ul>
+      <li><strong>Drum</strong> loop on MIDI channel <code>1</code></li>
+      <li><strong>Bass</strong> loop on MIDI channel <code>3</code></li>
+      <li><strong>Chord</strong> loop on MIDI channel <code>8</code></li>
+    </ul>
+
+    <p>
+      An <strong>EnergyManager</strong> controls hype and tension levels, which
+      can change chord voicings, drum complexity, and global rhythmic
+      subdivision. Live edit the code in each REPL and click “Eval” to update on
+      the fly.
+    </p>
+
+    <div id="replContainer">
+      <!-- CHORDS REPL -->
+      <div class="repl-box">
+        <h2>Chords REPL (Ch 8)</h2>
+        <textarea id="chordRepl"></textarea>
+        <button id="chordEvalBtn">Eval Chords</button>
+      </div>
+
+      <!-- BASS REPL -->
+      <div class="repl-box">
+        <h2>Bass REPL (Ch 3)</h2>
+        <textarea id="bassRepl"></textarea>
+        <button id="bassEvalBtn">Eval Bass</button>
+      </div>
+
+      <!-- DRUM REPL -->
+      <div class="repl-box">
+        <h2>Drum REPL (Ch 1)</h2>
+        <textarea id="drumRepl"></textarea>
+        <button id="drumEvalBtn">Eval Drums</button>
+      </div>
+
+      <!-- ENERGY REPL -->
+      <div class="repl-box">
+        <h2>Energy REPL</h2>
+        <textarea id="energyRepl"></textarea>
+        <button id="energyEvalBtn">Eval Energy</button>
+      </div>
+    </div>
+
+    <h3>Console Output</h3>
+    <div id="output"></div>
+
+    <script type="module">
+      /**********************************************************
+       * 1) Import from our library
+       **********************************************************/
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        ChordManager,
+        ChordPattern,
+        SyncopatedBass,
+        DrumPattern,
+        GlobalContext,
+        RhythmManager,
+        EnergyManager,
+      } from "../src/index.js";
+
+      /**********************************************************
+       * 2) Mirror console logs to #output for debugging
+       **********************************************************/
+      const outputEl = document.getElementById("output");
+      const originalConsoleLog = console.log;
+      console.log = (...args) => {
+        originalConsoleLog(...args);
+        outputEl.textContent += args.join(" ") + "\n";
+        outputEl.scrollTop = outputEl.scrollHeight;
+      };
+
+      /**********************************************************
+       * 3) Create MIDI Bus + RealPlaybackEngine + MIDI I/O
+       **********************************************************/
+      const midiBus = new MidiBus();
+      const realEngine = new RealPlaybackEngine(midiBus);
+
+      let midiAccess = null;
+      async function initMidiIO() {
+        // Request MIDI
+        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // INPUT: pick first input to receive Start/Stop/Clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length > 0) {
+          const firstInput = inputs[0];
+          console.log("Listening for MIDI clock on input:", firstInput.name);
+          firstInput.onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn("No MIDI inputs found. No external clock available.");
+        }
+
+        // OUTPUT: pick first output to send notes
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length > 0) {
+          console.log("Using MIDI output:", outputs[0].name);
+          realEngine.midiOutputs = [outputs[0]];
+        } else {
+          console.warn("No MIDI outputs found. Cannot send audible notes.");
+        }
+      }
+
+      // Start up the real engine output, then handle input
+      await realEngine.init();
+      await initMidiIO();
+
+      /**********************************************************
+       * 4) Global context + chord manager + default progression
+       **********************************************************/
+      const chordManager = new ChordManager({
+        // We'll start with tension="none" so chords are simple
+        tensionLevel: "none",
+      });
+
+      // Basic chord progression, each chord 16 steps => 4 chords x 16 = 64 steps
+      chordManager.setProgression([
+        { root: "C", type: "maj", duration: 16 },
+        { root: "F", type: "maj", duration: 16 },
+        { root: "G", type: "7", duration: 16 },
+        { root: "A", type: "min7", duration: 16 },
+      ]);
+
+      // RhythmManager defaults: stepsPerBar=16, stepsPerBeat=4 ("normal" mode)
+      const rhythmManager = new RhythmManager();
+
+      // Combine into GlobalContext
+      const globalContext = new GlobalContext({
+        chordManager,
+        rhythmManager,
+      });
+
+      /**********************************************************
+       * 5) An EnergyManager that orchestrates hype/tension
+       **********************************************************/
+      const energyManager = new EnergyManager({
+        chordManager,
+        rhythmManager,
+      });
+
+      /**********************************************************
+       * 6) Transport Manager (pulsesPerStep=6 => 16 steps/bar at 24PPQN)
+       **********************************************************/
+      const transport = new TransportManager(midiBus, {
+        liveLoops: [],
+        pulsesPerStep: 6,
+      });
+
+      /**********************************************************
+       * 7) Create the loops:
+       *    - Drum loop (ch 1)
+       *    - Bass loop (ch 3)
+       *    - Chord loop (ch 8)
+       **********************************************************/
+
+      // --- DRUM LOOP ---
+      const drumMap = {
+        kick: "C2", // or "C1" depending on your sampler
+        snare: "D2",
+        hh: "F#2",
+      };
+      const mediumPattern = {
+        // hits every beat
+        kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+        // typical backbeat on 4,8,12,16
+        snare: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+        // 16th hats
+        hh: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      };
+      const drumPattern = new DrumPattern({
+        mediumPattern,
+        drumMap,
+        patternLength: 16,
+      });
+      const drumLoop = new LiveLoop(midiBus, {
+        pattern: drumPattern,
+        midiChannel: 1,
+        globalContext,
+        name: "DrumLoop",
+      });
+      transport.addLiveLoop(drumLoop);
+      energyManager.addLiveLoop(drumLoop);
+
+      // --- BASS LOOP (ch 3) ---
+      const bassLoop = new LiveLoop(midiBus, {
+        pattern: new SyncopatedBass({
+          length: 16,
+          octave: 2,
+          rhythmPreset: "funk",
+        }),
+        midiChannel: 3,
+        globalContext,
+        name: "BassLoop",
+      });
+      transport.addLiveLoop(bassLoop);
+      energyManager.addLiveLoop(bassLoop);
+
+      // --- CHORD LOOP (ch 8) ---
+      const chordLoop = new LiveLoop(midiBus, {
+        pattern: new ChordPattern({
+          length: 64, // matches total steps of the progression
+          voicingType: "close",
+          octave: 4,
+        }),
+        midiChannel: 8,
+        globalContext,
+        name: "ChordLoop",
+      });
+      transport.addLiveLoop(chordLoop);
+      energyManager.addLiveLoop(chordLoop);
+
+      /**********************************************************
+       * 8) Expose references for the REPL
+       **********************************************************/
+      window.api = {
+        // main building blocks
+        midiBus,
+        realEngine,
+        transport,
+        globalContext,
+        chordManager,
+        rhythmManager,
+        energyManager,
+        // loops
+        chordLoop,
+        bassLoop,
+        drumLoop,
+        // pattern classes
+        ChordPattern,
+        SyncopatedBass,
+        DrumPattern,
+      };
+
+      /**********************************************************
+       * 9) Preload example code in the REPL textareas
+       **********************************************************/
+      // -- CHORDS REPL --
+      document.getElementById("chordRepl").value = `
+// Example: Change the chord progression in the ChordManager
+api.chordManager.setProgression([
+  { root: "D", type: "min",  duration: 16 },
+  { root: "G", type: "maj7", duration: 16 },
+  { root: "C", type: "maj7", duration: 16 },
+  { root: "Bb", type: "7",   duration: 16 }
+]);
+console.log("ChordManager progression updated!");
+      `.trim();
+
+      // -- BASS REPL --
+      document.getElementById("bassRepl").value = `
+// Example: Swap to a new SyncopatedBass pattern, or tweak 
+const newBassPattern = new api.SyncopatedBass({
+  length: 16,
+  octave: 3,
+  rhythmPreset: "latin"  // funk, latin, or reggae
+});
+api.bassLoop.setPattern(newBassPattern, true);
+console.log("Bass pattern changed (latin, octave=3)");
+      `.trim();
+
+      // -- DRUM REPL --
+      document.getElementById("drumRepl").value = `
+// Example: Force the drum pattern hype to "low" or "high"
+// If you want to do it manually (instead of EnergyManager):
+api.drumLoop.pattern.setHypeLevel("low");
+console.log("Drums set to low hype");
+      `.trim();
+
+      // -- ENERGY REPL --
+      document.getElementById("energyRepl").value = `
+// Example: Set hype or tension via the EnergyManager
+api.energyManager.setHypeLevel("full");
+api.energyManager.setTensionLevel("high");
+console.log("Energy: hype=full, tension=high");
+
+// This can cause drum pattern to go 'high', chord manager to go dissonant,
+// and the rhythm manager subdivision to become doubleTime, etc.
+      `.trim();
+
+      // Bind the Eval buttons
+      document.getElementById("chordEvalBtn").onclick = () => {
+        eval(document.getElementById("chordRepl").value);
+      };
+      document.getElementById("bassEvalBtn").onclick = () => {
+        eval(document.getElementById("bassRepl").value);
+      };
+      document.getElementById("drumEvalBtn").onclick = () => {
+        eval(document.getElementById("drumRepl").value);
+      };
+      document.getElementById("energyEvalBtn").onclick = () => {
+        eval(document.getElementById("energyRepl").value);
+      };
+
+      console.log(
+        "Drum (ch1), Bass (ch3), and Chord (ch8) loops ready. Awaiting external MIDI clock..."
+      );
+    </script>
+  </body>
+</html>
