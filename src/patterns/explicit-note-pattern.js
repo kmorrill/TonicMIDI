@@ -14,12 +14,12 @@ import { AbstractPattern } from "./pattern-interface.js";
 
 export class ExplicitNotePattern extends AbstractPattern {
   /**
-   * @param {Array<string|{note: string, durationSteps?: number, velocity?: number}|Array<string|{note: string, durationSteps?: number, velocity?: number}>>} notesArray
-   *   An array of note definitions. Each item can be:
-   *     - A string like "C4" (will be converted internally to { note: "C4" })
-   *     - An object like { note: "C4", durationSteps: 2 }
-   *     - An array of strings or objects for multiple notes per step: ["C4", "E4", "G4"]
-   *     - An array of note objects: [{ note: "C4", durationSteps: 2 }, { note: "E4", durationSteps: 3 }]
+   * @param {Array} notesArray - An array of note definitions.
+   *   Each item can be:
+   *   - A string like "C4" (will be converted internally to { note: "C4" })
+   *   - An object like { note: "C4", durationSteps: 2 }
+   *   - An array of strings or objects for multiple notes per step: ["C4", "E4", "G4"]
+   *   - An array of note objects: [{ note: "C4", durationSteps: 2 }, { note: "E4", durationSteps: 3 }]
    *
    * @example
    *   // Simple sequence of single notes
@@ -95,7 +95,8 @@ export class ExplicitNotePattern extends AbstractPattern {
     // Now map safely
     return validNoteObjects.map((noteObj) => {
       // Check for old property name and migrate it
-      const duration = noteObj.durationSteps ?? noteObj.durationStepsOrBeats ?? 1;
+      const duration =
+        noteObj.durationSteps ?? noteObj.durationStepsOrBeats ?? 1;
       return {
         ...noteObj,
         durationSteps: Math.floor(duration), // Ensure integer steps

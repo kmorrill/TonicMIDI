@@ -52,7 +52,7 @@ export class DeviceDefinition {
 
   /**
    * List the channels that this device uses, along with an engine name for each.
-   * @returns {{channel: number, engineName: string}[]}
+   * @returns {Array<Object>} Array of objects with channel and engineName
    */
   listChannels() {
     throw new Error("listChannels() must be implemented by subclass.");

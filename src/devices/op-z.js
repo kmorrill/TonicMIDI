@@ -1,5 +1,5 @@
 // op-z-device.js
-import { DeviceDefinition } from "./device-definition.js";
+import { DeviceDefinition } from "../device-definition.js";
 
 /**
  * Example OP-Z device definition.
