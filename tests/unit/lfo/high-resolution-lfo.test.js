@@ -28,9 +28,10 @@ describe("High-Resolution LFO Updates", () => {
     };
 
     // Mock LFO with both update methods
+    // In the new system, LFO returns CC values directly (0-127)
     lfoMock = {
-      update: jest.fn().mockReturnValue(0.5),
-      updateContinuousTime: jest.fn().mockReturnValue(0.5)
+      update: jest.fn().mockReturnValue(95), // Return CC value directly
+      updateContinuousTime: jest.fn().mockReturnValue(95) // Return CC value directly
     };
 
     // Mock Pattern
@@ -66,7 +67,7 @@ describe("High-Resolution LFO Updates", () => {
     expect(midiBusMock.controlChange).toHaveBeenCalledWith({
       channel: 1,
       cc: 74,
-      value: 95 // (0.5 + 1) * 63.5 = 95.25, floored to 95
+      value: 95 // CC value returned directly from LFO
     });
   });
 

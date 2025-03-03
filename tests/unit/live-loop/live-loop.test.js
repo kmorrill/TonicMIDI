@@ -38,9 +38,10 @@ describe("LiveLoop", () => {
       getLength: jest.fn().mockReturnValue(8), // assume 8-step pattern
     };
 
-    // Mock LFO
+    // Mock LFO 
+    // In the new pattern, LFO directly returns the CC value (0-127)
     lfoMock = {
-      update: jest.fn().mockReturnValue(0.0), // default waveValue
+      update: jest.fn().mockReturnValue(63), // Return CC value directly (not wave value)
     };
 
     // Create a LiveLoop with defaults
@@ -85,7 +86,7 @@ describe("LiveLoop", () => {
   });
 
   it("updates the LFO and sends controlChange", () => {
-    // lfoMock.update() defaults to 0.0 => waveValue => 0 => ccValue = 63
+    // lfoMock.update() now returns CC value 63 directly
     liveLoop.tick(1, 0.25);
 
     // LFO update called with deltaTime=0.25
@@ -96,14 +97,14 @@ describe("LiveLoop", () => {
     expect(midiBusMock.controlChange).toHaveBeenCalledWith({
       channel: 1,
       cc: 74,
-      value: 63, // from the naive mapping in liveLoop
+      value: 63, // CC value returned directly from LFO
     });
   });
 
   it("handles multiple LFOs", () => {
     // Add another mock LFO
     const secondLfoMock = {
-      update: jest.fn().mockReturnValue(1.0), // waveValue=1 => mapped 127
+      update: jest.fn().mockReturnValue(127), // Return CC value directly (not wave value)
     };
     liveLoop.addLFO(secondLfoMock);
 
@@ -118,7 +119,7 @@ describe("LiveLoop", () => {
     // Should have two controlChange calls
     expect(midiBusMock.controlChange).toHaveBeenCalledTimes(2);
 
-    // The second LFO's waveValue=1 => 127 cc value
+    // The second LFO returns CC value 127 directly
     expect(midiBusMock.controlChange).toHaveBeenNthCalledWith(2, {
       channel: 1,
       cc: 74,

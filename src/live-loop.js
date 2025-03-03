@@ -252,12 +252,13 @@ export class LiveLoop {
         waveValue = lfo.update(deltaTime);
       }
 
-      // For example, map [-1..1] => [0..127]
-      const ccValue = Math.floor(waveValue);
+      // Take the raw value directly, assuming LFO already does CC mapping internally 
+      // when targetParam is set. Just ensure it's within MIDI CC range.
+      const ccValue = Math.max(0, Math.min(127, Math.floor(waveValue)));
 
-      // Determine CC number based on device definition or use default (for tests)
+      // Determine CC number based on device definition or use default
       let ccNum = 74; // Default CC number for tests
-
+      
       // Look up the CC number for this LFO's target parameter if device definition exists
       if (lfo.targetParam && this.deviceDefinition) {
         const deviceCcNum = this.deviceDefinition.getCC(lfo.targetParam);
@@ -265,7 +266,7 @@ export class LiveLoop {
           ccNum = deviceCcNum;
         }
       }
-
+      
       // Send a CC message
       this.midiBus.controlChange({
         channel: this.midiChannel,
