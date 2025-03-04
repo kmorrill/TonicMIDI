@@ -32,7 +32,7 @@ const value = myLfo.update(deltaTime);
 
 ### Parameters
 
-*   `$0` **[Object][47]**  (optional, default `{}`)
+*   `$0` **[Object][60]**  (optional, default `{}`)
 
     *   `$0.frequency`   (optional, default `1.0`)
     *   `$0.amplitude`   (optional, default `1.0`)
@@ -50,7 +50,7 @@ Reset the oscillator's phase (and clears any memory of absolute time).
 
 #### Parameters
 
-*   `phase` **[number][48]** If `useRadians=true`, a value in \[0..2π).
+*   `phase` **[number][61]** If `useRadians=true`, a value in \[0..2π).
     If `useRadians=false`, a value in \[0..1). (optional, default `0`)
 
 ## EnergyManager
@@ -91,7 +91,7 @@ manager.setTensionLevel("high");
 
 ### Parameters
 
-*   `$0` **[Object][47]**  (optional, default `{}`)
+*   `$0` **[Object][60]**  (optional, default `{}`)
 
     *   `$0.liveLoops`   (optional, default `[]`)
     *   `$0.chordManager`   (optional, default `null`)
@@ -114,7 +114,7 @@ adjust subdivisions accordingly (e.g. halfTime, normal, doubleTime).
 
 #### Parameters
 
-*   `level` **[string][49]** A label for the desired energy state (e.g. "low", "medium", "full").
+*   `level` **[string][62]** A label for the desired energy state (e.g. "low", "medium", "full").
 
 ### setTensionLevel
 
@@ -131,7 +131,7 @@ Examples:
 
 #### Parameters
 
-*   `level` **[string][49]** The desired tension level ("none", "low", "mid", "high").
+*   `level` **[string][62]** The desired tension level ("none", "low", "mid", "high").
 
 ### addLiveLoop
 
@@ -139,7 +139,7 @@ Adds a LiveLoop instance so that it can be controlled by this EnergyManager.
 
 #### Parameters
 
-*   `loop` **[object][47]** The LiveLoop instance to add.
+*   `loop` **[object][60]** The LiveLoop instance to add.
 
 ### removeLiveLoop
 
@@ -147,7 +147,7 @@ Removes a previously added LiveLoop from EnergyManager control.
 
 #### Parameters
 
-*   `loop` **[object][47]** The LiveLoop instance to remove.
+*   `loop` **[object][60]** The LiveLoop instance to remove.
 
 ### setArrangementStyle
 
@@ -157,7 +157,7 @@ or drastically different patterns. The exact implementation is up to you.
 
 #### Parameters
 
-*   `style` **[string][49]** A label for the arrangement style (e.g. "wide", "minimal", etc.).
+*   `style` **[string][62]** A label for the arrangement style (e.g. "wide", "minimal", etc.).
 
 ### setChordProgression
 
@@ -167,7 +167,7 @@ should adapt automatically on their next cycle.
 
 #### Parameters
 
-*   `progression` **[Array][50]** An array of chord objects (e.g. \[{ root: "C", type: "maj7" }, ...]).
+*   `progression` **[Array][63]** An array of chord objects (e.g. \[{ root: "C", type: "maj7" }, ...]).
 
 ## SyncopatedBass
 
@@ -209,7 +209,7 @@ const loop = new LiveLoop(midiBus, {
 
 ### Parameters
 
-*   `$0` **[Object][47]**  (optional, default `{}`)
+*   `$0` **[Object][60]**  (optional, default `{}`)
 
     *   `$0.length`   (optional, default `16`)
     *   `$0.octave`   (optional, default `2`)
@@ -217,6 +217,24 @@ const loop = new LiveLoop(midiBus, {
     *   `$0.rhythmPreset`   (optional, default `"funk"`)
     *   `$0.probabilityToAdvance`   (optional, default `50`)
     *   `$0.restProbability`   (optional, default `30`)
+
+## ContourMelodyOptions
+
+Type: [Object][60]
+
+### Properties
+
+*   `contour` **[Array][63]<[number][61]>?** An array of integers representing "chord-tone index offsets" or steps in chord-tone space.
+    Example: \[0, 1, 2, 1, -1]. Index 0 = chord root. Index 1 = next chord tone, etc.
+    If chord.notes = \["C4", "E4", "G4", "B4"], index 1 might be "E4".
+    Negative indices move backward in chord.notes (e.g., -1 picks the chord tone before the current one).
+    We wrap or clamp if we go out of range.
+*   `length` **[number][61]?** The number of steps before the pattern conceptually loops.
+*   `allowRests` **[boolean][64]?** If true, you can randomly skip steps or rest. Implementation is optional.
+*   `restProbability` **[number][61]?** Probability in percent (0..100) of generating a rest on any given step (only if allowRests=true).
+*   `spiceProbability` **[number][61]?** Probability in percent (0..100) that we deviate from the pure chord tone
+    to an approach/dissonance note. Higher tension might also increase this.
+*   `randomFn` **[function][65]?** A custom random function for deterministic output in tests.
 
 ## DrumPattern
 
@@ -260,7 +278,7 @@ const drumPattern = new DrumPattern({
 
 ### Parameters
 
-*   `$0` **[Object][47]**  (optional, default `{}`)
+*   `$0` **[Object][60]**  (optional, default `{}`)
 
     *   `$0.mediumPattern` &#x20;
     *   `$0.drumMap`   (optional, default `{}`)
@@ -327,7 +345,7 @@ myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
 ### Parameters
 
 *   `midiBus` &#x20;
-*   `$1` **[Object][47]**  (optional, default `{}`)
+*   `$1` **[Object][60]**  (optional, default `{}`)
 
     *   `$1.pattern` &#x20;
     *   `$1.lfos`   (optional, default `[]`)
@@ -348,8 +366,8 @@ at the next pattern boundary (start of pattern).
 
 #### Parameters
 
-*   `newPattern` **[object][47]** The new pattern, which must implement `getNotes()` and `getLength()`.
-*   `immediate` **[boolean][51]** If true, replace the pattern right away; if false, wait until the next
+*   `newPattern` **[object][60]** The new pattern, which must implement `getNotes()` and `getLength()`.
+*   `immediate` **[boolean][64]** If true, replace the pattern right away; if false, wait until the next
     time `stepIndex` modulo pattern length = 0. (optional, default `false`)
 
 ### addLFO
@@ -358,7 +376,7 @@ Add an LFO immediately (no enqueuing needed).
 
 #### Parameters
 
-*   `lfo` **[object][47]** An LFO instance (e.g. new LFO({ ... }))
+*   `lfo` **[object][60]** An LFO instance (e.g. new LFO({ ... }))
 
 ### updateLFO
 
@@ -368,9 +386,9 @@ alter its state mid-cycle.
 
 #### Parameters
 
-*   `index` **[number][48]** The index of the LFO in the `lfos` array.
-*   `newProps` **[object][47]** An object of updated properties, e.g. `{ frequency: 2.0 }`.
-*   `immediate` **[boolean][51]** If true, apply changes now; otherwise, queue them. (optional, default `false`)
+*   `index` **[number][61]** The index of the LFO in the `lfos` array.
+*   `newProps` **[object][60]** An object of updated properties, e.g. `{ frequency: 2.0 }`.
+*   `immediate` **[boolean][64]** If true, apply changes now; otherwise, queue them. (optional, default `false`)
 
 ### setContext
 
@@ -380,8 +398,8 @@ user-defined flags, or anything else to influence note generation.
 
 #### Parameters
 
-*   `context` **[object][47]** The new local context.
-*   `immediate` **[boolean][51]** If true, apply immediately. If false, wait until the pattern boundary. (optional, default `true`)
+*   `context` **[object][60]** The new local context.
+*   `immediate` **[boolean][64]** If true, apply immediately. If false, wait until the pattern boundary. (optional, default `true`)
 
 ### setGlobalContext
 
@@ -391,7 +409,7 @@ want to attach after constructing the loop.
 
 #### Parameters
 
-*   `globalContext` **[object][47]** The new global context object.
+*   `globalContext` **[object][60]** The new global context object.
 
 ### setMuted
 
@@ -400,7 +418,7 @@ although it will still handle durations and eventually send `noteOff`.
 
 #### Parameters
 
-*   `bool` **[boolean][51]** If true, liveLoop is muted.
+*   `bool` **[boolean][64]** If true, liveLoop is muted.
 
 ### setTranspose
 
@@ -410,7 +428,7 @@ might raise all notes by a perfect fifth for tension.
 
 #### Parameters
 
-*   `semitones` **[number][48]** Positive to shift up, negative to shift down.
+*   `semitones` **[number][61]** Positive to shift up, negative to shift down.
 
 ### setName
 
@@ -419,5 +437,112 @@ This can be helpful for orchestration or debugging logs.
 
 #### Parameters
 
-*   `name` **[string][49]** The new name for this loop.
+*   `name` **[string][62]** The new name for this loop.
+
+## createPhrasePattern
+
+meta-phrase-pattern.js
+
+Provides a function `createPhrasePattern` that combines any two existing patterns
+(main vs. fill) into a single "meta pattern." By default, it repeats
+4 bars of main + 1 bar of fill, but you can configure any ratio of main vs fill bars.
+
+Usage:
+import { createPhrasePattern } from './meta-phrase-pattern.js';
+import { DrumPattern } from './patterns/drum-pattern.js'; // e.g.
+
+const mainDrum = new DrumPattern(...);
+const fillDrum = new DrumPattern(...);
+
+const phrasedDrumPattern = createPhrasePattern(
+mainDrum,
+fillDrum,
+{
+barsOfMain: 4,
+barsOfFill: 1,
+barLengthInSteps: 16,
+onPhraseStart: (phraseIndex) => console.log('New phrase started:', phraseIndex),
+onPhraseEnd: (phraseIndex) => console.log('Phrase ended:', phraseIndex),
+}
+);
+
+// Then in your LiveLoop:
+const loop = new LiveLoop(midiBus, {
+pattern: phrasedDrumPattern,
+...
+});
+
+### Parameters
+
+*   `mainPattern` &#x20;
+*   `fillPattern` &#x20;
+*   `$2` **[Object][60]**  (optional, default `{}`)
+
+    *   `$2.barsOfMain`   (optional, default `4`)
+    *   `$2.barsOfFill`   (optional, default `1`)
+    *   `$2.barLengthInSteps`   (optional, default `16`)
+    *   `$2.onPhraseStart`   (optional, default `null`)
+    *   `$2.onPhraseEnd`   (optional, default `null`)
+
+## createPhrasePattern
+
+Wraps two existing patterns (main and fill) into a single meta-pattern
+that alternates 4 bars of main and 1 bar of fill, repeating indefinitely.
+
+You can pass ANY pattern object for mainPattern or fillPattern, as long as
+it implements `getNotes(stepIndex, context)` and `getLength()`.
+
+### Parameters
+
+*   `mainPattern` **[object][60]** An existing pattern implementing {getNotes, getLength}
+*   `fillPattern` **[object][60]** Another pattern, used for the "fill" measure
+*   `options` **[PhrasePatternOptions][53]**  (optional, default `{}`)
+
+    *   `options.barsOfMain`   (optional, default `4`)
+    *   `options.barsOfFill`   (optional, default `1`)
+    *   `options.barLengthInSteps`   (optional, default `16`)
+    *   `options.onPhraseStart`   (optional, default `null`)
+    *   `options.onPhraseEnd`   (optional, default `null`)
+
+## PhrasePatternOptions
+
+Type: [Object][60]
+
+### Properties
+
+*   `barsOfMain` **[number][61]?** Number of bars (measures) to use the mainPattern.
+*   `barsOfFill` **[number][61]?** Number of bars (measures) to use the fillPattern.
+*   `barLengthInSteps` **[number][61]?** How many steps in one bar. Typically 16 if you're doing 4/4 with each quarter = 4 steps.
+*   `onPhraseStart` **[function][65]?** Callback when a phrase starts. (phraseIndex) => void
+*   `onPhraseEnd` **[function][65]?** Callback when a phrase ends.   (phraseIndex) => void
+
+## getNotes
+
+Called each step by the LiveLoop. We must have a chord from chordManager, or we throw an error.
+If we have a rhythmManager, we can do additional logic like skipping offbeats.
+If tension is high, we might increase spice probability, etc.
+
+### Parameters
+
+*   `stepIndex` **[number][61]**&#x20;
+*   `context` **[object][60]** Typically includes { chordManager, rhythmManager, energyState, ... } (optional, default `{}`)
+
+Returns **[Array][63]<{note: [string][62], velocity: [number][61], durationSteps: [number][61]}>**&#x20;
+
+## getLength
+
+The pattern length in steps for looping or boundary logic.
+
+Returns **[number][61]**&#x20;
+
+## reset
+
+Optional: If we want to reset the pattern’s internal index or other state.
+Called, for example, when the transport restarts or user wants a fresh cycle.
+
+## toConfig
+
+Returns a config object describing this pattern’s settings (for debugging or serialization).
+
+Returns **[Object][60]**&#x20;
 

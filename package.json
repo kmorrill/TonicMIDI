@@ -10,7 +10,7 @@
     "dump-docs": "find docs -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done",
     "dump-src": "find src -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done",
     "dump-demo": "find demo -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done",
-    "docs": "documentation build src/live-loop.js src/lfo.js src/energy-manager.js src/patterns/explicit-note-pattern.js src/patterns/drum-pattern.js src/patterns/syncopated-bass.js --shallow --document-exported -f md -o docs/api-temp.md && sed -E -e '/^### Table of Contents/,/^## /{ /^## /!d; }' -e '/^\\[[0-9]+]: /,$d' docs/api-temp.md > docs/api.md && rm docs/api-temp.md",
+    "docs": "documentation build src/live-loop.js src/lfo.js src/energy-manager.js src/patterns/meta-phrase-pattern.js src/patterns/contour-melody-pattern.js src/patterns/explicit-note-pattern.js src/patterns/drum-pattern.js src/patterns/syncopated-bass.js --shallow --document-exported -f md -o docs/api-temp.md && sed -E -e '/^### Table of Contents/,/^## /{ /^## /!d; }' -e '/^\\[[0-9]+]: /,$d' docs/api-temp.md > docs/api.md && rm docs/api-temp.md",
     "docs:watch": "nodemon --watch src -e js --exec \"npm run docs\""
   },
   "keywords": [],
