@@ -43,6 +43,20 @@
  * // 6) Change the pattern or transpose in real time:
  * myLoop.setTranspose(2); // shift up by 2 semitones
  * myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
+ *
+ * // 7) Chaining Mode Example:
+ * //    Provide 'cycles' to the constructor, then chain more sub-loops.
+ * const chainLoop = new LiveLoop(midiBus, {
+ *   pattern: patternA,
+ *   midiChannel: 1,
+ *   name: "ChainedMelody",
+ *   cycles: 2   // how many times patternA should repeat
+ * })
+ * .chainLiveLoop({ pattern: patternB, cycles: 4 })
+ * .chainLiveLoop({ pattern: patternC, cycles: 1 })
+ * .onChainComplete(() => {
+ *   console.log("All chained patterns completed!");
+ * });
  * ```
  */
 
@@ -85,8 +99,31 @@ export class LiveLoop {
    * sends `noteOn` events, schedules `noteOff` (based on note durations),
    * and updates LFOs to send `controlChange` events as needed.
    *
-   * Additionally, if `cycles` is specified, this loop enters "chain mode."
-   * You can then add more chained sub-loops with `.chainLiveLoop()` calls.
+   * **Chaining Mode**:
+   * If you specify the `cycles` option, this LiveLoop enters "chain mode."
+   * That means the current `pattern` will play for the given number of `cycles`
+   * (each cycle = one full pass of `pattern.getLength()` steps), and then it
+   * can automatically proceed to additional sub-loops you define with
+   * `.chainLiveLoop()`. Once all chained items finish, the loop calls
+   * `onChainComplete()` if defined, and then mutes itself.
+   *
+   * ### Basic constructor example (non-chained):
+   * ```js
+   * const loop = new LiveLoop(midiBus, { pattern: myPattern, midiChannel: 1 });
+   * ```
+   *
+   * ### Chaining example:
+   * ```js
+   * const loop = new LiveLoop(midiBus, {
+   *   pattern: patA,
+   *   cycles: 2  // patA repeats 2 times
+   * })
+   *   .chainLiveLoop({ pattern: patB, cycles: 4 })
+   *   .chainLiveLoop({ pattern: patC, cycles: 1 })
+   *   .onChainComplete(() => {
+   *     console.log("All patterns done!");
+   *   });
+   * ```
    *
    * @param {object} midiBus
    *   The MIDI Bus for sending noteOn, noteOff, controlChange, etc.
@@ -192,18 +229,20 @@ export class LiveLoop {
   /**
    * chainLiveLoop(params) - Add another sub-loop to the chain.
    *
-   * Example:
+   * Use this to chain multiple patterns one after another, each repeating
+   * for its specified `cycles` count. For example:
+   *
    * ```js
-   * new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
+   * const chainLoop = new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
    *   .chainLiveLoop({ pattern: patB, cycles: 4 })
    *   .chainLiveLoop({ pattern: patC, cycles: 8 })
    *   .onChainComplete(() => console.log("All done"));
    * ```
    *
    * @param {object} params
-   * @param {object} params.pattern
-   * @param {number} [params.cycles=1]
-   * @param {number} [params.midiChannel]
+   * @param {object} params.pattern  The pattern for this chained segment
+   * @param {number} [params.cycles=1] How many times to repeat the pattern
+   * @param {number} [params.midiChannel] Optional override of MIDI channel
    * @returns {LiveLoop} this
    */
   chainLiveLoop(params = {}) {
@@ -231,7 +270,16 @@ export class LiveLoop {
    * onChainComplete(callback) - Called once the final chain item finishes.
    * If no chain is used, this never fires.
    *
-   * @param {function} callback
+   * Example:
+   * ```js
+   * new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
+   *   .chainLiveLoop({ pattern: patB, cycles: 4 })
+   *   .onChainComplete(() => {
+   *     console.log("All patterns in the chain have finished!");
+   *   });
+   * ```
+   *
+   * @param {function} callback - A function to run when the chain is fully complete
    * @returns {LiveLoop} this
    */
   onChainComplete(callback) {

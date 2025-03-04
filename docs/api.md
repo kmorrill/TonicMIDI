@@ -292,6 +292,83 @@ const drumPattern = new DrumPattern({
 
 *   `notesArray` &#x20;
 
+## createPhrasePattern
+
+meta-phrase-pattern.js
+
+Provides a function `createPhrasePattern` that combines any two existing patterns
+(main vs. fill) into a single "meta pattern." By default, it repeats
+4 bars of main + 1 bar of fill, but you can configure any ratio of main vs fill bars.
+
+Usage:
+import { createPhrasePattern } from './meta-phrase-pattern.js';
+import { DrumPattern } from './patterns/drum-pattern.js'; // e.g.
+
+const mainDrum = new DrumPattern(...);
+const fillDrum = new DrumPattern(...);
+
+const phrasedDrumPattern = createPhrasePattern(
+mainDrum,
+fillDrum,
+{
+barsOfMain: 4,
+barsOfFill: 1,
+barLengthInSteps: 16,
+onPhraseStart: (phraseIndex) => console.log('New phrase started:', phraseIndex),
+onPhraseEnd: (phraseIndex) => console.log('Phrase ended:', phraseIndex),
+}
+);
+
+// Then in your LiveLoop:
+const loop = new LiveLoop(midiBus, {
+pattern: phrasedDrumPattern,
+...
+});
+
+### Parameters
+
+*   `mainPattern` &#x20;
+*   `fillPattern` &#x20;
+*   `$2` **[Object][64]**  (optional, default `{}`)
+
+    *   `$2.barsOfMain`   (optional, default `4`)
+    *   `$2.barsOfFill`   (optional, default `1`)
+    *   `$2.barLengthInSteps`   (optional, default `16`)
+    *   `$2.onPhraseStart`   (optional, default `null`)
+    *   `$2.onPhraseEnd`   (optional, default `null`)
+
+## createPhrasePattern
+
+Wraps two existing patterns (main and fill) into a single meta-pattern
+that alternates 4 bars of main and 1 bar of fill, repeating indefinitely.
+
+You can pass ANY pattern object for mainPattern or fillPattern, as long as
+it implements `getNotes(stepIndex, context)` and `getLength()`.
+
+### Parameters
+
+*   `mainPattern` **[object][64]** An existing pattern implementing {getNotes, getLength}
+*   `fillPattern` **[object][64]** Another pattern, used for the "fill" measure
+*   `options` **[PhrasePatternOptions][34]**  (optional, default `{}`)
+
+    *   `options.barsOfMain`   (optional, default `4`)
+    *   `options.barsOfFill`   (optional, default `1`)
+    *   `options.barLengthInSteps`   (optional, default `16`)
+    *   `options.onPhraseStart`   (optional, default `null`)
+    *   `options.onPhraseEnd`   (optional, default `null`)
+
+## PhrasePatternOptions
+
+Type: [Object][64]
+
+### Properties
+
+*   `barsOfMain` **[number][65]?** Number of bars (measures) to use the mainPattern.
+*   `barsOfFill` **[number][65]?** Number of bars (measures) to use the fillPattern.
+*   `barLengthInSteps` **[number][65]?** How many steps in one bar. Typically 16 if you're doing 4/4 with each quarter = 4 steps.
+*   `onPhraseStart` **[function][69]?** Callback when a phrase starts. (phraseIndex) => void
+*   `onPhraseEnd` **[function][69]?** Callback when a phrase ends.   (phraseIndex) => void
+
 ## LiveLoop
 
 src/live-loop.js
@@ -340,6 +417,20 @@ const myLoop = new LiveLoop(midiBus, {
 // 6) Change the pattern or transpose in real time:
 myLoop.setTranspose(2); // shift up by 2 semitones
 myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
+
+// 7) Chaining Mode Example:
+//    Provide 'cycles' to the constructor, then chain more sub-loops.
+const chainLoop = new LiveLoop(midiBus, {
+  pattern: patternA,
+  midiChannel: 1,
+  name: "ChainedMelody",
+  cycles: 2   // how many times patternA should repeat
+})
+.chainLiveLoop({ pattern: patternB, cycles: 4 })
+.chainLiveLoop({ pattern: patternC, cycles: 1 })
+.onChainComplete(() => {
+  console.log("All chained patterns completed!");
+});
 ```
 
 ### Parameters
@@ -364,10 +455,11 @@ myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
 
 chainLiveLoop(params) - Add another sub-loop to the chain.
 
-Example:
+Use this to chain multiple patterns one after another, each repeating
+for its specified `cycles` count. For example:
 
 ```js
-new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
+const chainLoop = new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
   .chainLiveLoop({ pattern: patB, cycles: 4 })
   .chainLiveLoop({ pattern: patC, cycles: 8 })
   .onChainComplete(() => console.log("All done"));
@@ -377,22 +469,32 @@ new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
 
 *   `params` **[object][64]**  (optional, default `{}`)
 
-    *   `params.pattern` **[object][64]**&#x20;
-    *   `params.cycles` **[number][65]**  (optional, default `1`)
-    *   `params.midiChannel` **[number][65]?**&#x20;
+    *   `params.pattern` **[object][64]** The pattern for this chained segment
+    *   `params.cycles` **[number][65]** How many times to repeat the pattern (optional, default `1`)
+    *   `params.midiChannel` **[number][65]?** Optional override of MIDI channel
 
-Returns **[LiveLoop][30]** this
+Returns **[LiveLoop][36]** this
 
 ### onChainComplete
 
 onChainComplete(callback) - Called once the final chain item finishes.
 If no chain is used, this never fires.
 
+Example:
+
+```js
+new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
+  .chainLiveLoop({ pattern: patB, cycles: 4 })
+  .onChainComplete(() => {
+    console.log("All patterns in the chain have finished!");
+  });
+```
+
 #### Parameters
 
-*   `callback` **[function][69]**&#x20;
+*   `callback` **[function][69]** A function to run when the chain is fully complete
 
-Returns **[LiveLoop][30]** this
+Returns **[LiveLoop][36]** this
 
 ### setPattern
 
@@ -469,83 +571,6 @@ Assign a descriptive or friendly name (e.g. "Bass", "Melody", "Drums").
 #### Parameters
 
 *   `name` **[string][66]**&#x20;
-
-## createPhrasePattern
-
-meta-phrase-pattern.js
-
-Provides a function `createPhrasePattern` that combines any two existing patterns
-(main vs. fill) into a single "meta pattern." By default, it repeats
-4 bars of main + 1 bar of fill, but you can configure any ratio of main vs fill bars.
-
-Usage:
-import { createPhrasePattern } from './meta-phrase-pattern.js';
-import { DrumPattern } from './patterns/drum-pattern.js'; // e.g.
-
-const mainDrum = new DrumPattern(...);
-const fillDrum = new DrumPattern(...);
-
-const phrasedDrumPattern = createPhrasePattern(
-mainDrum,
-fillDrum,
-{
-barsOfMain: 4,
-barsOfFill: 1,
-barLengthInSteps: 16,
-onPhraseStart: (phraseIndex) => console.log('New phrase started:', phraseIndex),
-onPhraseEnd: (phraseIndex) => console.log('Phrase ended:', phraseIndex),
-}
-);
-
-// Then in your LiveLoop:
-const loop = new LiveLoop(midiBus, {
-pattern: phrasedDrumPattern,
-...
-});
-
-### Parameters
-
-*   `mainPattern` &#x20;
-*   `fillPattern` &#x20;
-*   `$2` **[Object][64]**  (optional, default `{}`)
-
-    *   `$2.barsOfMain`   (optional, default `4`)
-    *   `$2.barsOfFill`   (optional, default `1`)
-    *   `$2.barLengthInSteps`   (optional, default `16`)
-    *   `$2.onPhraseStart`   (optional, default `null`)
-    *   `$2.onPhraseEnd`   (optional, default `null`)
-
-## createPhrasePattern
-
-Wraps two existing patterns (main and fill) into a single meta-pattern
-that alternates 4 bars of main and 1 bar of fill, repeating indefinitely.
-
-You can pass ANY pattern object for mainPattern or fillPattern, as long as
-it implements `getNotes(stepIndex, context)` and `getLength()`.
-
-### Parameters
-
-*   `mainPattern` **[object][64]** An existing pattern implementing {getNotes, getLength}
-*   `fillPattern` **[object][64]** Another pattern, used for the "fill" measure
-*   `options` **[PhrasePatternOptions][57]**  (optional, default `{}`)
-
-    *   `options.barsOfMain`   (optional, default `4`)
-    *   `options.barsOfFill`   (optional, default `1`)
-    *   `options.barLengthInSteps`   (optional, default `16`)
-    *   `options.onPhraseStart`   (optional, default `null`)
-    *   `options.onPhraseEnd`   (optional, default `null`)
-
-## PhrasePatternOptions
-
-Type: [Object][64]
-
-### Properties
-
-*   `barsOfMain` **[number][65]?** Number of bars (measures) to use the mainPattern.
-*   `barsOfFill` **[number][65]?** Number of bars (measures) to use the fillPattern.
-*   `barLengthInSteps` **[number][65]?** How many steps in one bar. Typically 16 if you're doing 4/4 with each quarter = 4 steps.
-*   `onPhraseStart` **[function][69]?** Callback when a phrase starts. (phraseIndex) => void
-*   `onPhraseEnd` **[function][69]?** Callback when a phrase ends.   (phraseIndex) => void
 
 ## getNotes
 
