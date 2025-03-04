@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Client-Side MIDI Parser + Web MIDI Demo</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+        background: #f4f4f4;
+      }
+      header {
+        background: #2c3e50;
+        color: #ecf0f1;
+        padding: 1em;
+      }
+      .header-content {
+        max-width: 900px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .header-content h1 {
+        font-size: 1.2em;
+        margin: 0;
+      }
+
+      .main-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 1em;
+      }
+      .file-input {
+        margin-bottom: 1em;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1em;
+        margin-bottom: 1em;
+        flex-wrap: wrap;
+      }
+      .controls button {
+        padding: 0.5em 1em;
+        font-size: 0.9em;
+        cursor: pointer;
+      }
+
+      .transport-state {
+        margin-top: 0.5em;
+        font-size: 0.85em;
+        color: #555;
+      }
+
+      .timeline-area {
+        position: relative;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        height: 80px;
+        margin-bottom: 1em;
+        overflow: hidden;
+      }
+      .bar-ruler {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 20px;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        font-size: 0.75em;
+        pointer-events: none;
+      }
+      .bar-label {
+        position: absolute;
+        top: 2px;
+        padding: 0 2px;
+        background: #bdc3c7;
+        border-radius: 3px;
+        color: #2c3e50;
+      }
+      .track-lane {
+        position: absolute;
+        top: 20px;
+        left: 0;
+        width: 100%;
+        height: 60px;
+        background: #fafafa;
+      }
+      .segment {
+        position: absolute;
+        top: 20px; /* visually offset */
+        height: 20px;
+        color: #fff;
+        text-align: center;
+        font-size: 0.7em;
+        line-height: 20px;
+        border-radius: 3px;
+        overflow: hidden;
+        background: #2980b9;
+      }
+      .playhead-line {
+        position: absolute;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        background: red;
+        pointer-events: none;
+      }
+
+      .midi-tracks-info {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-top: 2em;
+        padding: 1em;
+      }
+      .midi-tracks-info h2 {
+        margin-top: 0;
+        font-size: 1em;
+        margin-bottom: 0.5em;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 0.3em;
+        color: #333;
+      }
+      .track-item {
+        margin: 1em 0;
+        border-bottom: 1px dashed #ccc;
+        padding-bottom: 1em;
+      }
+      .track-item:last-child {
+        border-bottom: none;
+      }
+      .track-item label {
+        font-weight: bold;
+      }
+      .track-item .channel-select {
+        margin-left: 0.3em;
+      }
+
+      footer {
+        background: #34495e;
+        color: #ecf0f1;
+        text-align: center;
+        padding: 0.7em;
+        margin-top: 2em;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-content">
+        <h1>MIDI File Import Demo + Web MIDI</h1>
+        <div id="fileNameDisplay" style="font-size: 0.9em"></div>
+      </div>
+    </header>
+
+    <div class="main-container">
+      <!-- Simple placeholder for a status message -->
+      <div id="app"></div>
+
+      <!-- File Input -->
+      <div class="file-input">
+        <label for="midiFileInput"><strong>Select MIDI File:</strong></label>
+        <input type="file" id="midiFileInput" accept=".mid,.midi" />
+      </div>
+
+      <!-- Transport / Timeline Controls -->
+      <div class="controls">
+        <div>
+          <button onclick="movePlayhead(-1)">-1 Bar</button>
+          <button onclick="movePlayhead(1)">+1 Bar</button>
+          <button onclick="movePlayhead(-4)">-4 Bars</button>
+          <button onclick="movePlayhead(4)">+4 Bars</button>
+        </div>
+        <div>
+          <button onclick="startTransport()">Play from Playhead</button>
+          <button onclick="stopTransport()">Stop</button>
+          <button onclick="splitAtPlayhead()">Split at Playhead</button>
+        </div>
+      </div>
+      <div id="transportState" class="transport-state">Transport: Stopped</div>
+
+      <!-- Timeline area -->
+      <div class="timeline-area" id="timelineArea">
+        <div class="bar-ruler" id="barRuler"></div>
+        <div class="track-lane" id="trackLane"></div>
+        <div class="playhead-line" id="playhead"></div>
+      </div>
+
+      <!-- MIDI Tracks Info -->
+      <div id="midiTracksInfo" class="midi-tracks-info" style="display: none">
+        <h2>MIDI Tracks</h2>
+        <div id="tracksContainer"></div>
+      </div>
+    </div>
+
+    <footer>
+      <p>&copy; 2025 Example Client-Side MIDI Parser + Web MIDI Output</p>
+    </footer>
+
+    <!-- In your HTML HEAD or BODY -->
+    <script type="module" src="./state.js"></script>
+    <script type="module" src="./midiWebAccess.js"></script>
+    <script type="module" src="./timeline.js"></script>
+    <script type="module" src="./tracks.js"></script>
+    <script type="module" src="./transport.js"></script>
+    <script type="module" src="./fileSelect.js"></script>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
