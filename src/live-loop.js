@@ -45,6 +45,7 @@
  * myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
  * ```
  */
+
 export class LiveLoop {
   /**
    * @typedef {Object} LiveLoopOptions
@@ -73,6 +74,9 @@ export class LiveLoop {
    * @property {string|null} [midiOutputId=null]
    *   Identifies which MIDI output device is used. If provided with a deviceManager,
    *   then `deviceDefinition` is retrieved automatically.
+   * @property {number} [cycles=null]
+   *   (Optional) If provided, enables "chain mode." This loop's pattern
+   *   will repeat for `cycles` times, then end or switch to a chained pattern.
    */
 
   /**
@@ -80,6 +84,9 @@ export class LiveLoop {
    * a TransportManager. Each tick, it retrieves notes from its pattern,
    * sends `noteOn` events, schedules `noteOff` (based on note durations),
    * and updates LFOs to send `controlChange` events as needed.
+   *
+   * Additionally, if `cycles` is specified, this loop enters "chain mode."
+   * You can then add more chained sub-loops with `.chainLiveLoop()` calls.
    *
    * @param {object} midiBus
    *   The MIDI Bus for sending noteOn, noteOff, controlChange, etc.
@@ -100,69 +107,39 @@ export class LiveLoop {
       deviceDefinition = null,
       deviceManager = null,
       midiOutputId = null,
+      // New optional param that triggers chain logic
+      cycles = null,
     } = {}
   ) {
     /** @private */
     this.midiBus = midiBus;
 
-    /**
-     * The pattern that determines which notes to play at each step.
-     * Must implement `getNotes(stepIndex, context)` and `getLength()`.
-     * @type {object}
-     */
+    /** @type {object} */
     this.pattern = pattern;
 
-    /**
-     * Array of LFO objects for continuous parameter modulation.
-     * @type {object[]}
-     */
+    /** @type {object[]} */
     this.lfos = lfos;
 
-    /**
-     * MIDI channel to use for noteOn/noteOff messages (1-16).
-     * @type {number}
-     */
+    /** @type {number} */
     this.midiChannel = midiChannel;
 
-    /**
-     * Local context passed to the pattern (e.g. chord info, scale).
-     * @type {object}
-     */
+    /** @type {object} */
     this.context = context;
 
-    /**
-     * GlobalContext that may include chordManager, rhythmManager, etc.
-     * @type {object|null}
-     */
+    /** @type {object|null} */
     this.globalContext = globalContext;
 
-    /**
-     * An optional name for logging, debugging, or orchestration identification.
-     * @type {string}
-     */
+    /** @type {string} */
     this.name = name;
 
-    /**
-     * Whether this loop is currently muted. If true, noteOn events are skipped.
-     * @type {boolean}
-     */
+    /** @type {boolean} */
     this.muted = muted;
 
-    /**
-     * A semitone shift for all notes from this pattern (positive = pitch up).
-     * @type {number}
-     */
+    /** @type {number} */
     this.transpose = transpose;
 
     /** @private */
     this.changeQueue = [];
-
-    /**
-     * Array of active notes that are currently sounding. Used to know when to send noteOff.
-     * Each item has { note, velocity, endStep, channel }.
-     * @type {Array}
-     */
-    this.activeNotes = [];
 
     /** @private */
     this.deviceManager = deviceManager;
@@ -178,48 +155,131 @@ export class LiveLoop {
       this.deviceDefinition = deviceDefinition;
     }
 
+    /** @private */
+    this.activeNotes = [];
+
     // Build noteName->MIDI map
     this._initNoteToMidiMap();
+
+    // ----------------------------------------------------------------------
+    // Chaining-related fields:
+    // An array of items: [ { pattern, cycles, midiChannel? }, ... ]
+    // If the user passes `cycles` in the constructor, we add the first chain item.
+    // Otherwise, _chainItems stays empty => chain logic is off.
+    /** @private */
+    this._chainItems = [];
+    /** @private */
+    this._currentChainIndex = -1;
+    /** @private */
+    this._cyclesSoFar = 0;
+    /** @private */
+    this._onChainComplete = null;
+
+    if (typeof cycles === "number" && cycles > 0) {
+      this._chainItems.push({
+        pattern: this.pattern,
+        cycles,
+        midiChannel: this.midiChannel,
+      });
+      this._currentChainIndex = 0; // we'll start on item[0]
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Chaining API Methods
+  // ----------------------------------------------------------------------
+
+  /**
+   * chainLiveLoop(params) - Add another sub-loop to the chain.
+   *
+   * Example:
+   * ```js
+   * new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
+   *   .chainLiveLoop({ pattern: patB, cycles: 4 })
+   *   .chainLiveLoop({ pattern: patC, cycles: 8 })
+   *   .onChainComplete(() => console.log("All done"));
+   * ```
+   *
+   * @param {object} params
+   * @param {object} params.pattern
+   * @param {number} [params.cycles=1]
+   * @param {number} [params.midiChannel]
+   * @returns {LiveLoop} this
+   */
+  chainLiveLoop(params = {}) {
+    // If we haven't started chain mode yet (i.e. no cycles in constructor),
+    // create an initial chain item from the current pattern:
+    if (this._chainItems.length === 0) {
+      this._chainItems.push({
+        pattern: this.pattern,
+        cycles: 1,
+        midiChannel: this.midiChannel,
+      });
+      this._currentChainIndex = 0;
+      this._cyclesSoFar = 0;
+    }
+    // Add the new chain item
+    this._chainItems.push({
+      pattern: params.pattern,
+      cycles: typeof params.cycles === "number" ? params.cycles : 1,
+      midiChannel: params.midiChannel ?? this.midiChannel,
+    });
+    return this;
   }
 
   /**
-   * **Internal method (called by TransportManager).**
-   * Advances the loop by one step:
-   *  1) Applies queued changes if at pattern boundary
-   *  2) Calls the pattern for new notes
-   *  3) Sends noteOn (unless muted) and schedules noteOff
-   *  4) Checks for notes that need noteOff this step
-   *  5) Updates LFOs
+   * onChainComplete(callback) - Called once the final chain item finishes.
+   * If no chain is used, this never fires.
    *
-   * @private
-   * @param {number} stepIndex - Current integer step index
-   * @param {number} deltaTime - Time since last step (in beats)
-   * @param {number|null} absoluteTime - Absolute time in beats (for LFO usage)
+   * @param {function} callback
+   * @returns {LiveLoop} this
+   */
+  onChainComplete(callback) {
+    this._onChainComplete = callback;
+    return this;
+  }
+
+  // ----------------------------------------------------------------------
+  // Core Playback & Tick
+  // ----------------------------------------------------------------------
+
+  /**
+   * Advances the loop by one step:
+   *   1) Applies queued changes if at pattern boundary
+   *   2) Gets notes from the pattern
+   *   3) Sends noteOn (unless muted) and schedules noteOff
+   *   4) Checks for notes that need noteOff
+   *   5) Updates LFOs
+   *   6) If in chain mode, checks if we finished a pattern cycle
+   *
+   * Normally called by TransportManager once per "step."
+   *
+   * @param {number} stepIndex - which step in the bar or pattern
+   * @param {number} deltaTime - time since last step (beats)
+   * @param {number} [absoluteTime=null] - optional total time (beats)
    */
   tick(stepIndex, deltaTime, absoluteTime = null) {
-    // 1) Handle pattern changes if we just hit the pattern boundary
+    // 1) Possibly apply queued changes at pattern boundary
     this._applyQueuedChangesIfNeeded(stepIndex);
 
-    // 2) Combine local context with global context
+    // 2) Merge contexts
     const effectiveContext = this._getEffectiveContext(stepIndex);
 
     // 3) Get new notes from pattern
     const notes = this.pattern.getNotes(stepIndex, effectiveContext);
 
-    // 4) Start new notes with noteOn, store them in activeNotes
+    // 4) Start new notes with noteOn
     if (notes && notes.length) {
       for (const noteObj of notes) {
         let midiNote = this._convertNoteNameToMidi(noteObj.note);
         midiNote += this.transpose; // apply semitone shift
-        // Clamp to [0..127] just to be safe
-        midiNote = Math.max(0, Math.min(127, midiNote));
+        midiNote = Math.max(0, Math.min(127, midiNote)); // clamp
 
-        const duration =
-          noteObj.durationSteps ?? noteObj.durationStepsOrBeats ?? 1;
+        const duration = noteObj.durationSteps ?? 1;
         const endStep = stepIndex + Math.floor(duration);
         const velocity = noteObj.velocity ?? 100;
 
-        // If note is retriggered, stop the old instance
+        // If a note is re-triggered, noteOff the old one
         const existingIdx = this.activeNotes.findIndex(
           (n) => n.channel === this.midiChannel && n.note === midiNote
         );
@@ -232,7 +292,6 @@ export class LiveLoop {
           this.activeNotes.splice(existingIdx, 1);
         }
 
-        // Send noteOn unless muted
         if (!this.muted) {
           this.midiBus.noteOn({
             channel: this.midiChannel,
@@ -250,36 +309,78 @@ export class LiveLoop {
       }
     }
 
-    // 5) Turn off any notes that have reached their end
+    // 5) Turn off any notes that ended
     const stillActive = [];
     for (const noteObj of this.activeNotes) {
       if (stepIndex >= noteObj.endStep) {
-        this.midiBus.noteOff({
-          channel: noteObj.channel,
-          note: noteObj.note,
-        });
+        this.midiBus.noteOff({ channel: noteObj.channel, note: noteObj.note });
       } else {
         stillActive.push(noteObj);
       }
     }
     this.activeNotes = stillActive;
 
-    // 6) High-level LFO update (if not done at finer resolution)
+    // 6) Update LFOs
     this._updateLFOs(deltaTime, absoluteTime);
+
+    // 7) If we’re in chain mode, check if we just finished a pattern cycle
+    if (this._chainItems.length > 0 && this._currentChainIndex >= 0) {
+      const currentItem = this._chainItems[this._currentChainIndex];
+      const length =
+        currentItem.pattern.getLength && currentItem.pattern.getLength();
+      if (length && stepIndex === length - 1) {
+        // We completed one cycle of the current pattern
+        this._cyclesSoFar++;
+        if (this._cyclesSoFar >= currentItem.cycles) {
+          this._moveToNextChainItem();
+        }
+      }
+    }
   }
 
   /**
-   * **Internal method (called by TransportManager).**
-   * Updates LFOs at every clock pulse (higher resolution than 1 step).
-   * This is optional but can provide smoother parameter modulation.
+   * If called at a higher resolution (e.g. every audio callback),
+   * updates LFOs alone. Optional feature for smoother parameter automation.
    *
-   * @private
-   * @param {number} deltaTime - Elapsed time (beats) since last call
-   * @param {number|null} absoluteTime - Absolute time in beats
+   * @param {number} deltaTime - time in beats since last call
+   * @param {number} [absoluteTime=null]
    */
   updateLFOsOnly(deltaTime, absoluteTime = null) {
     this._updateLFOs(deltaTime, absoluteTime);
   }
+
+  // ----------------------------------------------------------------------
+  // Chaining Internals
+  // ----------------------------------------------------------------------
+
+  /**
+   * @private
+   * Moves from the current chain item to the next. If there is no next,
+   * calls onChainComplete (if any) and mutes the loop.
+   */
+  _moveToNextChainItem() {
+    this._currentChainIndex++;
+    this._cyclesSoFar = 0;
+
+    if (this._currentChainIndex >= this._chainItems.length) {
+      // We are done with all chain items
+      if (this._onChainComplete) {
+        this._onChainComplete();
+      }
+      // Mute or remove yourself from transport, up to you
+      this.setMuted(true);
+      return;
+    }
+
+    // Switch to next chain item
+    const nextItem = this._chainItems[this._currentChainIndex];
+    this.pattern = nextItem.pattern;
+    this.midiChannel = nextItem.midiChannel;
+  }
+
+  // ----------------------------------------------------------------------
+  // LiveLoop's Standard Methods (unchanged from default)
+  // ----------------------------------------------------------------------
 
   /**
    * Immediately replaces the current pattern or queues the change to occur
@@ -288,8 +389,6 @@ export class LiveLoop {
    * @param {object} newPattern
    *   The new pattern, which must implement `getNotes()` and `getLength()`.
    * @param {boolean} [immediate=false]
-   *   If true, replace the pattern right away; if false, wait until the next
-   *   time `stepIndex` modulo pattern length = 0.
    */
   setPattern(newPattern, immediate = false) {
     if (immediate) {
@@ -301,9 +400,7 @@ export class LiveLoop {
 
   /**
    * Add an LFO immediately (no enqueuing needed).
-   *
    * @param {object} lfo
-   *   An LFO instance (e.g. new LFO({ ... }))
    */
   addLFO(lfo) {
     this.lfos.push(lfo);
@@ -315,11 +412,8 @@ export class LiveLoop {
    * alter its state mid-cycle.
    *
    * @param {number} index
-   *   The index of the LFO in the `lfos` array.
    * @param {object} newProps
-   *   An object of updated properties, e.g. `{ frequency: 2.0 }`.
    * @param {boolean} [immediate=false]
-   *   If true, apply changes now; otherwise, queue them.
    */
   updateLFO(index, newProps, immediate = false) {
     if (immediate) {
@@ -335,9 +429,7 @@ export class LiveLoop {
    * user-defined flags, or anything else to influence note generation.
    *
    * @param {object} context
-   *   The new local context.
    * @param {boolean} [immediate=true]
-   *   If true, apply immediately. If false, wait until the pattern boundary.
    */
   setContext(context, immediate = true) {
     if (immediate) {
@@ -353,30 +445,25 @@ export class LiveLoop {
    * want to attach after constructing the loop.
    *
    * @param {object} globalContext
-   *   The new global context object.
    */
   setGlobalContext(globalContext) {
     this.globalContext = globalContext;
   }
 
   /**
-   * Mutes or unmutes the loop. If muted, it won't send any `noteOn` events,
-   * although it will still handle durations and eventually send `noteOff`.
+   * Mutes or unmutes the loop. If muted, no noteOn events are sent,
+   * though noteOff will still occur to end any sustained notes.
    *
    * @param {boolean} bool
-   *   If true, liveLoop is muted.
    */
   setMuted(bool) {
     this.muted = bool;
   }
 
   /**
-   * Applies a semitone transposition to all played notes. Typically used by
-   * an EnergyManager or tension mechanism to create pitch shifts. E.g. setTranspose(7)
-   * might raise all notes by a perfect fifth for tension.
+   * Applies a semitone transposition to all played notes.
    *
    * @param {number} semitones
-   *   Positive to shift up, negative to shift down.
    */
   setTranspose(semitones) {
     this.transpose = semitones;
@@ -384,30 +471,35 @@ export class LiveLoop {
 
   /**
    * Assign a descriptive or friendly name (e.g. "Bass", "Melody", "Drums").
-   * This can be helpful for orchestration or debugging logs.
-   *
    * @param {string} name
-   *   The new name for this loop.
    */
   setName(name) {
     this.name = name;
   }
 
+  // ----------------------------------------------------------------------
+  // Private Helpers
+  // ----------------------------------------------------------------------
+
   /**
    * @private
-   * Applies queued changes if we're at the start of a pattern cycle
-   * (`stepIndex % pattern.getLength() === 0`). The changes may include
-   * setting a new pattern or updating an LFO.
+   * Applies queued changes if at the start of a pattern cycle
    */
   _applyQueuedChangesIfNeeded(stepIndex) {
     if (!this.changeQueue.length) return;
 
-    const length = this.pattern.getLength && this.pattern.getLength();
-    if (!length || length <= 0) {
-      // If pattern length is invalid, skip
-      return;
+    // If we're in chain mode, get the current chain item. Otherwise, just use this.pattern
+    let length;
+    if (this._chainItems.length > 0 && this._currentChainIndex >= 0) {
+      const currentItem = this._chainItems[this._currentChainIndex];
+      length = currentItem.pattern.getLength();
+    } else {
+      length = this.pattern.getLength && this.pattern.getLength();
     }
 
+    if (!length || length <= 0) return;
+
+    // If we're at a pattern boundary
     if (stepIndex % length === 0) {
       for (const change of this.changeQueue) {
         if (change.type === "setPattern") {
@@ -424,37 +516,27 @@ export class LiveLoop {
 
   /**
    * @private
-   * Merges local context with any chord/rhythm data from globalContext
-   * to produce the final context object passed to the pattern.
+   * Combines local + global contexts for the pattern
    */
   _getEffectiveContext(stepIndex) {
     const effectiveContext = { ...this.context };
-
     if (this.globalContext) {
-      // chord/rhythm managers
       if (this.globalContext.chordManager) {
         effectiveContext.chordManager = this.globalContext.chordManager;
       }
       if (this.globalContext.rhythmManager) {
         effectiveContext.rhythmManager = this.globalContext.rhythmManager;
       }
-      // energy state
       if (this.globalContext.getEnergyState) {
         effectiveContext.energyState = this.globalContext.getEnergyState();
       }
-      // extra fields
-      if (this.globalContext.additionalContext) {
-        Object.assign(effectiveContext, this.globalContext.additionalContext);
-      }
     }
-
     return effectiveContext;
   }
 
   /**
    * @private
-   * Performs LFO updates each tick or pulse. Sends controlChange messages
-   * if needed, using deviceDefinition or a default CC number.
+   * Performs LFO updates, sending CC messages if deviceDefinition is available.
    */
   _updateLFOs(deltaTime, absoluteTime) {
     for (const lfo of this.lfos) {
@@ -471,7 +553,6 @@ export class LiveLoop {
       const ccValue = Math.max(0, Math.min(127, Math.floor(waveValue)));
       let ccNum = 74; // fallback CC
 
-      // If LFO targets a param recognized by the deviceDefinition
       if (lfo.targetParam && this.deviceDefinition) {
         const mapped = this.deviceDefinition.getCC(lfo.targetParam);
         if (mapped !== null && mapped !== undefined) {
@@ -489,7 +570,7 @@ export class LiveLoop {
 
   /**
    * @private
-   * Initializes a note name -> semitone map, used by `_convertNoteNameToMidi()`.
+   * Build a note name -> semitone map for _convertNoteNameToMidi
    */
   _initNoteToMidiMap() {
     this._noteToSemitone = {
@@ -515,8 +596,7 @@ export class LiveLoop {
 
   /**
    * @private
-   * Converts a note name like "C4" or "F#3" to a MIDI note number (0-127).
-   * If already a number, returns it directly. Defaults to 60 (C4) if invalid.
+   * Converts a note name (e.g. "C4") or numeric note to MIDI number [0..127].
    */
   _convertNoteNameToMidi(noteName) {
     if (typeof noteName === "number") {
@@ -539,7 +619,7 @@ export class LiveLoop {
       return 60;
     }
 
-    const [_, note, octave] = match;
+    const [, note, octave] = match;
     const semitone = this._noteToSemitone[note];
     if (semitone === undefined) {
       console.warn(`LiveLoop: Unknown note: ${note}, defaulting to C.`);

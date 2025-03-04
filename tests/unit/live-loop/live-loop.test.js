@@ -13,6 +13,8 @@
  * 7. (New) Track active notes with endStep:
  *    - Store notes with appropriate endStep in activeNotes array
  *    - Handle durations properly (using durationSteps if provided)
+ *
+ * (ADDITION) Also tests "chain mode": cycles, chainLiveLoop(), onChainComplete, etc.
  */
 
 import { jest } from "@jest/globals"; // Needed for ES module jest usage
@@ -28,7 +30,7 @@ describe("LiveLoop", () => {
     // Mock MIDI Bus
     midiBusMock = {
       noteOn: jest.fn(),
-      noteOff: jest.fn(), // should never be called
+      noteOff: jest.fn(), // should never be called unless durations expire
       controlChange: jest.fn(),
     };
 
@@ -38,10 +40,10 @@ describe("LiveLoop", () => {
       getLength: jest.fn().mockReturnValue(8), // assume 8-step pattern
     };
 
-    // Mock LFO 
-    // In the new pattern, LFO directly returns the CC value (0-127)
+    // Mock LFO
+    // In this version, LFO directly returns the CC value (0-127)
     lfoMock = {
-      update: jest.fn().mockReturnValue(63), // Return CC value directly (not wave value)
+      update: jest.fn().mockReturnValue(63), // Return CC value directly
     };
 
     // Create a LiveLoop with defaults
@@ -54,6 +56,10 @@ describe("LiveLoop", () => {
       transpose: 0,
     });
   });
+
+  // --------------------------------------------------------------
+  // Original Tests
+  // --------------------------------------------------------------
 
   it("calls pattern.getNotes and sends noteOn (but not noteOff)", () => {
     patternMock.getNotes.mockReturnValue([
@@ -74,7 +80,7 @@ describe("LiveLoop", () => {
       note: 60,
       velocity: 80,
     });
-    // E4 is MIDI note 64 (E in octave 4)
+    // E4 is MIDI note 64
     expect(midiBusMock.noteOn).toHaveBeenNthCalledWith(2, {
       channel: 1,
       note: 64,
@@ -104,7 +110,7 @@ describe("LiveLoop", () => {
   it("handles multiple LFOs", () => {
     // Add another mock LFO
     const secondLfoMock = {
-      update: jest.fn().mockReturnValue(127), // Return CC value directly (not wave value)
+      update: jest.fn().mockReturnValue(127), // Return CC value
     };
     liveLoop.addLFO(secondLfoMock);
 
@@ -186,7 +192,7 @@ describe("LiveLoop", () => {
   });
 
   it("enqueued LFO changes apply at the next loop boundary", () => {
-    // Add a second LFO for testing changes
+    // Add a second LFO
     const secondLfoMock = { update: jest.fn().mockReturnValue(-0.5) };
     liveLoop.addLFO(secondLfoMock);
 
@@ -212,13 +218,13 @@ describe("LiveLoop", () => {
     liveLoop.tick(0, 0.25);
     // No noteOff for a new note
     expect(midiBusMock.noteOff).not.toHaveBeenCalled();
-    
-    // Tick at step 1, which should trigger noteOff for the C4 note (default duration = 1)
+
+    // Tick at step 1 => should trigger noteOff for C4 (default duration = 1)
     patternMock.getNotes.mockReturnValue([]);
     liveLoop.tick(1, 0.25);
     expect(midiBusMock.noteOff).toHaveBeenCalledWith({
       channel: 1,
-      note: 60  // C4
+      note: 60, // C4
     });
   });
 
@@ -261,7 +267,7 @@ describe("LiveLoop", () => {
       liveLoop.setTranspose(2);
 
       liveLoop.tick(0, 0.25);
-      // original logic => "C4" => 60, plus transpose(2) => 62
+      // "C4" => 60, plus transpose(2) => 62
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
         note: 62,
@@ -270,496 +276,522 @@ describe("LiveLoop", () => {
     });
 
     it("clamps transposed MIDI note within [0..127]", () => {
-      // Suppose pattern returns a super high note, "C8" => 108 (stub = 60?)
-      // Let's just force it to 126 in test to see if it clamps properly
-      patternMock.getNotes.mockReturnValue([
-        { note: "Whatever", velocity: 80 },
-      ]);
-      // We'll pretend convertNoteNameToMidi -> 126 in code, plus 5 => 131 => clamp => 127
+      // Force _convertNoteNameToMidi to return 126
       jest.spyOn(liveLoop, "_convertNoteNameToMidi").mockReturnValue(126);
 
+      patternMock.getNotes.mockReturnValue([{ note: "??", velocity: 80 }]);
       liveLoop.setTranspose(5);
       liveLoop.tick(0, 0.1);
 
+      // 126 + 5 => 131 => clamp => 127
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
-        note: 127, // clamped
+        note: 127,
         velocity: 80,
       });
     });
   });
-  
+
   describe("activeNotes tracking", () => {
     it("adds notes to activeNotes array with default endStep (stepIndex + 1)", () => {
-      patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80 }
-      ]);
-      
-      liveLoop.tick(5, 0.25); // stepIndex = 5
-      
+      patternMock.getNotes.mockReturnValue([{ note: "C4", velocity: 80 }]);
+
+      liveLoop.tick(5, 0.25);
+
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0]).toEqual({
-        note: 60, // C4 is MIDI 60
+        note: 60,
         velocity: 80,
-        endStep: 6, // stepIndex(5) + 1
-        channel: 1
+        endStep: 6,
+        channel: 1,
       });
     });
-    
+
     it("uses durationSteps to calculate endStep when provided", () => {
       patternMock.getNotes.mockReturnValue([
-        { note: "D4", velocity: 90, durationSteps: 4 }
+        { note: "D4", velocity: 90, durationSteps: 4 },
       ]);
-      
-      liveLoop.tick(10, 0.25); // stepIndex = 10
-      
+
+      liveLoop.tick(10, 0.25);
+
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0]).toEqual({
-        note: 62, // D4 is MIDI 62
+        note: 62,
         velocity: 90,
-        endStep: 14, // stepIndex(10) + durationSteps(4)
-        channel: 1
+        endStep: 14,
+        channel: 1,
       });
     });
-    
+
     it("adds multiple notes to activeNotes with correct endSteps", () => {
       patternMock.getNotes.mockReturnValue([
         { note: "C4", velocity: 80, durationSteps: 2 },
         { note: "E4", velocity: 90, durationSteps: 1 },
-        { note: "G4", velocity: 100, durationSteps: 3 }
+        { note: "G4", velocity: 100, durationSteps: 3 },
       ]);
-      
-      liveLoop.tick(8, 0.25); // stepIndex = 8
-      
+
+      liveLoop.tick(8, 0.25);
+
       expect(liveLoop.activeNotes).toHaveLength(3);
       expect(liveLoop.activeNotes[0]).toEqual({
-        note: 60, // C4
+        note: 60,
         velocity: 80,
-        endStep: 10, // stepIndex(8) + durationSteps(2)
-        channel: 1
+        endStep: 10, // 8 + 2
+        channel: 1,
       });
       expect(liveLoop.activeNotes[1]).toEqual({
-        note: 64, // E4
+        note: 64,
         velocity: 90,
-        endStep: 9, // stepIndex(8) + durationSteps(1)
-        channel: 1
+        endStep: 9, // 8 + 1
+        channel: 1,
       });
       expect(liveLoop.activeNotes[2]).toEqual({
-        note: 67, // G4
+        note: 67,
         velocity: 100,
-        endStep: 11, // stepIndex(8) + durationSteps(3)
-        channel: 1
+        endStep: 11, // 8 + 3
+        channel: 1,
       });
     });
-    
+
     it("adds notes to activeNotes even when muted", () => {
       liveLoop.setMuted(true);
-      
+
       patternMock.getNotes.mockReturnValue([
-        { note: "A4", velocity: 85, durationSteps: 2 }
+        { note: "A4", velocity: 85, durationSteps: 2 },
       ]);
-      
+
       liveLoop.tick(4, 0.25);
-      
-      // Should not send noteOn
+      // no noteOn
       expect(midiBusMock.noteOn).not.toHaveBeenCalled();
-      
-      // But should still add to activeNotes
+
+      // still adds to activeNotes
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0]).toEqual({
         note: 69, // A4
         velocity: 85,
-        endStep: 6, // stepIndex(4) + durationSteps(2)
-        channel: 1
+        endStep: 6, // 4 + 2
+        channel: 1,
       });
     });
-    
+
     it("applies transpose to notes stored in activeNotes", () => {
-      liveLoop.setTranspose(3); // Up 3 semitones
-      
+      liveLoop.setTranspose(3); // up 3 semitones
+
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 100, durationSteps: 2 }
+        { note: "C4", velocity: 100, durationSteps: 2 },
       ]);
-      
+
       liveLoop.tick(2, 0.25);
-      
+
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0]).toEqual({
-        note: 63, // C4(60) + transpose(3)
+        note: 63, // C4(60) + 3
         velocity: 100,
-        endStep: 4, // stepIndex(2) + durationSteps(2)
-        channel: 1
+        endStep: 4,
+        channel: 1,
       });
     });
-    
+
     it("handles zero-step durations by immediately turning notes off", () => {
-      // Set up a pattern that returns a note with zero duration
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationSteps: 0 }
+        { note: "C4", velocity: 80, durationSteps: 0 },
       ]);
-      
-      // Execute tick and capture noteOn/noteOff order
+
       liveLoop.tick(5, 0.25);
-      
-      // Should still send noteOn
+
+      // noteOn
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
-        note: 60, // C4
-        velocity: 80
+        note: 60,
+        velocity: 80,
       });
-      
-      // Should send noteOff immediately since endStep would be 5 (same as current step)
+      // immediate noteOff
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 60
+        note: 60,
       });
-      
-      // Should not keep the note in activeNotes
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
-    
+
     it("handles multiple notes with different durations across multiple steps", () => {
-      // Reset activeNotes
       liveLoop.activeNotes = [];
-      
-      // Step 0: Add 3 notes with different durations
+
+      // Step 0: 3 notes
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationSteps: 2 }, // Ends at step 2
-        { note: "E4", velocity: 90, durationSteps: 3 }, // Ends at step 3
-        { note: "G4", velocity: 100, durationSteps: 4 } // Ends at step 4
+        { note: "C4", velocity: 80, durationSteps: 2 }, // ends step 2
+        { note: "E4", velocity: 90, durationSteps: 3 }, // ends step 3
+        { note: "G4", velocity: 100, durationSteps: 4 }, // ends step 4
       ]);
-      
-      liveLoop.tick(0, 0.25); // stepIndex = 0
-      
-      // Should have 3 notes in activeNotes
+
+      liveLoop.tick(0, 0.25);
       expect(liveLoop.activeNotes).toHaveLength(3);
-      
-      // Clear mocks for next step
+
       midiBusMock.noteOn.mockClear();
       midiBusMock.noteOff.mockClear();
-      
-      // Step 1: Add a new overlapping note
+
+      // Step 1: add a new note
       patternMock.getNotes.mockReturnValue([
-        { note: "D4", velocity: 85, durationSteps: 2 } // Ends at step 3
+        { note: "D4", velocity: 85, durationSteps: 2 }, // ends step 3
       ]);
-      
-      liveLoop.tick(1, 0.25); // stepIndex = 1
-      
-      // Should still have 4 active notes (all from steps 0 and 1)
+      liveLoop.tick(1, 0.25);
       expect(liveLoop.activeNotes).toHaveLength(4);
-      
-      // Clear mocks for next step
+
       midiBusMock.noteOn.mockClear();
       midiBusMock.noteOff.mockClear();
-      
-      // Step 2: First note (C4) should turn off
+
+      // Step 2 => C4 ends
       patternMock.getNotes.mockReturnValue([]);
-      
-      liveLoop.tick(2, 0.25); // stepIndex = 2
-      
-      // Should turn off C4
+      liveLoop.tick(2, 0.25);
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 60 // C4
+        note: 60,
       });
-      
-      // Should now have 3 active notes (E4, G4, D4)
       expect(liveLoop.activeNotes).toHaveLength(3);
-      expect(liveLoop.activeNotes.map(n => n.note)).toEqual([64, 67, 62]); // E4, G4, D4
-      
-      // Clear mocks for next step
+
       midiBusMock.noteOn.mockClear();
       midiBusMock.noteOff.mockClear();
-      
-      // Step 3: E4 and D4 should turn off
-      patternMock.getNotes.mockReturnValue([]);
-      
-      liveLoop.tick(3, 0.25); // stepIndex = 3
-      
-      // Should turn off E4 and D4
+
+      // Step 3 => E4 & D4 end
+      liveLoop.tick(3, 0.25);
       expect(midiBusMock.noteOff).toHaveBeenCalledTimes(2);
-      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
-        channel: 1,
-        note: 64 // E4
-      });
-      expect(midiBusMock.noteOff).toHaveBeenCalledWith({
-        channel: 1,
-        note: 62 // D4
-      });
-      
-      // Should now have just 1 active note (G4)
-      expect(liveLoop.activeNotes).toHaveLength(1);
-      expect(liveLoop.activeNotes[0].note).toBe(67); // G4
-      
-      // Clear mocks for next step
+      expect(liveLoop.activeNotes).toHaveLength(1); // G4 remains
+
       midiBusMock.noteOn.mockClear();
       midiBusMock.noteOff.mockClear();
-      
-      // Step 4: Last note (G4) should turn off
-      patternMock.getNotes.mockReturnValue([]);
-      
-      liveLoop.tick(4, 0.25); // stepIndex = 4
-      
-      // Should turn off G4
+
+      // Step 4 => G4 ends
+      liveLoop.tick(4, 0.25);
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 67 // G4
+        note: 67,
       });
-      
-      // No active notes should remain
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
-    
+
     it("handles the case where same note is retriggered before its previous instance ends", () => {
-      // Reset activeNotes
       liveLoop.activeNotes = [];
-      
-      // Step 0: Add a C4 note with 3-step duration
+
+      // Step 0: add C4, ends step 3
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationSteps: 3 } // Ends at step 3
+        { note: "C4", velocity: 80, durationSteps: 3 },
       ]);
-      
-      liveLoop.tick(0, 0.25); // stepIndex = 0
-      
-      // Should have 1 note in activeNotes
+      liveLoop.tick(0, 0.25);
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0].endStep).toBe(3);
-      
-      // Clear mocks for next step
+
       midiBusMock.noteOn.mockClear();
       midiBusMock.noteOff.mockClear();
-      
-      // Step 1: Retrigger the same C4 note with 2-step duration
+
+      // Step 1: retrigger C4, ends step 3
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 90, durationSteps: 2 } // Ends at step 3
+        { note: "C4", velocity: 90, durationSteps: 2 },
       ]);
-      
-      liveLoop.tick(1, 0.25); // stepIndex = 1
-      
-      // Should have turned off the previous C4 when triggering the new one
+      liveLoop.tick(1, 0.25);
+
+      // Should have noteOff for the old C4
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 60 // C4
+        note: 60,
       });
-      
-      // Should have sent a new noteOn with the new velocity
+      // Then noteOn for the new C4
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
-        note: 60, // C4
-        velocity: 90
+        note: 60,
+        velocity: 90,
       });
-      
-      // Should still have 1 active note (the new C4)
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0]).toEqual({
-        note: 60, // C4
+        note: 60,
         velocity: 90,
-        endStep: 3, // stepIndex(1) + durationStepsOrBeats(2)
-        channel: 1
+        endStep: 3,
+        channel: 1,
       });
     });
   });
-  
+
   describe("noteOff scheduling", () => {
     beforeEach(() => {
-      // Reset the activeNotes array before each test
       liveLoop.activeNotes = [];
     });
-    
+
     it("sends noteOff when a note's endStep is reached", () => {
-      // Add a note that will expire at step 3
+      // expires at step 3
       liveLoop.activeNotes.push({
-        note: 60, // C4
+        note: 60,
         velocity: 80,
         endStep: 3,
-        channel: 1
+        channel: 1,
       });
-      
-      // No notes from pattern on this tick
       patternMock.getNotes.mockReturnValue([]);
-      
-      // Tick at step 3 (equal to endStep)
+
       liveLoop.tick(3, 0.25);
-      
-      // Should send noteOff for the expired note
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 60
+        note: 60,
       });
-      
-      // The note should be removed from activeNotes
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
-    
+
     it("sends noteOff when stepIndex exceeds a note's endStep", () => {
-      // Add a note that will expire at step 5
+      // expires at step 5
       liveLoop.activeNotes.push({
-        note: 64, // E4
+        note: 64,
         velocity: 90,
         endStep: 5,
-        channel: 1
+        channel: 1,
       });
-      
-      // No notes from pattern on this tick
       patternMock.getNotes.mockReturnValue([]);
-      
-      // Tick at step 6 (greater than endStep)
+
       liveLoop.tick(6, 0.25);
-      
-      // Should send noteOff for the expired note
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 64
+        note: 64,
       });
-      
-      // The note should be removed from activeNotes
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
-    
+
     it("keeps notes that haven't reached their endStep", () => {
-      // Add a note that will expire at step 10
+      // expires at step 10
       liveLoop.activeNotes.push({
-        note: 67, // G4
+        note: 67,
         velocity: 100,
         endStep: 10,
-        channel: 1
+        channel: 1,
       });
-      
-      // No notes from pattern on this tick
       patternMock.getNotes.mockReturnValue([]);
-      
-      // Tick at step 9 (less than endStep)
+
       liveLoop.tick(9, 0.25);
-      
-      // Should not send noteOff
       expect(midiBusMock.noteOff).not.toHaveBeenCalled();
-      
-      // The note should remain in activeNotes
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0].note).toBe(67);
     });
-    
+
     it("handles multiple notes with different endSteps", () => {
-      // Add multiple notes with different endSteps
       liveLoop.activeNotes = [
-        { note: 60, velocity: 80, endStep: 5, channel: 1 }, // Expires at step 5
-        { note: 64, velocity: 90, endStep: 7, channel: 1 }, // Expires at step 7
-        { note: 67, velocity: 100, endStep: 9, channel: 1 } // Expires at step 9
+        { note: 60, velocity: 80, endStep: 5, channel: 1 },
+        { note: 64, velocity: 90, endStep: 7, channel: 1 },
+        { note: 67, velocity: 100, endStep: 9, channel: 1 },
       ];
-      
-      // No notes from pattern on this tick
       patternMock.getNotes.mockReturnValue([]);
-      
-      // Tick at step 6
+
+      // step=6 => note 60 ends
       liveLoop.tick(6, 0.25);
-      
-      // Should send noteOff for the first note only
       expect(midiBusMock.noteOff).toHaveBeenCalledTimes(1);
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 60
+        note: 60,
       });
-      
-      // Only the expired note should be removed
       expect(liveLoop.activeNotes).toHaveLength(2);
-      expect(liveLoop.activeNotes[0].note).toBe(64);
-      expect(liveLoop.activeNotes[1].note).toBe(67);
-      
-      // Tick at step 8
+
+      // step=8 => note 64 ends
       liveLoop.tick(8, 0.25);
-      
-      // Should send noteOff for the second note
       expect(midiBusMock.noteOff).toHaveBeenCalledTimes(2);
       expect(midiBusMock.noteOff).toHaveBeenLastCalledWith({
         channel: 1,
-        note: 64
+        note: 64,
       });
-      
-      // Only the third note should remain
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0].note).toBe(67);
     });
-    
+
     it("correctly adds new notes and removes expired ones in the same tick", () => {
-      // Add a note that will expire at step 4
+      // note that will expire at step=4
       liveLoop.activeNotes.push({
-        note: 60, // C4
+        note: 60,
         velocity: 80,
         endStep: 4,
-        channel: 1
+        channel: 1,
       });
-      
-      // Add new note at step 4
+
       patternMock.getNotes.mockReturnValue([
-        { note: "E4", velocity: 90, durationSteps: 2 }
+        { note: "E4", velocity: 90, durationSteps: 2 },
       ]);
-      
-      // Tick at step 4
+
       liveLoop.tick(4, 0.25);
-      
-      // Should send noteOff for the expired note
+
+      // noteOff for old note
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 60
+        note: 60,
       });
-      
-      // Should also send noteOn for the new note
+      // noteOn for new note
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
-        note: 64, // E4
-        velocity: 90
+        note: 64,
+        velocity: 90,
       });
-      
-      // activeNotes should only contain the new note
+
+      // only the new note remains
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0]).toEqual({
-        note: 64, // E4
+        note: 64,
         velocity: 90,
-        endStep: 6, // stepIndex(4) + durationStepsOrBeats(2)
-        channel: 1
+        endStep: 6,
+        channel: 1,
       });
     });
-    
+
     it("handles notes with 1-step duration correctly", () => {
-      // No existing notes
-      
-      // Add a new note with explicit 1-step duration
       patternMock.getNotes.mockReturnValue([
-        { note: "C4", velocity: 80, durationSteps: 1 }
+        { note: "C4", velocity: 80, durationSteps: 1 },
       ]);
-      
-      // Tick at step 5
+
       liveLoop.tick(5, 0.25);
-      
-      // Should send noteOn
+
+      // noteOn
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
-        note: 60, // C4
-        velocity: 80
+        note: 60,
+        velocity: 80,
       });
-      
-      // The note should be in activeNotes with endStep = 6
-      expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0].endStep).toBe(6);
-      
-      // Clear the mock to check the next call
+
       midiBusMock.noteOn.mockClear();
       midiBusMock.noteOff.mockClear();
-      
-      // No new notes on step 6
+
+      // step=6 => the 1-step note ends
       patternMock.getNotes.mockReturnValue([]);
-      
-      // Tick at step 6 (should turn off the note)
       liveLoop.tick(6, 0.25);
-      
-      // Should send noteOff for the 1-step note
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
-        note: 60
+        note: 60,
       });
-      
-      // No notes should remain active
       expect(liveLoop.activeNotes).toHaveLength(0);
+    });
+  });
+
+  // --------------------------------------------------------------
+  // New Chain-Mode Tests
+  // --------------------------------------------------------------
+
+  // Helper for chain tests only
+  function doOneCycle(loop, length = 4) {
+    for (let s = 0; s < length; s++) {
+      loop.tick(s, 0.25);
+    }
+  }
+
+  describe("chain mode", () => {
+    let chainPatternA;
+    let chainPatternB;
+    let chainPatternC;
+    let chainLoop;
+
+    beforeEach(() => {
+      chainPatternA = {
+        getLength: jest.fn().mockReturnValue(4),
+        getNotes: jest.fn().mockReturnValue([{ note: "C4", velocity: 70 }]),
+      };
+      chainPatternB = {
+        getLength: jest.fn().mockReturnValue(4),
+        getNotes: jest.fn().mockReturnValue([{ note: "E4", velocity: 80 }]),
+      };
+      chainPatternC = {
+        getLength: jest.fn().mockReturnValue(4),
+        getNotes: jest.fn().mockReturnValue([{ note: "G4", velocity: 90 }]),
+      };
+
+      chainLoop = new LiveLoop(midiBusMock, {
+        pattern: chainPatternA,
+        midiChannel: 1,
+        cycles: 2, // triggers chain mode for patternA
+      });
+    });
+
+    it("plays the initial pattern for 'cycles' times, then mutes if no chainLiveLoop calls", () => {
+      // patternA => length=4, cycles=2
+      // do cycle #1 and cycle #2
+      doOneCycle(chainLoop, 4);
+      doOneCycle(chainLoop, 4);
+      expect(chainLoop.muted).toBe(true);
+    });
+
+    it("moves on to next chain item when cycles are done", () => {
+      chainLoop.chainLiveLoop({ pattern: chainPatternB, cycles: 3 });
+
+      // A => cycles=2
+      doOneCycle(chainLoop, 4);
+      doOneCycle(chainLoop, 4);
+      // should now be on B
+      const outB = chainLoop.pattern.getNotes(0, {});
+      expect(outB).toEqual([{ note: "E4", velocity: 80 }]);
+
+      // B => cycles=3
+      doOneCycle(chainLoop, 4);
+      doOneCycle(chainLoop, 4);
+      doOneCycle(chainLoop, 4);
+      // no more chain => muted
+      expect(chainLoop.muted).toBe(true);
+    });
+
+    it("can chain multiple items in a single expression", () => {
+      chainLoop
+        .chainLiveLoop({ pattern: chainPatternB, cycles: 1 })
+        .chainLiveLoop({ pattern: chainPatternC, cycles: 2 });
+
+      // A => cycles=2
+      doOneCycle(chainLoop, 4);
+      doOneCycle(chainLoop, 4);
+      // now on B
+      const outB = chainLoop.pattern.getNotes(0, {});
+      expect(outB).toEqual([{ note: "E4", velocity: 80 }]);
+
+      // B => cycles=1
+      doOneCycle(chainLoop, 4);
+      // now on C
+      const outC = chainLoop.pattern.getNotes(0, {});
+      expect(outC).toEqual([{ note: "G4", velocity: 90 }]);
+
+      // C => cycles=2
+      doOneCycle(chainLoop, 4);
+      doOneCycle(chainLoop, 4);
+      expect(chainLoop.muted).toBe(true);
+    });
+
+    it("calls onChainComplete after final item", () => {
+      const onCompleteMock = jest.fn();
+      chainLoop.chainLiveLoop({ pattern: chainPatternB, cycles: 1 });
+      chainLoop.onChainComplete(onCompleteMock);
+
+      // A => cycles=2
+      doOneCycle(chainLoop, 4);
+      doOneCycle(chainLoop, 4);
+      // B => cycles=1
+      doOneCycle(chainLoop, 4);
+
+      expect(onCompleteMock).toHaveBeenCalledTimes(1);
+      expect(chainLoop.muted).toBe(true);
+    });
+
+    it("works if user didn't specify cycles in constructor but calls chainLiveLoop anyway", () => {
+      // DUMMY pattern
+      const dummyPattern = {
+        getLength: jest.fn().mockReturnValue(4),
+        getNotes: jest.fn().mockReturnValue([]),
+      };
+      const altLoop = new LiveLoop(midiBusMock, {
+        pattern: dummyPattern,
+        midiChannel: 1,
+        // no cycles => not in chain mode yet
+      });
+
+      // chain items: first is A, second is B
+      altLoop.chainLiveLoop({ pattern: chainPatternA, cycles: 1 });
+      altLoop.chainLiveLoop({ pattern: chainPatternB, cycles: 2 });
+
+      // 1) doOneCycle => finishes dummy => move to patternA
+      doOneCycle(altLoop, 4);
+
+      // 2) patternA => 1 cycle
+      doOneCycle(altLoop, 4);
+      // now we should be on B
+      const outB = altLoop.pattern.getNotes(0, {});
+      expect(outB).toEqual([{ note: "E4", velocity: 80 }]);
+
+      // 3) patternB => 2 cycles
+      doOneCycle(altLoop, 4);
+      doOneCycle(altLoop, 4);
+      expect(altLoop.muted).toBe(true);
     });
   });
 });
