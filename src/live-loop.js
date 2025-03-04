@@ -257,6 +257,8 @@ export class LiveLoop {
    * @param {number} stepIndex - which step in the bar or pattern
    * @param {number} deltaTime - time since last step (beats)
    * @param {number} [absoluteTime=null] - optional total time (beats)
+   *
+   * @private
    */
   tick(stepIndex, deltaTime, absoluteTime = null) {
     // 1) Possibly apply queued changes at pattern boundary
@@ -341,6 +343,8 @@ export class LiveLoop {
   /**
    * If called at a higher resolution (e.g. every audio callback),
    * updates LFOs alone. Optional feature for smoother parameter automation.
+   *
+   * @private
    *
    * @param {number} deltaTime - time in beats since last call
    * @param {number} [absoluteTime=null]

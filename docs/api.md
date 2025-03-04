@@ -32,7 +32,7 @@ const value = myLfo.update(deltaTime);
 
 ### Parameters
 
-*   `$0` **[Object][60]**  (optional, default `{}`)
+*   `$0` **[Object][64]**  (optional, default `{}`)
 
     *   `$0.frequency`   (optional, default `1.0`)
     *   `$0.amplitude`   (optional, default `1.0`)
@@ -50,7 +50,7 @@ Reset the oscillator's phase (and clears any memory of absolute time).
 
 #### Parameters
 
-*   `phase` **[number][61]** If `useRadians=true`, a value in \[0..2π).
+*   `phase` **[number][65]** If `useRadians=true`, a value in \[0..2π).
     If `useRadians=false`, a value in \[0..1). (optional, default `0`)
 
 ## EnergyManager
@@ -91,7 +91,7 @@ manager.setTensionLevel("high");
 
 ### Parameters
 
-*   `$0` **[Object][60]**  (optional, default `{}`)
+*   `$0` **[Object][64]**  (optional, default `{}`)
 
     *   `$0.liveLoops`   (optional, default `[]`)
     *   `$0.chordManager`   (optional, default `null`)
@@ -114,7 +114,7 @@ adjust subdivisions accordingly (e.g. halfTime, normal, doubleTime).
 
 #### Parameters
 
-*   `level` **[string][62]** A label for the desired energy state (e.g. "low", "medium", "full").
+*   `level` **[string][66]** A label for the desired energy state (e.g. "low", "medium", "full").
 
 ### setTensionLevel
 
@@ -131,7 +131,7 @@ Examples:
 
 #### Parameters
 
-*   `level` **[string][62]** The desired tension level ("none", "low", "mid", "high").
+*   `level` **[string][66]** The desired tension level ("none", "low", "mid", "high").
 
 ### addLiveLoop
 
@@ -139,7 +139,7 @@ Adds a LiveLoop instance so that it can be controlled by this EnergyManager.
 
 #### Parameters
 
-*   `loop` **[object][60]** The LiveLoop instance to add.
+*   `loop` **[object][64]** The LiveLoop instance to add.
 
 ### removeLiveLoop
 
@@ -147,7 +147,7 @@ Removes a previously added LiveLoop from EnergyManager control.
 
 #### Parameters
 
-*   `loop` **[object][60]** The LiveLoop instance to remove.
+*   `loop` **[object][64]** The LiveLoop instance to remove.
 
 ### setArrangementStyle
 
@@ -157,7 +157,7 @@ or drastically different patterns. The exact implementation is up to you.
 
 #### Parameters
 
-*   `style` **[string][62]** A label for the arrangement style (e.g. "wide", "minimal", etc.).
+*   `style` **[string][66]** A label for the arrangement style (e.g. "wide", "minimal", etc.).
 
 ### setChordProgression
 
@@ -167,7 +167,7 @@ should adapt automatically on their next cycle.
 
 #### Parameters
 
-*   `progression` **[Array][63]** An array of chord objects (e.g. \[{ root: "C", type: "maj7" }, ...]).
+*   `progression` **[Array][67]** An array of chord objects (e.g. \[{ root: "C", type: "maj7" }, ...]).
 
 ## SyncopatedBass
 
@@ -209,7 +209,7 @@ const loop = new LiveLoop(midiBus, {
 
 ### Parameters
 
-*   `$0` **[Object][60]**  (optional, default `{}`)
+*   `$0` **[Object][64]**  (optional, default `{}`)
 
     *   `$0.length`   (optional, default `16`)
     *   `$0.octave`   (optional, default `2`)
@@ -220,21 +220,21 @@ const loop = new LiveLoop(midiBus, {
 
 ## ContourMelodyOptions
 
-Type: [Object][60]
+Type: [Object][64]
 
 ### Properties
 
-*   `contour` **[Array][63]<[number][61]>?** An array of integers representing "chord-tone index offsets" or steps in chord-tone space.
+*   `contour` **[Array][67]<[number][65]>?** An array of integers representing "chord-tone index offsets" or steps in chord-tone space.
     Example: \[0, 1, 2, 1, -1]. Index 0 = chord root. Index 1 = next chord tone, etc.
     If chord.notes = \["C4", "E4", "G4", "B4"], index 1 might be "E4".
     Negative indices move backward in chord.notes (e.g., -1 picks the chord tone before the current one).
     We wrap or clamp if we go out of range.
-*   `length` **[number][61]?** The number of steps before the pattern conceptually loops.
-*   `allowRests` **[boolean][64]?** If true, you can randomly skip steps or rest. Implementation is optional.
-*   `restProbability` **[number][61]?** Probability in percent (0..100) of generating a rest on any given step (only if allowRests=true).
-*   `spiceProbability` **[number][61]?** Probability in percent (0..100) that we deviate from the pure chord tone
+*   `length` **[number][65]?** The number of steps before the pattern conceptually loops.
+*   `allowRests` **[boolean][68]?** If true, you can randomly skip steps or rest. Implementation is optional.
+*   `restProbability` **[number][65]?** Probability in percent (0..100) of generating a rest on any given step (only if allowRests=true).
+*   `spiceProbability` **[number][65]?** Probability in percent (0..100) that we deviate from the pure chord tone
     to an approach/dissonance note. Higher tension might also increase this.
-*   `randomFn` **[function][65]?** A custom random function for deterministic output in tests.
+*   `randomFn` **[function][69]?** A custom random function for deterministic output in tests.
 
 ## DrumPattern
 
@@ -278,7 +278,7 @@ const drumPattern = new DrumPattern({
 
 ### Parameters
 
-*   `$0` **[Object][60]**  (optional, default `{}`)
+*   `$0` **[Object][64]**  (optional, default `{}`)
 
     *   `$0.mediumPattern` &#x20;
     *   `$0.drumMap`   (optional, default `{}`)
@@ -345,7 +345,7 @@ myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
 ### Parameters
 
 *   `midiBus` &#x20;
-*   `$1` **[Object][60]**  (optional, default `{}`)
+*   `$1` **[Object][64]**  (optional, default `{}`)
 
     *   `$1.pattern` &#x20;
     *   `$1.lfos`   (optional, default `[]`)
@@ -358,6 +358,41 @@ myLoop.setPattern(someOtherPattern, false); // queue new pattern for next cycle
     *   `$1.deviceDefinition`   (optional, default `null`)
     *   `$1.deviceManager`   (optional, default `null`)
     *   `$1.midiOutputId`   (optional, default `null`)
+    *   `$1.cycles`   (optional, default `null`)
+
+### chainLiveLoop
+
+chainLiveLoop(params) - Add another sub-loop to the chain.
+
+Example:
+
+```js
+new LiveLoop(midiBus, { pattern: patA, cycles: 2 })
+  .chainLiveLoop({ pattern: patB, cycles: 4 })
+  .chainLiveLoop({ pattern: patC, cycles: 8 })
+  .onChainComplete(() => console.log("All done"));
+```
+
+#### Parameters
+
+*   `params` **[object][64]**  (optional, default `{}`)
+
+    *   `params.pattern` **[object][64]**&#x20;
+    *   `params.cycles` **[number][65]**  (optional, default `1`)
+    *   `params.midiChannel` **[number][65]?**&#x20;
+
+Returns **[LiveLoop][30]** this
+
+### onChainComplete
+
+onChainComplete(callback) - Called once the final chain item finishes.
+If no chain is used, this never fires.
+
+#### Parameters
+
+*   `callback` **[function][69]**&#x20;
+
+Returns **[LiveLoop][30]** this
 
 ### setPattern
 
@@ -366,9 +401,8 @@ at the next pattern boundary (start of pattern).
 
 #### Parameters
 
-*   `newPattern` **[object][60]** The new pattern, which must implement `getNotes()` and `getLength()`.
-*   `immediate` **[boolean][64]** If true, replace the pattern right away; if false, wait until the next
-    time `stepIndex` modulo pattern length = 0. (optional, default `false`)
+*   `newPattern` **[object][64]** The new pattern, which must implement `getNotes()` and `getLength()`.
+*   `immediate` **[boolean][68]**  (optional, default `false`)
 
 ### addLFO
 
@@ -376,7 +410,7 @@ Add an LFO immediately (no enqueuing needed).
 
 #### Parameters
 
-*   `lfo` **[object][60]** An LFO instance (e.g. new LFO({ ... }))
+*   `lfo` **[object][64]**&#x20;
 
 ### updateLFO
 
@@ -386,9 +420,9 @@ alter its state mid-cycle.
 
 #### Parameters
 
-*   `index` **[number][61]** The index of the LFO in the `lfos` array.
-*   `newProps` **[object][60]** An object of updated properties, e.g. `{ frequency: 2.0 }`.
-*   `immediate` **[boolean][64]** If true, apply changes now; otherwise, queue them. (optional, default `false`)
+*   `index` **[number][65]**&#x20;
+*   `newProps` **[object][64]**&#x20;
+*   `immediate` **[boolean][68]**  (optional, default `false`)
 
 ### setContext
 
@@ -398,8 +432,8 @@ user-defined flags, or anything else to influence note generation.
 
 #### Parameters
 
-*   `context` **[object][60]** The new local context.
-*   `immediate` **[boolean][64]** If true, apply immediately. If false, wait until the pattern boundary. (optional, default `true`)
+*   `context` **[object][64]**&#x20;
+*   `immediate` **[boolean][68]**  (optional, default `true`)
 
 ### setGlobalContext
 
@@ -409,35 +443,32 @@ want to attach after constructing the loop.
 
 #### Parameters
 
-*   `globalContext` **[object][60]** The new global context object.
+*   `globalContext` **[object][64]**&#x20;
 
 ### setMuted
 
-Mutes or unmutes the loop. If muted, it won't send any `noteOn` events,
-although it will still handle durations and eventually send `noteOff`.
+Mutes or unmutes the loop. If muted, no noteOn events are sent,
+though noteOff will still occur to end any sustained notes.
 
 #### Parameters
 
-*   `bool` **[boolean][64]** If true, liveLoop is muted.
+*   `bool` **[boolean][68]**&#x20;
 
 ### setTranspose
 
-Applies a semitone transposition to all played notes. Typically used by
-an EnergyManager or tension mechanism to create pitch shifts. E.g. setTranspose(7)
-might raise all notes by a perfect fifth for tension.
+Applies a semitone transposition to all played notes.
 
 #### Parameters
 
-*   `semitones` **[number][61]** Positive to shift up, negative to shift down.
+*   `semitones` **[number][65]**&#x20;
 
 ### setName
 
 Assign a descriptive or friendly name (e.g. "Bass", "Melody", "Drums").
-This can be helpful for orchestration or debugging logs.
 
 #### Parameters
 
-*   `name` **[string][62]** The new name for this loop.
+*   `name` **[string][66]**&#x20;
 
 ## createPhrasePattern
 
@@ -476,7 +507,7 @@ pattern: phrasedDrumPattern,
 
 *   `mainPattern` &#x20;
 *   `fillPattern` &#x20;
-*   `$2` **[Object][60]**  (optional, default `{}`)
+*   `$2` **[Object][64]**  (optional, default `{}`)
 
     *   `$2.barsOfMain`   (optional, default `4`)
     *   `$2.barsOfFill`   (optional, default `1`)
@@ -494,9 +525,9 @@ it implements `getNotes(stepIndex, context)` and `getLength()`.
 
 ### Parameters
 
-*   `mainPattern` **[object][60]** An existing pattern implementing {getNotes, getLength}
-*   `fillPattern` **[object][60]** Another pattern, used for the "fill" measure
-*   `options` **[PhrasePatternOptions][53]**  (optional, default `{}`)
+*   `mainPattern` **[object][64]** An existing pattern implementing {getNotes, getLength}
+*   `fillPattern` **[object][64]** Another pattern, used for the "fill" measure
+*   `options` **[PhrasePatternOptions][57]**  (optional, default `{}`)
 
     *   `options.barsOfMain`   (optional, default `4`)
     *   `options.barsOfFill`   (optional, default `1`)
@@ -506,15 +537,15 @@ it implements `getNotes(stepIndex, context)` and `getLength()`.
 
 ## PhrasePatternOptions
 
-Type: [Object][60]
+Type: [Object][64]
 
 ### Properties
 
-*   `barsOfMain` **[number][61]?** Number of bars (measures) to use the mainPattern.
-*   `barsOfFill` **[number][61]?** Number of bars (measures) to use the fillPattern.
-*   `barLengthInSteps` **[number][61]?** How many steps in one bar. Typically 16 if you're doing 4/4 with each quarter = 4 steps.
-*   `onPhraseStart` **[function][65]?** Callback when a phrase starts. (phraseIndex) => void
-*   `onPhraseEnd` **[function][65]?** Callback when a phrase ends.   (phraseIndex) => void
+*   `barsOfMain` **[number][65]?** Number of bars (measures) to use the mainPattern.
+*   `barsOfFill` **[number][65]?** Number of bars (measures) to use the fillPattern.
+*   `barLengthInSteps` **[number][65]?** How many steps in one bar. Typically 16 if you're doing 4/4 with each quarter = 4 steps.
+*   `onPhraseStart` **[function][69]?** Callback when a phrase starts. (phraseIndex) => void
+*   `onPhraseEnd` **[function][69]?** Callback when a phrase ends.   (phraseIndex) => void
 
 ## getNotes
 
@@ -524,16 +555,16 @@ If tension is high, we might increase spice probability, etc.
 
 ### Parameters
 
-*   `stepIndex` **[number][61]**&#x20;
-*   `context` **[object][60]** Typically includes { chordManager, rhythmManager, energyState, ... } (optional, default `{}`)
+*   `stepIndex` **[number][65]**&#x20;
+*   `context` **[object][64]** Typically includes { chordManager, rhythmManager, energyState, ... } (optional, default `{}`)
 
-Returns **[Array][63]<{note: [string][62], velocity: [number][61], durationSteps: [number][61]}>**&#x20;
+Returns **[Array][67]<{note: [string][66], velocity: [number][65], durationSteps: [number][65]}>**&#x20;
 
 ## getLength
 
 The pattern length in steps for looping or boundary logic.
 
-Returns **[number][61]**&#x20;
+Returns **[number][65]**&#x20;
 
 ## reset
 
@@ -544,5 +575,5 @@ Called, for example, when the transport restarts or user wants a fresh cycle.
 
 Returns a config object describing this pattern’s settings (for debugging or serialization).
 
-Returns **[Object][60]**&#x20;
+Returns **[Object][64]**&#x20;
 
