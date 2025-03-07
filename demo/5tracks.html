@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- from https://chatgpt.com/c/67c7b6a4-caa0-8010-98fc-3999f8c47dd6 -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>5-Track Demo with XY Pad</title>
+    <title>
+      op-xy-live 5-Track Demo (DrumKit, New Arp Param, No Console UI)
+    </title>
     <style>
       body {
         font-family: sans-serif;
@@ -19,7 +20,6 @@
       main {
         padding: 16px;
       }
-
       .track-row {
         background: #fff;
         border: 1px solid #ccc;
@@ -33,148 +33,690 @@
         display: inline-block;
         margin-right: 20px;
       }
+      #channelConfig {
+        background: #fff;
+        border: 1px solid #ccc;
+        margin: 12px;
+        padding: 12px;
+      }
+      .track-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      label {
+        display: inline-block;
+        margin-right: 6px;
+      }
+      select {
+        margin-right: 12px;
+      }
     </style>
   </head>
   <body>
     <header>
-      <h1>5-Track Demo with XY Pad</h1>
+      <h1>op-xy-live 5-Track Demo</h1>
     </header>
     <main>
       <p>
-        This demo sets up 5 tracks (Drums, Bass, Chords, Lead/Arp, and Melody)
-        each with a pattern and optionally an XY pad controlling pattern
-        parameters or LFO/fx. Click "Start" to begin, "Stop" to end. See code
-        for details!
+        This example uses an <strong>external MIDI clock</strong> from the first
+        MIDI input (no local Start/Stop). We route notes to the first MIDI
+        output. Five tracks: Drums, Bass, Chords, Lead/Arp, Melody.
       </p>
 
-      <button id="startBtn">Start</button>
-      <button id="stopBtn">Stop</button>
+      <!-- TRACK CONTROLS UI -->
+      <div id="channelConfig">
+        <h3>Track Controls</h3>
+
+        <div class="track-controls">
+          <label>Drums:</label>
+          <input type="checkbox" id="drumsMute" />Mute
+          <input type="radio" name="soloGroup" id="drumsSolo" value="Drums" />
+          <label for="drumsSolo">Solo</label>
+          <label>Ch:</label>
+          <select id="drumsChSel">
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+            <option>9</option>
+            <option>10</option>
+            <option>11</option>
+            <option>12</option>
+            <option>13</option>
+            <option>14</option>
+            <option>15</option>
+            <option>16</option>
+          </select>
+        </div>
+
+        <div class="track-controls">
+          <label>Bass:</label>
+          <input type="checkbox" id="bassMute" />Mute
+          <input type="radio" name="soloGroup" id="bassSolo" value="Bass" />
+          <label for="bassSolo">Solo</label>
+          <label>Ch:</label>
+          <select id="bassChSel">
+            <option>1</option>
+            <option>2</option>
+            <option selected>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+            <option>9</option>
+            <option>10</option>
+            <option>11</option>
+            <option>12</option>
+            <option>13</option>
+            <option>14</option>
+            <option>15</option>
+            <option>16</option>
+          </select>
+        </div>
+
+        <div class="track-controls">
+          <label>Chords:</label>
+          <input type="checkbox" id="chordsMute" />Mute
+          <input type="radio" name="soloGroup" id="chordsSolo" value="Chords" />
+          <label for="chordsSolo">Solo</label>
+          <label>Ch:</label>
+          <select id="chordsChSel">
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option selected>8</option>
+            <option>9</option>
+            <option>10</option>
+            <option>11</option>
+            <option>12</option>
+            <option>13</option>
+            <option>14</option>
+            <option>15</option>
+            <option>16</option>
+          </select>
+        </div>
+
+        <div class="track-controls">
+          <label>LeadArp:</label>
+          <input type="checkbox" id="leadMute" />Mute
+          <input type="radio" name="soloGroup" id="leadSolo" value="LeadArp" />
+          <label for="leadSolo">Solo</label>
+          <label>Ch:</label>
+          <select id="leadChSel">
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option selected>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+            <option>9</option>
+            <option>10</option>
+            <option>11</option>
+            <option>12</option>
+            <option>13</option>
+            <option>14</option>
+            <option>15</option>
+            <option>16</option>
+          </select>
+        </div>
+
+        <div class="track-controls">
+          <label>Melody:</label>
+          <input type="checkbox" id="melodyMute" />Mute
+          <input type="radio" name="soloGroup" id="melodySolo" value="Melody" />
+          <label for="melodySolo">Solo</label>
+          <label>Ch:</label>
+          <select id="melodyChSel">
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option selected>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+            <option>9</option>
+            <option>10</option>
+            <option>11</option>
+            <option>12</option>
+            <option>13</option>
+            <option>14</option>
+            <option>15</option>
+            <option>16</option>
+          </select>
+        </div>
+      </div>
 
       <!-- DRUM TRACK -->
       <div class="track-row">
-        <h2>Drum Track</h2>
+        <h2>Drum Track (XY: hat density / ghost snare)</h2>
         <div class="xy-container" id="drumXyContainer"></div>
       </div>
 
       <!-- BASS TRACK -->
       <div class="track-row">
-        <h2>Bass Track</h2>
+        <h2>Bass Track (XY: octaveUpProb / LFO=CC32 Filter)</h2>
         <div class="xy-container" id="bassXyContainer"></div>
       </div>
 
       <!-- CHORD TRACK -->
       <div class="track-row">
-        <h2>Chords Track</h2>
+        <h2>Chords Track (XY: voicing / pitch shift)</h2>
         <div class="xy-container" id="chordsXyContainer"></div>
       </div>
 
       <!-- LEAD/ARP TRACK -->
       <div class="track-row">
-        <h2>Lead / Arpeggio Track</h2>
+        <h2>Lead / Arpeggio (XY: restProb / passingNoteProb)</h2>
         <div class="xy-container" id="leadXyContainer"></div>
       </div>
 
       <!-- MELODY TRACK -->
       <div class="track-row">
-        <h2>Melody Track</h2>
+        <h2>Melody (XY: spiceProbability / transpose)</h2>
         <div class="xy-container" id="melodyXyContainer"></div>
       </div>
     </main>
 
-    <!-- The main script. We'll import modules from your library. -->
     <script type="module">
-      /*********************************************************
-       * 1) IMPORT YOUR LIBRARY CLASSES
-       *********************************************************/
-      import { MidiBus } from "../src/midi-bus.js";
-      import { TransportManager } from "../src/transport/transport-manager.js";
-      import { EnergyManager } from "../src/energy-manager.js"; // if needed
-      import { LiveLoop } from "../src/live-loop.js";
+      /*******************************************************
+       * 1) IMPORT from your library
+       *******************************************************/
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        ChordManager,
+        RhythmManager,
+        GlobalContext,
+        DrumPattern,
+        ChanceStepArp,
+        SyncopatedBass,
+        ChordPattern,
+        ContourMelodyPattern,
+        LFO,
+      } from "../src/index.js";
+      import { XYPad } from "../src/ui/xy-pad.js";
+      import { DeviceDefinition } from "../src/device-definition.js";
 
-      // Pattern Classes (dummy imports for example)
-      import { DrumPattern } from "../src/patterns/drum-pattern.js";
-      import { SyncopatedBass } from "../src/patterns/syncopated-bass.js";
-      import { ChordPattern } from "../src/patterns/chord-pattern.js";
-      import { ChanceStepArp } from "../src/patterns/chance-step-arp.js";
-      import { ContourMelodyPattern } from "../src/patterns/contour-melody-pattern.js";
+      /*******************************************************
+       * 2) Setup a basic console logger (not displayed in UI).
+       *******************************************************/
+      const originalLog = console.log;
+      console.log = (...args) => {
+        originalLog(...args);
+        // We won't show it in the DOM UI.
+      };
 
-      // XYPad class
-      import { XYPad } from "../src/ui/xy-pad.js"; // Adjust path as needed
-
-      /*********************************************************
-       * 2) SETUP MIDI BUS & TRANSPORT
-       *********************************************************/
-      // Create a global or local midiBus
+      /*******************************************************
+       * 3) MIDI Bus + RealPlaybackEngine + External Clock
+       *******************************************************/
       const midiBus = new MidiBus();
-      // Optionally, attach to window if you want the XYPad's default reference
-      window.midiBus = midiBus;
+      window.midiBus = midiBus; // for XYPad "cc" usage
 
-      // Create a TransportManager
+      const realEngine = new RealPlaybackEngine(midiBus);
+
+      async function initMidiIO() {
+        await realEngine.init();
+        const midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // Output
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length) {
+          console.log("Using MIDI output:", outputs[0].name);
+          realEngine.midiOutputs = [outputs[0]];
+        } else {
+          console.warn("No MIDI outputs found. No sound will be produced.");
+        }
+
+        // Input => external clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length) {
+          console.log("Listening for MIDI clock on input:", inputs[0].name);
+          inputs[0].onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn(
+            "No MIDI inputs found. External clock won't be received."
+          );
+        }
+      }
+      await initMidiIO();
+
+      /*******************************************************
+       * 4) GlobalContext
+       *******************************************************/
+      const chordManager = new ChordManager({
+        progression: [
+          { root: "C", type: "maj", duration: 16 },
+          { root: "F", type: "maj", duration: 16 },
+          { root: "G", type: "7", duration: 16 },
+          { root: "E", type: "min7", duration: 16 },
+        ],
+      });
+      const rhythmManager = new RhythmManager({
+        stepsPerBar: 16,
+        stepsPerBeat: 4,
+      });
+      const globalContext = new GlobalContext({ chordManager, rhythmManager });
+
+      /*******************************************************
+       * 5) TransportManager
+       *******************************************************/
       const transport = new TransportManager(midiBus, {
-        liveLoops: [], // we'll add loops dynamically
-        pulsesPerStep: 6,
+        liveLoops: [],
+        pulsesPerStep: 6, // 24 PPQN => 4 steps/beat
       });
 
-      /*********************************************************
-       * 3) CREATE 5 PATTERNS & LIVE LOOPS
-       *********************************************************/
+      /*******************************************************
+       * 6) DRUMS with numeric note IDs
+       *******************************************************/
+      // We'll define a "drumMap" and a "mediumPattern" that references keys from the map.
+      // Then override getNotes to do hatDensity & ghostSnare.
 
-      // 3.1 DRUMS
-      const drumPattern = new DrumPattern({
-        // Medium pattern example:
+      const FULL_KIT = {
+        KICK: 53,
+        KICK_ALT: 54,
+        SNARE: 55,
+        SNARE_ALT: 56,
+        RIM: 57,
+        CLAP: 58,
+        TAMBOURINE: 59,
+        SHAKER: 60,
+        CLOSED_HAT: 61,
+        OPEN_HAT: 62,
+        PEDAL_HAT: 63,
+        LOW_TOM: 65,
+        CRASH: 66,
+        MID_TOM: 67,
+        RIDE: 68,
+        HIGH_TOM: 69,
+        CONGA_LOW: 71,
+        CONGA_HIGH: 72,
+        COWBELL: 73,
+        GUIRO: 74,
+        METAL: 75,
+        CHI: 76,
+      };
+
+      class ExtendedDrumPattern extends DrumPattern {
+        constructor(opts = {}) {
+          super(opts);
+          // We store a local map from string -> numeric note
+          this.drumMap = {
+            kick: FULL_KIT.KICK,
+            snare: FULL_KIT.SNARE,
+            hatClosed: FULL_KIT.CLOSED_HAT,
+          };
+          this.hatDensity = 1.0; // 0..1
+          this.ghostSnare = 0.0; // 0..1
+        }
+
+        getNotes(stepIndex, context) {
+          // We'll get the base hits from "mediumPattern", then remap each part to numeric note
+          const notes = [];
+          const pat = this.options.mediumPattern; // e.g. {kick:[], snare:[], hatClosed:[]}
+          const totalSteps = this.options.patternLength || 16;
+          const localStep = stepIndex % totalSteps;
+
+          // For each drumPart in mediumPattern, if there's a "1" => add note
+          for (const partName in pat) {
+            const arr = pat[partName];
+            if (!arr || !Array.isArray(arr)) continue;
+            if (arr[localStep] === 1) {
+              const midiNote = this.drumMap[partName] || 53; // fallback=kick
+              notes.push({
+                note: midiNote,
+                velocity: 100,
+                durationSteps: 1,
+              });
+            }
+          }
+
+          // 1) hatDensity: if partName=hatClosed => random remove
+          if (this.hatDensity < 1.0) {
+            for (let i = notes.length - 1; i >= 0; i--) {
+              if (notes[i].note === FULL_KIT.CLOSED_HAT) {
+                if (Math.random() > this.hatDensity) {
+                  notes.splice(i, 1);
+                }
+              }
+            }
+          }
+
+          // 2) ghost snare => insert SNARE_ALT w/ velocity=50 on step%4==1 randomly
+          if (localStep % 4 === 1 && Math.random() < this.ghostSnare) {
+            notes.push({
+              note: FULL_KIT.SNARE_ALT, // 56
+              velocity: 50,
+              durationSteps: 1,
+            });
+          }
+          return notes;
+        }
+      }
+
+      // A simple 16-step pattern for "kick", "snare", "hatClosed"
+      const myDrumPattern = new ExtendedDrumPattern({
         mediumPattern: {
           kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
           snare: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-          hat: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          hatClosed: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         },
         patternLength: 16,
       });
-      // A LiveLoop using this pattern
-      const drumLoop = new LiveLoop(midiBus, {
-        pattern: drumPattern,
-        midiChannel: 10,
-        name: "Drums",
-      });
-      transport.addLiveLoop(drumLoop); // add to TransportManager
 
-      // 3.2 BASS
-      const bassPattern = new SyncopatedBass({
-        length: 16,
-        octave: 2,
+      myDrumPattern.setHatDensity = (v) => {
+        myDrumPattern.hatDensity = v;
+      };
+      myDrumPattern.setGhostSnare = (v) => {
+        myDrumPattern.ghostSnare = v;
+      };
+
+      const drumLoop = new LiveLoop(midiBus, {
+        pattern: myDrumPattern,
+        midiChannel: 1,
+        name: "Drums",
+        globalContext,
       });
+      transport.addLiveLoop(drumLoop);
+
+      /*******************************************************
+       * 7) BASS => octaveUpProb + LFO CC32
+       *******************************************************/
+      class BassDeviceDef extends DeviceDefinition {
+        getDrumNote(n) {
+          return null;
+        }
+        getCC(param) {
+          return param === "filterCutoff" ? 32 : null;
+        }
+        getSynthEngine(ch) {
+          return null;
+        }
+        getChannelEngineName(ch) {
+          return "BassEngine";
+        }
+        listChannels() {
+          return [{ channel: 3, engineName: "BassEngine" }];
+        }
+      }
+      const bassDeviceDef = new BassDeviceDef();
+
+      // Subclass to add "octaveUpProb"
+      class MyBassPattern extends SyncopatedBass {
+        constructor(opts = {}) {
+          super(opts);
+          this.octaveUpProb = 0.0;
+        }
+        getNotes(stepIndex, ctx) {
+          const baseNotes = super.getNotes(stepIndex, ctx);
+          baseNotes.forEach((n) => {
+            if (
+              typeof n.note === "string" &&
+              Math.random() < this.octaveUpProb
+            ) {
+              n.note = this._shiftUp(n.note, 12);
+            }
+          });
+          return baseNotes;
+        }
+        _shiftUp(noteName, semi) {
+          const m = noteName.match(/^([A-G][b#]?)(\d+)$/i);
+          if (!m) return noteName;
+          const [_, pitch, octStr] = m;
+          const noteMap = {
+            C: 0,
+            "C#": 1,
+            Db: 1,
+            D: 2,
+            "D#": 3,
+            Eb: 3,
+            E: 4,
+            F: 5,
+            "F#": 6,
+            Gb: 6,
+            G: 7,
+            "G#": 8,
+            Ab: 8,
+            A: 9,
+            "A#": 10,
+            Bb: 10,
+            B: 11,
+          };
+          const sem = noteMap[pitch] ?? 0;
+          const octave = parseInt(octStr, 10);
+          const midi = (octave + 1) * 12 + sem + semi;
+          const names = [
+            "C",
+            "C#",
+            "D",
+            "D#",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "G#",
+            "A",
+            "A#",
+            "B",
+          ];
+          const newOct = Math.floor(midi / 12) - 1;
+          const newSem = midi % 12;
+          return names[newSem] + newOct;
+        }
+      }
+      const bassPattern = new MyBassPattern({ length: 16, octave: 2 });
+      bassPattern.setOctaveUpProbability = (v) => {
+        bassPattern.octaveUpProb = v;
+      };
+
+      // Slower, smaller LFO => CC32
+      const bassLfo = new LFO({
+        frequency: 0.1,
+        amplitude: 0.2,
+        targetParam: "filterCutoff",
+      });
+
       const bassLoop = new LiveLoop(midiBus, {
         pattern: bassPattern,
-        midiChannel: 2,
+        midiChannel: 3,
         name: "Bass",
+        globalContext,
+        deviceDefinition: bassDeviceDef,
       });
+      bassLoop.addLFO(bassLfo);
       transport.addLiveLoop(bassLoop);
 
-      // 3.3 CHORDS
-      const chordPattern = new ChordPattern({
-        length: 16,
+      /*******************************************************
+       * 8) CHORDS => voicing + semitone offset
+       *******************************************************/
+      class MyChordPattern extends ChordPattern {
+        constructor(opts = {}) {
+          super(opts);
+          this.semitoneOffset = 0;
+        }
+        _generateChordNotes(chord, velocity) {
+          const base = super._generateChordNotes(chord, velocity);
+          return base.map((nObj) => {
+            if (typeof nObj.note !== "string") return nObj;
+            return {
+              ...nObj,
+              note: this._shiftSemitones(nObj.note, this.semitoneOffset),
+            };
+          });
+        }
+        _shiftSemitones(noteName, semi) {
+          const m = noteName.match(/^([A-G][b#]?)(\d+)$/i);
+          if (!m) return noteName;
+          const [_, pitch, octStr] = m;
+          const noteMap = {
+            C: 0,
+            "C#": 1,
+            Db: 1,
+            D: 2,
+            "D#": 3,
+            Eb: 3,
+            E: 4,
+            F: 5,
+            "F#": 6,
+            Gb: 6,
+            G: 7,
+            "G#": 8,
+            Ab: 8,
+            A: 9,
+            "A#": 10,
+            Bb: 10,
+            B: 11,
+          };
+          const s = noteMap[pitch] ?? 0;
+          const oct = parseInt(octStr, 10);
+          const midi = (oct + 1) * 12 + s + semi;
+          const names = [
+            "C",
+            "C#",
+            "D",
+            "D#",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "G#",
+            "A",
+            "A#",
+            "B",
+          ];
+          const nOct = Math.floor(midi / 12) - 1;
+          const nSem = midi % 12;
+          return names[nSem] + nOct;
+        }
+        setSemitoneOffset(v) {
+          this.semitoneOffset = v;
+        }
+      }
+      const chordPattern = new MyChordPattern({
+        length: 64,
         voicingType: "close",
         octave: 4,
       });
       const chordLoop = new LiveLoop(midiBus, {
         pattern: chordPattern,
-        midiChannel: 3,
+        midiChannel: 8,
         name: "Chords",
+        globalContext,
       });
       transport.addLiveLoop(chordLoop);
 
-      // 3.4 LEAD/ARP
-      const leadArpPattern = new ChanceStepArp({
+      /*******************************************************
+       * 9) LEAD / ARP => restProb + passingNoteProbability
+       *******************************************************/
+      class MyChanceArp extends ChanceStepArp {
+        constructor(opts = {}) {
+          super(opts);
+          this.passingNoteProb = 0.0;
+        }
+        getNotes(stepIndex, ctx) {
+          const base = super.getNotes(stepIndex, ctx);
+          if (!base.length) return base;
+
+          // If passingNoteProb is high, we might slip in a half-step approach before the chord tone
+          if (Math.random() < this.passingNoteProb) {
+            const noteObj = base[0]; // only approach the first note
+            if (typeof noteObj.note === "string") {
+              // insert an approach ~1 semitone below
+              const approach = { ...noteObj };
+              approach.note = this._shift(approach.note, -1);
+              approach.velocity = (noteObj.velocity || 100) - 20;
+              approach.durationSteps = 1;
+              // We'll return approach + main note
+              return [approach, noteObj];
+            }
+          }
+          return base;
+        }
+        _shift(noteName, semi) {
+          if (typeof noteName !== "string") return noteName;
+          const m = noteName.match(/^([A-G][b#]?)(\d+)$/i);
+          if (!m) return noteName;
+          const noteMap = {
+            C: 0,
+            "C#": 1,
+            Db: 1,
+            D: 2,
+            "D#": 3,
+            Eb: 3,
+            E: 4,
+            F: 5,
+            "F#": 6,
+            Gb: 6,
+            G: 7,
+            "G#": 8,
+            Ab: 8,
+            A: 9,
+            "A#": 10,
+            Bb: 10,
+            B: 11,
+          };
+          const [_, pitch, octStr] = m;
+          const s = noteMap[pitch] ?? 0;
+          const oct = parseInt(octStr, 10);
+          const midi = (oct + 1) * 12 + s + semi;
+          const names = [
+            "C",
+            "C#",
+            "D",
+            "D#",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "G#",
+            "A",
+            "A#",
+            "B",
+          ];
+          const nOct = Math.floor(midi / 12) - 1;
+          const nSem = midi % 12;
+          return names[nSem] + nOct;
+        }
+        setPassingNoteProbability(v) {
+          this.passingNoteProb = v;
+        }
+      }
+
+      const leadArpPattern = new MyChanceArp({
         probabilityToAdvance: 70,
         restProbability: 10,
       });
+      leadArpPattern.setRestProbability = (v) => {
+        leadArpPattern.restProbability = v;
+      };
       const leadLoop = new LiveLoop(midiBus, {
         pattern: leadArpPattern,
         midiChannel: 4,
         name: "LeadArp",
+        globalContext,
       });
       transport.addLiveLoop(leadLoop);
 
-      // 3.5 MELODY
+      /*******************************************************
+       * 10) MELODY => spiceProb + transpose
+       *******************************************************/
       const melodyPattern = new ContourMelodyPattern({
         contour: [0, 1, 2, 1, -1],
         length: 16,
@@ -182,170 +724,179 @@
         restProbability: 15,
         spiceProbability: 10,
       });
+      melodyPattern.setSpiceProbability = (v) => {
+        melodyPattern.spiceProbability = v;
+      };
       const melodyLoop = new LiveLoop(midiBus, {
         pattern: melodyPattern,
         midiChannel: 5,
         name: "Melody",
+        globalContext,
       });
       transport.addLiveLoop(melodyLoop);
 
-      /*********************************************************
-       * 4) XY PADS FOR REAL-TIME CONTROL
-       *    We'll create 1 XY pad per track.
-       *********************************************************/
-
-      // == DRUM XY PAD ==
-      // Suppose we want X to control "fillProbability"
-      // and Y to control "swing" (if we coded that in the pattern).
-      // If the DrumPattern doesn't natively have these methods,
-      // we'll do param type "function" for demonstration.
-      const drumXy = new XYPad({
+      /*******************************************************
+       * 11) XY Pads
+       *******************************************************/
+      // Drums => hatDensity / ghostSnare
+      new XYPad({
         container: document.getElementById("drumXyContainer"),
         width: 150,
         height: 150,
-        // We'll do an onChange callback to manually handle.
-        // Alternatively paramX / paramY could do direct "pattern" type if you add setFillProbability(...) etc.
         onChange: (xVal, yVal) => {
-          // xVal,yVal in [0..1]
-          // Example: map xVal to fill probability 0..1
-          // We'll assume we have a method drumPattern.setFillProb(prob).
-          // If not, we can store in the pattern's config or do something else.
-          if (typeof drumPattern.setFillProbability === "function") {
-            drumPattern.setFillProbability(xVal);
-          }
-
-          // yVal => swing 0..1
-          // If your DrumPattern doesn't have a 'setSwing' method,
-          // you might store a property and do the actual logic in getNotes().
-          if (typeof drumPattern.setSwing === "function") {
-            drumPattern.setSwing(yVal);
-          }
+          myDrumPattern.setHatDensity?.(xVal);
+          myDrumPattern.setGhostSnare?.(yVal);
         },
       });
 
-      // == BASS XY PAD ==
-      // We'll try param-based approach.
-      // Let's assume we added a "setChanceVariation" method to SyncopatedBass
-      // that sets how likely it is to add passing notes.
-      // Y might be controlling an LFO's amplitude (example).
-      import { LFO } from "../src/lfo.js";
-      const bassLfo = new LFO({ frequency: 0.5, amplitude: 0.5 });
-      bassLoop.addLFO(bassLfo); // attach the LFO so it gets updates each step
-
-      const bassXy = new XYPad({
+      // Bass => octaveUpProb / LFO amplitude => CC32
+      new XYPad({
         container: document.getElementById("bassXyContainer"),
         width: 150,
         height: 150,
-
         paramX: {
           type: "function",
-          callback: (val) => {
-            // val in [0..1]
-            if (typeof bassPattern.setChanceVariation === "function") {
-              bassPattern.setChanceVariation(val);
-            }
-          },
+          callback: (val) => bassPattern.setOctaveUpProbability?.(val),
           range: [0, 1],
         },
         paramY: {
           type: "lfo",
           lfo: bassLfo,
           method: "setAmplitude",
-          range: [0, 1.0],
+          // Keep amplitude small for subtle filter
+          range: [0, 0.2],
         },
       });
 
-      // == CHORDS XY PAD ==
-      // X => chord voicing from 0=close to 1=spread
-      // Y => reverb send CC example on channel 3
-      // paramX => pattern approach
-      // paramY => cc approach
-      const chordXy = new XYPad({
+      // Chords => voicing / semitoneOffset(0..12)
+      new XYPad({
         container: document.getElementById("chordsXyContainer"),
         width: 150,
         height: 150,
-
         paramX: {
           type: "function",
           callback: (val) => {
-            // range: 0..1
-            // map to "close" if val < 0.5, "spread" if val >= 0.5
             if (val < 0.5) chordPattern.setVoicingType("close");
             else chordPattern.setVoicingType("spread");
           },
           range: [0, 1],
         },
         paramY: {
-          type: "cc",
-          channel: 3,
-          cc: 91, // typical reverb send CC
-          range: [0, 127],
+          type: "function",
+          callback: (val) => {
+            const sem = Math.floor(val * 12);
+            chordPattern.setSemitoneOffset(sem);
+          },
+          range: [0, 1],
         },
       });
 
-      // == LEAD/ARP XY PAD ==
-      // We'll do X => chance for "restProbability"
-      // Y => some CC like pitch bend or modulation
-      // For pitch bend, we might do a "function" approach,
-      // because pitch bend is a special message, not CC.
-      const leadXy = new XYPad({
+      // Lead => restProbability(0..50) / passingNoteProb(0..1)
+      new XYPad({
         container: document.getElementById("leadXyContainer"),
         width: 150,
         height: 150,
-        // We can handle both in onChange for demonstration
         onChange: (xVal, yVal) => {
-          // xVal => restProb in [0,1], scale to 0..50%?
-          const restProb = xVal * 50;
-          if (typeof leadArpPattern.setRestProbability === "function") {
-            leadArpPattern.setRestProbability(restProb);
-          }
-
-          // yVal => pitch bend: -8192..8191
-          // Let's map 0..1 => -8192..8191
-          const pitchRange = 8192 * 2;
-          const bendVal = Math.floor(-8192 + yVal * pitchRange);
-          midiBus.pitchBend({ channel: 4, value: bendVal });
+          leadArpPattern.setRestProbability?.(xVal * 50);
+          leadArpPattern.setPassingNoteProbability?.(yVal);
         },
       });
 
-      // == MELODY XY PAD ==
-      // X => "spiceProbability" in [0..100]
-      // Y => transpose in semitones [-12..+12]
-      const melodyXy = new XYPad({
+      // Melody => spiceProbability(0..100) / transpose(-12..+12)
+      new XYPad({
         container: document.getElementById("melodyXyContainer"),
         width: 150,
         height: 150,
         onChange: (xVal, yVal) => {
-          // xVal => 0..1, map to 0..100
-          const spice = xVal * 100;
-          if (typeof melodyPattern.setSpiceProbability === "function") {
-            melodyPattern.setSpiceProbability(spice);
-          }
-
-          // yVal => 0..1, map to -12..+12
-          const semitone = -12 + Math.floor(yVal * 24);
-          // Suppose we have a setTranspose method
-          if (typeof melodyLoop.setTranspose === "function") {
-            melodyLoop.setTranspose(semitone);
-          }
+          melodyPattern.setSpiceProbability?.(xVal * 100);
+          const sem = -12 + Math.floor(yVal * 24);
+          melodyLoop.setTranspose(sem);
         },
       });
 
-      /*********************************************************
-       * 5) START/STOP BUTTONS
-       *********************************************************/
-      const startBtn = document.getElementById("startBtn");
-      const stopBtn = document.getElementById("stopBtn");
+      /*******************************************************
+       * 12) Mute, Solo, Channel
+       *******************************************************/
+      const drumsMuteEl = document.getElementById("drumsMute");
+      const bassMuteEl = document.getElementById("bassMute");
+      const chordsMuteEl = document.getElementById("chordsMute");
+      const leadMuteEl = document.getElementById("leadMute");
+      const melodyMuteEl = document.getElementById("melodyMute");
 
-      startBtn.addEventListener("click", () => {
-        console.log("Starting transport...");
-        transport._onStart(); // or a more formal method if you have one
+      const drumsSoloEl = document.getElementById("drumsSolo");
+      const bassSoloEl = document.getElementById("bassSolo");
+      const chordsSoloEl = document.getElementById("chordsSolo");
+      const leadSoloEl = document.getElementById("leadSolo");
+      const melodySoloEl = document.getElementById("melodySolo");
+
+      const drumsChSel = document.getElementById("drumsChSel");
+      const bassChSel = document.getElementById("bassChSel");
+      const chordsChSel = document.getElementById("chordsChSel");
+      const leadChSel = document.getElementById("leadChSel");
+      const melodyChSel = document.getElementById("melodyChSel");
+
+      drumsChSel.value = "1";
+      bassChSel.value = "3";
+      chordsChSel.value = "8";
+      leadChSel.value = "4";
+      melodyChSel.value = "5";
+
+      function updateMuteState() {
+        const soloedTrack =
+          (drumsSoloEl.checked && "Drums") ||
+          (bassSoloEl.checked && "Bass") ||
+          (chordsSoloEl.checked && "Chords") ||
+          (leadSoloEl.checked && "LeadArp") ||
+          (melodySoloEl.checked && "Melody") ||
+          null;
+
+        if (soloedTrack) {
+          drumLoop.setMuted(soloedTrack !== "Drums");
+          bassLoop.setMuted(soloedTrack !== "Bass");
+          chordLoop.setMuted(soloedTrack !== "Chords");
+          leadLoop.setMuted(soloedTrack !== "LeadArp");
+          melodyLoop.setMuted(soloedTrack !== "Melody");
+        } else {
+          drumLoop.setMuted(drumsMuteEl.checked);
+          bassLoop.setMuted(bassMuteEl.checked);
+          chordLoop.setMuted(chordsMuteEl.checked);
+          leadLoop.setMuted(leadMuteEl.checked);
+          melodyLoop.setMuted(melodyMuteEl.checked);
+        }
+      }
+
+      [
+        drumsMuteEl,
+        bassMuteEl,
+        chordsMuteEl,
+        leadMuteEl,
+        melodyMuteEl,
+        drumsSoloEl,
+        bassSoloEl,
+        chordsSoloEl,
+        leadSoloEl,
+        melodySoloEl,
+      ].forEach((el) => el.addEventListener("change", updateMuteState));
+
+      // Channel changes
+      drumsChSel.addEventListener("change", () => {
+        drumLoop.midiChannel = parseInt(drumsChSel.value, 10);
+      });
+      bassChSel.addEventListener("change", () => {
+        bassLoop.midiChannel = parseInt(bassChSel.value, 10);
+      });
+      chordsChSel.addEventListener("change", () => {
+        chordLoop.midiChannel = parseInt(chordsChSel.value, 10);
+      });
+      leadChSel.addEventListener("change", () => {
+        leadLoop.midiChannel = parseInt(leadChSel.value, 10);
+      });
+      melodyChSel.addEventListener("change", () => {
+        melodyLoop.midiChannel = parseInt(melodyChSel.value, 10);
       });
 
-      stopBtn.addEventListener("click", () => {
-        console.log("Stopping transport...");
-        transport._onStop();
-      });
+      updateMuteState();
+      console.log("5-track demo loaded. Clock from external MIDI input...");
     </script>
   </body>
 </html>

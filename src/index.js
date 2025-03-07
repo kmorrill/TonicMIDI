@@ -17,6 +17,8 @@ export * from "./patterns/chance-step-arp.js";
 export * from "./patterns/syncopated-bass.js";
 export * from "./patterns/chord-pattern.js";
 export * from "./patterns/explicit-note-pattern.js";
+export * from "./patterns/contour-melody-pattern.js";
+export * from "./patterns/chord-pattern.js";
 
 // Exporting LFO module
 export { LFO } from "./lfo.js";
