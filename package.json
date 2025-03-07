@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "start": "vite demo",
-    "build:demo": "vite build demo --outDir dist",
+    "start": "vite",
+    "build:demo": "vite build",
     "dump-docs": "find docs -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done",
     "dump-src": "find src -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done",
     "dump-midi": "find demo/midi -type f | sort | while read -r file; do echo \"$file\"; cat \"$file\"; echo -e \"\\n\"; done",
