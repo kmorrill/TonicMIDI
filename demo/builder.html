@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>op-xy-live: Loops Builder + Overview</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: sans-serif;
+        background-color: #fafafa;
+        color: #333;
+      }
+
+      header {
+        background: #222;
+        color: #fff;
+        padding: 16px;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+
+      main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      /* TRANSPORT / OVERVIEW BAR */
+      #transportOverview {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 20px;
+        align-items: center;
+        background: #fefefe;
+        border: 1px solid #ddd;
+        padding: 16px;
+      }
+      .transport-item {
+        display: flex;
+        flex-direction: column;
+      }
+      .transport-item label {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+      .beat-indicator {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+      }
+      .beat-step {
+        width: 16px;
+        height: 16px;
+        background: #ccc;
+        border-radius: 3px;
+      }
+      .beat-step.active {
+        background: #66bb6a; /* highlight color */
+      }
+
+      /* TRACKS OVERVIEW TABLE */
+      #tracksOverview {
+        background: #fff;
+        border: 1px solid #ccc;
+        padding: 16px;
+      }
+      #tracksOverview h2 {
+        margin-top: 0;
+        font-size: 1.2rem;
+      }
+      #tracksTable {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+      }
+      #tracksTable th,
+      #tracksTable td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      #tracksTable th {
+        background: #f0f0f0;
+        font-weight: 600;
+      }
+      .mute-button,
+      .solo-button {
+        padding: 4px 8px;
+        margin-right: 6px;
+        cursor: pointer;
+      }
+
+      /* GLOBAL ENERGY CONTROLS */
+      #globalControls {
+        background: #fdfdfd;
+        border: 1px solid #ddd;
+        padding: 16px;
+      }
+      #globalControls h2 {
+        margin-top: 0;
+      }
+      .energy-control-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+      .energy-control-group label {
+        font-weight: bold;
+        margin-right: 6px;
+      }
+      .energy-control-group select {
+        padding: 4px 8px;
+      }
+
+      /* ADD NEW LOOP BUTTON */
+      #addLoopBtn {
+        padding: 8px 16px;
+        cursor: pointer;
+        margin: 8px 0;
+      }
+
+      /* LOOP CARDS */
+      #loopsContainer {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .loop-card {
+        background: #fff;
+        border: 1px solid #ccc;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .loop-card h3 {
+        margin-top: 0;
+        font-size: 1.1rem;
+      }
+
+      /* Basic info row */
+      .loop-info-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .loop-info-row > div {
+        flex: 1;
+        min-width: 200px;
+        display: flex;
+        flex-direction: column;
+      }
+      .loop-info-row label {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+      .loop-info-row input[type="text"],
+      .loop-info-row select {
+        padding: 6px;
+      }
+
+      /* Pattern config row */
+      .pattern-config {
+        display: flex;
+        flex-direction: column;
+      }
+      .pattern-config label {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+      .pattern-config textarea {
+        width: 100%;
+        min-height: 120px;
+        font-family: monospace;
+        padding: 6px;
+        resize: vertical;
+      }
+
+      /* LFO section */
+      .lfo-section {
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .lfo-section h4 {
+        margin: 0;
+        font-size: 1rem;
+      }
+      .lfo-item {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .lfo-item:last-child {
+        border-bottom: none;
+      }
+      .lfo-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        flex: 1;
+      }
+      .lfo-control-group {
+        display: flex;
+        flex-direction: column;
+        min-width: 120px;
+      }
+      .lfo-control-group label {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
+      .lfo-control-group input[type="number"],
+      .lfo-control-group select {
+        padding: 4px 6px;
+        font-size: 0.9rem;
+      }
+      .remove-lfo-btn {
+        align-self: center;
+        margin-left: auto;
+        padding: 4px 8px;
+        cursor: pointer;
+        height: fit-content;
+      }
+      .addLfoBtn {
+        align-self: flex-start;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+
+      footer {
+        text-align: center;
+        padding: 16px;
+        background: #f0f0f0;
+        margin-top: 40px;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>op-xy-live &mdash; Loops Builder + Overview</h1>
+    </header>
+
+    <main>
+      <!-- TRANSPORT / OVERVIEW BAR -->
+      <section id="transportOverview">
+        <div class="transport-item">
+          <label>Current Chord:</label>
+          <div id="currentChordLabel">C Maj7</div>
+        </div>
+        <div class="transport-item">
+          <label>Global Beat:</label>
+          <div id="currentBeatLabel">Beat #12</div>
+        </div>
+        <div class="transport-item">
+          <label>Phrase Steps (1-8):</label>
+          <div class="beat-indicator">
+            <!-- Example 8 steps, show active/inactive classes in real usage -->
+            <div class="beat-step active"></div>
+            <div class="beat-step"></div>
+            <div class="beat-step"></div>
+            <div class="beat-step"></div>
+            <div class="beat-step"></div>
+            <div class="beat-step"></div>
+            <div class="beat-step"></div>
+            <div class="beat-step"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRACKS OVERVIEW TABLE -->
+      <section id="tracksOverview">
+        <h2>Tracks Overview</h2>
+        <table id="tracksTable">
+          <thead>
+            <tr>
+              <th>Track Name</th>
+              <th>MIDI Ch</th>
+              <th>Engine</th>
+              <th>Mute</th>
+              <th>Solo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Example row -->
+            <tr>
+              <td>ChordLoop</td>
+              <td>8</td>
+              <td>Subtractive</td>
+              <td>
+                <button class="mute-button">Mute</button>
+              </td>
+              <td>
+                <button class="solo-button">Solo</button>
+              </td>
+            </tr>
+            <!-- Additional rows dynamically added for each track -->
+          </tbody>
+        </table>
+      </section>
+
+      <!-- GLOBAL ENERGY CONTROLS -->
+      <section id="globalControls">
+        <h2>Global Energy Controls</h2>
+        <div class="energy-control-group">
+          <div>
+            <label for="hypeLevelSelect">Hype Level:</label>
+            <select id="hypeLevelSelect">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="full">Full</option>
+            </select>
+          </div>
+          <div>
+            <label for="tensionLevelSelect">Tension Level:</label>
+            <select id="tensionLevelSelect">
+              <option value="none">None</option>
+              <option value="low">Low</option>
+              <option value="mid">Mid</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADD NEW LOOP BUTTON -->
+      <button id="addLoopBtn">+ Add New Loop</button>
+
+      <!-- LOOP CARDS -->
+      <div id="loopsContainer">
+        <!-- Example Loop Card #1 -->
+        <div class="loop-card">
+          <h3>Chord Loop Details</h3>
+
+          <!-- Basic Info -->
+          <div class="loop-info-row">
+            <div>
+              <label for="loopName_1">Name</label>
+              <input type="text" id="loopName_1" value="ChordLoop" />
+            </div>
+            <div>
+              <label for="midiChannel_1">MIDI Channel</label>
+              <select id="midiChannel_1">
+                <option value="1">Ch 1</option>
+                <option value="2">Ch 2</option>
+                <option value="3">Ch 3</option>
+                <option value="4">Ch 4</option>
+                <option value="5">Ch 5</option>
+                <option value="6">Ch 6</option>
+                <option value="7">Ch 7</option>
+                <option value="8" selected>Ch 8</option>
+                <option value="9">Ch 9</option>
+                <option value="10">Ch 10</option>
+                <option value="11">Ch 11</option>
+                <option value="12">Ch 12</option>
+                <option value="13">Ch 13</option>
+                <option value="14">Ch 14</option>
+                <option value="15">Ch 15</option>
+                <option value="16">Ch 16</option>
+              </select>
+            </div>
+            <div>
+              <label for="engine_1">Engine</label>
+              <input type="text" id="engine_1" value="Subtractive" />
+            </div>
+          </div>
+
+          <!-- Pattern Config -->
+          <div class="pattern-config">
+            <label for="patternType_1">Pattern Type</label>
+            <select id="patternType_1">
+              <option value="drum">DrumPattern</option>
+              <option value="sync-bass">SyncopatedBass</option>
+              <option value="chord" selected>ChordPattern</option>
+              <option value="explicit">ExplicitNotePattern</option>
+              <option value="chance-arp">ChanceStepArp</option>
+            </select>
+
+            <label for="patternConfig_1">Pattern JSON</label>
+            <textarea id="patternConfig_1">
+{
+  "length": 16,
+  "voicingType": "close",
+  "octave": 4
+}</textarea
+            >
+          </div>
+
+          <!-- LFO Section -->
+          <div class="lfo-section">
+            <h4>LFOs / Modulation</h4>
+
+            <!-- Example Existing LFO #1 -->
+            <div class="lfo-item">
+              <div class="lfo-controls">
+                <div class="lfo-control-group">
+                  <label for="lfoShape_1">Shape</label>
+                  <select id="lfoShape_1">
+                    <option value="sine">Sine</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="square">Square</option>
+                    <option value="sawUp">Saw Up</option>
+                    <option value="sawDown">Saw Down</option>
+                  </select>
+                </div>
+                <div class="lfo-control-group">
+                  <label for="lfoFreq_1">Frequency (Hz)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    id="lfoFreq_1"
+                    value="0.50"
+                  />
+                </div>
+                <div class="lfo-control-group">
+                  <label for="lfoAmp_1">Amplitude</label>
+                  <input type="number" step="0.01" id="lfoAmp_1" value="1.00" />
+                </div>
+                <div class="lfo-control-group">
+                  <label for="lfoTarget_1">Target Param</label>
+                  <select id="lfoTarget_1">
+                    <option value="filterCutoff" selected>filterCutoff</option>
+                    <option value="resonance">resonance</option>
+                    <option value="dist">dist</option>
+                  </select>
+                </div>
+              </div>
+              <button class="remove-lfo-btn">Remove</button>
+            </div>
+
+            <!-- "Add New LFO" Button -->
+            <button class="addLfoBtn">+ Add New LFO</button>
+          </div>
+        </div>
+
+        <!-- More loop-cards dynamically added -->
+      </div>
+    </main>
+
+    <footer>&copy; 2025 op-xy-live | UI Skeleton</footer>
+  </body>
+</html>

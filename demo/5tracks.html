@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<!-- from https://chatgpt.com/c/67c7b6a4-caa0-8010-98fc-3999f8c47dd6 -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>5-Track Demo with XY Pad</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f9f9f9;
+      }
+      header {
+        background: #333;
+        color: #fff;
+        padding: 10px;
+      }
+      main {
+        padding: 16px;
+      }
+
+      .track-row {
+        background: #fff;
+        border: 1px solid #ccc;
+        margin-bottom: 12px;
+        padding: 12px;
+      }
+      .track-row h2 {
+        margin: 0 0 8px 0;
+      }
+      .xy-container {
+        display: inline-block;
+        margin-right: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>5-Track Demo with XY Pad</h1>
+    </header>
+    <main>
+      <p>
+        This demo sets up 5 tracks (Drums, Bass, Chords, Lead/Arp, and Melody)
+        each with a pattern and optionally an XY pad controlling pattern
+        parameters or LFO/fx. Click "Start" to begin, "Stop" to end. See code
+        for details!
+      </p>
+
+      <button id="startBtn">Start</button>
+      <button id="stopBtn">Stop</button>
+
+      <!-- DRUM TRACK -->
+      <div class="track-row">
+        <h2>Drum Track</h2>
+        <div class="xy-container" id="drumXyContainer"></div>
+      </div>
+
+      <!-- BASS TRACK -->
+      <div class="track-row">
+        <h2>Bass Track</h2>
+        <div class="xy-container" id="bassXyContainer"></div>
+      </div>
+
+      <!-- CHORD TRACK -->
+      <div class="track-row">
+        <h2>Chords Track</h2>
+        <div class="xy-container" id="chordsXyContainer"></div>
+      </div>
+
+      <!-- LEAD/ARP TRACK -->
+      <div class="track-row">
+        <h2>Lead / Arpeggio Track</h2>
+        <div class="xy-container" id="leadXyContainer"></div>
+      </div>
+
+      <!-- MELODY TRACK -->
+      <div class="track-row">
+        <h2>Melody Track</h2>
+        <div class="xy-container" id="melodyXyContainer"></div>
+      </div>
+    </main>
+
+    <!-- The main script. We'll import modules from your library. -->
+    <script type="module">
+      /*********************************************************
+       * 1) IMPORT YOUR LIBRARY CLASSES
+       *********************************************************/
+      import { MidiBus } from "../src/midi-bus.js";
+      import { TransportManager } from "../src/transport/transport-manager.js";
+      import { EnergyManager } from "../src/energy-manager.js"; // if needed
+      import { LiveLoop } from "../src/live-loop.js";
+
+      // Pattern Classes (dummy imports for example)
+      import { DrumPattern } from "../src/patterns/drum-pattern.js";
+      import { SyncopatedBass } from "../src/patterns/syncopated-bass.js";
+      import { ChordPattern } from "../src/patterns/chord-pattern.js";
+      import { ChanceStepArp } from "../src/patterns/chance-step-arp.js";
+      import { ContourMelodyPattern } from "../src/patterns/contour-melody-pattern.js";
+
+      // XYPad class
+      import { XYPad } from "../src/ui/xy-pad.js"; // Adjust path as needed
+
+      /*********************************************************
+       * 2) SETUP MIDI BUS & TRANSPORT
+       *********************************************************/
+      // Create a global or local midiBus
+      const midiBus = new MidiBus();
+      // Optionally, attach to window if you want the XYPad's default reference
+      window.midiBus = midiBus;
+
+      // Create a TransportManager
+      const transport = new TransportManager(midiBus, {
+        liveLoops: [], // we'll add loops dynamically
+        pulsesPerStep: 6,
+      });
+
+      /*********************************************************
+       * 3) CREATE 5 PATTERNS & LIVE LOOPS
+       *********************************************************/
+
+      // 3.1 DRUMS
+      const drumPattern = new DrumPattern({
+        // Medium pattern example:
+        mediumPattern: {
+          kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+          snare: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+          hat: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        },
+        patternLength: 16,
+      });
+      // A LiveLoop using this pattern
+      const drumLoop = new LiveLoop(midiBus, {
+        pattern: drumPattern,
+        midiChannel: 10,
+        name: "Drums",
+      });
+      transport.addLiveLoop(drumLoop); // add to TransportManager
+
+      // 3.2 BASS
+      const bassPattern = new SyncopatedBass({
+        length: 16,
+        octave: 2,
+      });
+      const bassLoop = new LiveLoop(midiBus, {
+        pattern: bassPattern,
+        midiChannel: 2,
+        name: "Bass",
+      });
+      transport.addLiveLoop(bassLoop);
+
+      // 3.3 CHORDS
+      const chordPattern = new ChordPattern({
+        length: 16,
+        voicingType: "close",
+        octave: 4,
+      });
+      const chordLoop = new LiveLoop(midiBus, {
+        pattern: chordPattern,
+        midiChannel: 3,
+        name: "Chords",
+      });
+      transport.addLiveLoop(chordLoop);
+
+      // 3.4 LEAD/ARP
+      const leadArpPattern = new ChanceStepArp({
+        probabilityToAdvance: 70,
+        restProbability: 10,
+      });
+      const leadLoop = new LiveLoop(midiBus, {
+        pattern: leadArpPattern,
+        midiChannel: 4,
+        name: "LeadArp",
+      });
+      transport.addLiveLoop(leadLoop);
+
+      // 3.5 MELODY
+      const melodyPattern = new ContourMelodyPattern({
+        contour: [0, 1, 2, 1, -1],
+        length: 16,
+        allowRests: true,
+        restProbability: 15,
+        spiceProbability: 10,
+      });
+      const melodyLoop = new LiveLoop(midiBus, {
+        pattern: melodyPattern,
+        midiChannel: 5,
+        name: "Melody",
+      });
+      transport.addLiveLoop(melodyLoop);
+
+      /*********************************************************
+       * 4) XY PADS FOR REAL-TIME CONTROL
+       *    We'll create 1 XY pad per track.
+       *********************************************************/
+
+      // == DRUM XY PAD ==
+      // Suppose we want X to control "fillProbability"
+      // and Y to control "swing" (if we coded that in the pattern).
+      // If the DrumPattern doesn't natively have these methods,
+      // we'll do param type "function" for demonstration.
+      const drumXy = new XYPad({
+        container: document.getElementById("drumXyContainer"),
+        width: 150,
+        height: 150,
+        // We'll do an onChange callback to manually handle.
+        // Alternatively paramX / paramY could do direct "pattern" type if you add setFillProbability(...) etc.
+        onChange: (xVal, yVal) => {
+          // xVal,yVal in [0..1]
+          // Example: map xVal to fill probability 0..1
+          // We'll assume we have a method drumPattern.setFillProb(prob).
+          // If not, we can store in the pattern's config or do something else.
+          if (typeof drumPattern.setFillProbability === "function") {
+            drumPattern.setFillProbability(xVal);
+          }
+
+          // yVal => swing 0..1
+          // If your DrumPattern doesn't have a 'setSwing' method,
+          // you might store a property and do the actual logic in getNotes().
+          if (typeof drumPattern.setSwing === "function") {
+            drumPattern.setSwing(yVal);
+          }
+        },
+      });
+
+      // == BASS XY PAD ==
+      // We'll try param-based approach.
+      // Let's assume we added a "setChanceVariation" method to SyncopatedBass
+      // that sets how likely it is to add passing notes.
+      // Y might be controlling an LFO's amplitude (example).
+      import { LFO } from "../src/lfo.js";
+      const bassLfo = new LFO({ frequency: 0.5, amplitude: 0.5 });
+      bassLoop.addLFO(bassLfo); // attach the LFO so it gets updates each step
+
+      const bassXy = new XYPad({
+        container: document.getElementById("bassXyContainer"),
+        width: 150,
+        height: 150,
+
+        paramX: {
+          type: "function",
+          callback: (val) => {
+            // val in [0..1]
+            if (typeof bassPattern.setChanceVariation === "function") {
+              bassPattern.setChanceVariation(val);
+            }
+          },
+          range: [0, 1],
+        },
+        paramY: {
+          type: "lfo",
+          lfo: bassLfo,
+          method: "setAmplitude",
+          range: [0, 1.0],
+        },
+      });
+
+      // == CHORDS XY PAD ==
+      // X => chord voicing from 0=close to 1=spread
+      // Y => reverb send CC example on channel 3
+      // paramX => pattern approach
+      // paramY => cc approach
+      const chordXy = new XYPad({
+        container: document.getElementById("chordsXyContainer"),
+        width: 150,
+        height: 150,
+
+        paramX: {
+          type: "function",
+          callback: (val) => {
+            // range: 0..1
+            // map to "close" if val < 0.5, "spread" if val >= 0.5
+            if (val < 0.5) chordPattern.setVoicingType("close");
+            else chordPattern.setVoicingType("spread");
+          },
+          range: [0, 1],
+        },
+        paramY: {
+          type: "cc",
+          channel: 3,
+          cc: 91, // typical reverb send CC
+          range: [0, 127],
+        },
+      });
+
+      // == LEAD/ARP XY PAD ==
+      // We'll do X => chance for "restProbability"
+      // Y => some CC like pitch bend or modulation
+      // For pitch bend, we might do a "function" approach,
+      // because pitch bend is a special message, not CC.
+      const leadXy = new XYPad({
+        container: document.getElementById("leadXyContainer"),
+        width: 150,
+        height: 150,
+        // We can handle both in onChange for demonstration
+        onChange: (xVal, yVal) => {
+          // xVal => restProb in [0,1], scale to 0..50%?
+          const restProb = xVal * 50;
+          if (typeof leadArpPattern.setRestProbability === "function") {
+            leadArpPattern.setRestProbability(restProb);
+          }
+
+          // yVal => pitch bend: -8192..8191
+          // Let's map 0..1 => -8192..8191
+          const pitchRange = 8192 * 2;
+          const bendVal = Math.floor(-8192 + yVal * pitchRange);
+          midiBus.pitchBend({ channel: 4, value: bendVal });
+        },
+      });
+
+      // == MELODY XY PAD ==
+      // X => "spiceProbability" in [0..100]
+      // Y => transpose in semitones [-12..+12]
+      const melodyXy = new XYPad({
+        container: document.getElementById("melodyXyContainer"),
+        width: 150,
+        height: 150,
+        onChange: (xVal, yVal) => {
+          // xVal => 0..1, map to 0..100
+          const spice = xVal * 100;
+          if (typeof melodyPattern.setSpiceProbability === "function") {
+            melodyPattern.setSpiceProbability(spice);
+          }
+
+          // yVal => 0..1, map to -12..+12
+          const semitone = -12 + Math.floor(yVal * 24);
+          // Suppose we have a setTranspose method
+          if (typeof melodyLoop.setTranspose === "function") {
+            melodyLoop.setTranspose(semitone);
+          }
+        },
+      });
+
+      /*********************************************************
+       * 5) START/STOP BUTTONS
+       *********************************************************/
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+
+      startBtn.addEventListener("click", () => {
+        console.log("Starting transport...");
+        transport._onStart(); // or a more formal method if you have one
+      });
+
+      stopBtn.addEventListener("click", () => {
+        console.log("Stopping transport...");
+        transport._onStop();
+      });
+    </script>
+  </body>
+</html>
