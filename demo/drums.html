@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Drum Editor Demo (External MIDI Clock)</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 1rem;
+        background: #f0f0f0;
+      }
+      h1 {
+        margin-bottom: 0.5rem;
+      }
+      #output {
+        width: 100%;
+        height: 150px;
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 8px;
+        overflow-y: auto;
+        white-space: pre;
+        font-size: 0.9rem;
+        margin-top: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Drum Editor (External MIDI Clock)</h1>
+    <drum-editor id="drumEditor"></drum-editor>
+
+    <h2>Console Output</h2>
+    <div id="output"></div>
+
+    <script type="module">
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        DrumPattern,
+      } from "../src/index.js"; // adjust path if needed
+      import { OpXyDevice } from "../src/devices/op-xy.js";
+      import "../src/ui/drum-pattern-editor.js"; // must contain customElements.define("drum-editor", DrumPatternEditor);
+
+      // Mirror console logs
+      const outputEl = document.getElementById("output");
+      const origLog = console.log;
+      console.log = (...args) => {
+        origLog(...args);
+        outputEl.textContent += args.join(" ") + "\n";
+        outputEl.scrollTop = outputEl.scrollHeight;
+      };
+
+      // Setup MIDI
+      const midiBus = new MidiBus();
+      const realEngine = new RealPlaybackEngine(midiBus);
+
+      let midiAccess = null;
+      async function initMidiIO() {
+        midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // pick first input for external clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length > 0) {
+          const firstInput = inputs[0];
+          console.log("Listening for MIDI clock on:", firstInput.name);
+          firstInput.onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn(
+            "No MIDI inputs found. No external clock will be received."
+          );
+        }
+
+        // pick first output for sending notes
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length > 0) {
+          console.log("Using MIDI output:", outputs[0].name);
+          realEngine.midiOutputs = [outputs[0]];
+        } else {
+          console.warn("No MIDI outputs found. No notes will be sent.");
+        }
+      }
+      await realEngine.init();
+      await initMidiIO();
+
+      // Transport
+      const transport = new TransportManager(midiBus, {
+        liveLoops: [],
+        pulsesPerStep: 6, // 4 steps/quarter @24 PPQN
+      });
+
+      // Our device definition (with a .drumMap)
+      const device = new OpXyDevice();
+
+      // Create a default DRUM pattern so it's never null
+      const initialEmptyPattern = new DrumPattern({
+        mediumPattern: {},
+        patternLength: 16,
+      });
+
+      // Create a drumLoop with that default pattern
+      const drumLoop = new LiveLoop(midiBus, {
+        pattern: initialEmptyPattern,
+        midiChannel: 1,
+        name: "DrumLoop",
+      });
+      transport.addLiveLoop(drumLoop);
+
+      console.log("Drum loop ready.");
+
+      // Hook the <drum-editor> to device + loop
+      const drumEditor = document.getElementById("drumEditor");
+      drumEditor.deviceDefinition = device;
+      drumEditor.liveLoop = drumLoop;
+
+      console.log(
+        "Waiting for external MIDI clock. Press Play on your DAW/hardware."
+      );
+    </script>
+  </body>
+</html>
