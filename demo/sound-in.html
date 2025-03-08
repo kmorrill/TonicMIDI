@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Audio Input Device Recorder</title>
+  </head>
+  <body>
+    <h1>Audio Recorder</h1>
+    <div>
+      <label for="audioSourceSelect">Select Microphone:</label>
+      <select id="audioSourceSelect"></select>
+    </div>
+
+    <button id="startBtn">Start Recording</button>
+    <button id="stopBtn" disabled>Stop Recording</button>
+
+    <h2>Playback</h2>
+    <audio id="playback" controls></audio>
+
+    <script>
+      let mediaRecorder;
+      let recordedChunks = [];
+
+      // 1. List available audio input devices
+      async function listAudioDevices() {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioSelect = document.getElementById("audioSourceSelect");
+
+          devices.forEach((device) => {
+            if (device.kind === "audioinput") {
+              const option = document.createElement("option");
+              option.value = device.deviceId;
+              // Some labels may be empty depending on user permissions and browser
+              option.text =
+                device.label || `Microphone ${audioSelect.length + 1}`;
+              audioSelect.appendChild(option);
+            }
+          });
+        } catch (err) {
+          console.error("Error listing audio devices:", err);
+        }
+      }
+
+      // 2. Start recording from selected device
+      async function startRecording() {
+        recordedChunks = [];
+        const audioSelect = document.getElementById("audioSourceSelect");
+        const deviceId = audioSelect.value;
+
+        try {
+          // Request audio from the chosen device
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              deviceId: deviceId ? { exact: deviceId } : undefined,
+            },
+            video: false,
+          });
+
+          // Create a MediaRecorder instance from the stream
+          mediaRecorder = new MediaRecorder(stream);
+
+          // Gather recorded data as it becomes available
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              recordedChunks.push(event.data);
+            }
+          };
+
+          // When recording stops, create a Blob and set the audio element source to play it back
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: "audio/webm" });
+            const url = URL.createObjectURL(blob);
+            const playback = document.getElementById("playback");
+            playback.src = url;
+            playback.play(); // optional: start playback automatically
+          };
+
+          // Start recording
+          mediaRecorder.start();
+
+          // Toggle button states
+          document.getElementById("startBtn").disabled = true;
+          document.getElementById("stopBtn").disabled = false;
+        } catch (err) {
+          console.error("Error accessing user media:", err);
+        }
+      }
+
+      // 3. Stop recording
+      function stopRecording() {
+        if (mediaRecorder) {
+          mediaRecorder.stop();
+        }
+
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+      }
+
+      // Setup event listeners
+      document
+        .getElementById("startBtn")
+        .addEventListener("click", startRecording);
+      document
+        .getElementById("stopBtn")
+        .addEventListener("click", stopRecording);
+
+      // On page load, list audio devices
+      listAudioDevices();
+    </script>
+  </body>
+</html>
