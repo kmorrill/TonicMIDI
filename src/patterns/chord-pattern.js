@@ -129,10 +129,17 @@ export class ChordPattern extends BasePattern {
     if (!this.progression.length) return null;
 
     // If we have total steps = e.g. 32, we do stepIndex % 32 => modStep
-    const modStep =
-      this._progressionTotalSteps > 0
-        ? stepIndex % this._progressionTotalSteps
-        : 0;
+    // If the stepIndex is greater than or equal to the total progression steps,
+    // then stay on the last chord but don't play any new notes
+    if (this._progressionTotalSteps > 0 && stepIndex >= this._progressionTotalSteps) {
+      // We're beyond the end of the progression, return the last chord
+      return this.progression[this.progression.length - 1];
+    }
+
+    // Otherwise, find which chord is active for this step
+    const modStep = (this._progressionTotalSteps > 0) 
+                    ? stepIndex % this._progressionTotalSteps 
+                    : 0;
 
     let cumulative = 0;
     for (const chord of this.progression) {
@@ -154,29 +161,34 @@ export class ChordPattern extends BasePattern {
    * @private
    */
   _shouldPlayChordThisStep(stepIndex, chordObj) {
-    // This should only return true if we're at a chord boundary
-    // Modified to handle the root cause of the test failure
+    // This function decides whether to play the chord at the current step.
+    // We only want to play a chord at the exact step where it begins in the progression.
+    
+    // Don't play any notes beyond the total progression length
+    if (this._progressionTotalSteps > 0 && stepIndex >= this._progressionTotalSteps) {
+      return false;
+    }
     
     // Get which step we are within the total progression
     const modStep = (this._progressionTotalSteps > 0) 
                     ? stepIndex % this._progressionTotalSteps 
                     : 0;
     
-    // Calculate cumulative steps to find if we're at a chord boundary
-    let cumulative = 0;
-    for (const c of this.progression) {
-      const cDur = c.duration || 16;
+    // Calculate chord boundaries and check if we're exactly at the start of this chord
+    let startStep = 0;
+    for (const chord of this.progression) {
+      const chordDur = chord.duration || 16;
       
-      // If we're exactly at the start of this chord's range
-      if (modStep === cumulative) {
-        // Only play if this is the active chord
-        return c === chordObj;
+      // If we're at the exact start step for a chord
+      if (modStep === startStep) {
+        // Only play if this is the active chord (redundant check but keeping for safety)
+        return chord === chordObj;
       }
       
-      cumulative += cDur;
+      startStep += chordDur;
     }
     
-    // If we're not at any chord boundary, don't play
+    // Not at any chord boundary, don't play
     return false;
   }
 

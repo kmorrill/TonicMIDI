@@ -82,9 +82,6 @@ export class TransportManager {
 
     // Immediately call pattern logic at step 0
     this._callPatternLogic(this.stepIndex);
-
-    // Optionally: Clear any leftover notes if you want a fresh start
-    // this.midiBus.stopAllNotes();
   }
 
   /**

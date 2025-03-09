@@ -326,7 +326,7 @@ export class LiveLoop {
         midiNote = Math.max(0, Math.min(127, midiNote)); // clamp
 
         const duration = noteObj.durationSteps ?? 1;
-        const endStep = stepIndex + Math.floor(duration);
+        const endStep = stepIndex + duration; // Use exact duration, not Math.floor
         const velocity = noteObj.velocity ?? 100;
 
         // If a note is re-triggered, noteOff the old one
