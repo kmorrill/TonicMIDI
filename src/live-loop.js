@@ -91,6 +91,11 @@ export class LiveLoop {
    * @property {number} [cycles=null]
    *   (Optional) If provided, enables "chain mode." This loop's pattern
    *   will repeat for `cycles` times, then end or switch to a chained pattern.
+   * @property {string} [role=null]
+   *   The role of the pattern. Valid roles could be:
+   *   "chordProvider" for the pattern that sets the chord
+   *   "kickProvider" for the pattern that sets the kick
+   *   null (or some other string) for all other patterns
    */
 
   /**
@@ -120,9 +125,7 @@ export class LiveLoop {
    * })
    *   .chainLiveLoop({ pattern: patB, cycles: 4 })
    *   .chainLiveLoop({ pattern: patC, cycles: 1 })
-   *   .onChainComplete(() => {
-   *     console.log("All patterns done!");
-   *   });
+   *   .onChainComplete(() => console.log("All done"));
    * ```
    *
    * @param {object} midiBus
@@ -146,6 +149,7 @@ export class LiveLoop {
       midiOutputId = null,
       // New optional param that triggers chain logic
       cycles = null,
+      role = null,
     } = {}
   ) {
     /** @private */
@@ -217,6 +221,7 @@ export class LiveLoop {
         pattern: this.pattern,
         cycles,
         midiChannel: this.midiChannel,
+        role: role,
       });
       this._currentChainIndex = 0; // we'll start on item[0]
     }
@@ -243,6 +248,7 @@ export class LiveLoop {
    * @param {object} params.pattern  The pattern for this chained segment
    * @param {number} [params.cycles=1] How many times to repeat the pattern
    * @param {number} [params.midiChannel] Optional override of MIDI channel
+   * @param {string} [params.role=null] The role of the pattern
    * @returns {LiveLoop} this
    */
   chainLiveLoop(params = {}) {
@@ -253,6 +259,7 @@ export class LiveLoop {
         pattern: this.pattern,
         cycles: 1,
         midiChannel: this.midiChannel,
+        role: null,
       });
       this._currentChainIndex = 0;
       this._cyclesSoFar = 0;
@@ -262,6 +269,7 @@ export class LiveLoop {
       pattern: params.pattern,
       cycles: typeof params.cycles === "number" ? params.cycles : 1,
       midiChannel: params.midiChannel ?? this.midiChannel,
+      role: params.role,
     });
     return this;
   }

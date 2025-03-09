@@ -40,7 +40,8 @@ import { BasePattern } from "./base-pattern.js";
  * const loop = new LiveLoop(midiBus, {
  *   pattern: drumPattern,
  *   context: { energyManager, rhythmManager },
- *   name: "Drums"
+ *   name: "Drums",
+ *   role: "kickProvider",
  * });
  * ```
  */

@@ -54,6 +54,7 @@ describe("LiveLoop", () => {
       context: {},
       muted: false,
       transpose: 0,
+      role: null,
     });
   });
 
@@ -695,6 +696,7 @@ describe("LiveLoop", () => {
         pattern: chainPatternA,
         midiChannel: 1,
         cycles: 2, // triggers chain mode for patternA
+        role: null,
       });
     });
 
@@ -773,6 +775,7 @@ describe("LiveLoop", () => {
         pattern: dummyPattern,
         midiChannel: 1,
         // no cycles => not in chain mode yet
+        role: null,
       });
 
       // chain items: first is A, second is B

@@ -45,6 +45,7 @@ describe("High-Resolution LFO Updates", () => {
       pattern: patternMock,
       lfos: [lfoMock],
       midiChannel: 1,
+      role: null,
     });
 
     // Create TransportManager with high-resolution option enabled

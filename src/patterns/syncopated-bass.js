@@ -30,7 +30,8 @@ import { RhythmManager } from "../rhythm-manager.js";
  *   pattern: bassPattern,
  *   context: { chordManager },
  *   midiChannel: 2,
- *   name: "Funky Bass"
+ *   name: "Funky Bass",
+ *   role: null,
  * });
  * ```
  */

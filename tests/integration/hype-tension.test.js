@@ -135,6 +135,7 @@ describe("EnergyManager hype + tension integration test", () => {
       },
       midiChannel: 1,
       name: "Chord",
+      role: "chordProvider",
     });
 
     drumLoop = new LiveLoop(midiBus, {
@@ -145,6 +146,7 @@ describe("EnergyManager hype + tension integration test", () => {
       },
       midiChannel: 2,
       name: "Drums",
+      role: "kickProvider",
     });
 
     // 7) Create a CustomEnergyManager

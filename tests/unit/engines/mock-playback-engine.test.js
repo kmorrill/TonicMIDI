@@ -95,7 +95,7 @@ describe("MockPlaybackEngine", () => {
     expect(mockEngine.events[1].type).toBe("controlChange");
     expect(mockEngine.events[2].type).toBe("noteOff");
   });
-  
+
   it("should log LiveLoop noteOff events with proper timing", () => {
     // Create a simple pattern that returns fixed notes
     const patternMock = {
@@ -105,36 +105,37 @@ describe("MockPlaybackEngine", () => {
         }
         return []; // No new notes on other steps
       },
-      getLength: () => 4
+      getLength: () => 4,
     };
-    
+
     // Create a LiveLoop with our pattern
     const liveLoop = new LiveLoop(midiBus, {
       pattern: patternMock,
-      midiChannel: 1
+      midiChannel: 1,
+      role: null,
     });
-    
+
     // Clear any existing events
     mockEngine.clearEvents();
-    
+
     // Step 0: Should trigger a noteOn for C4
     liveLoop.tick(0, 0.25);
     expect(mockEngine.events).toHaveLength(1);
     expect(mockEngine.events[0]).toMatchObject({
       type: "noteOn",
-      data: { channel: 1, note: 60, velocity: 100 } // C4 is MIDI 60
+      data: { channel: 1, note: 60, velocity: 100 }, // C4 is MIDI 60
     });
-    
+
     // Step 1: Nothing should happen yet (duration is 2)
     liveLoop.tick(1, 0.25);
     expect(mockEngine.events).toHaveLength(1); // Still only the noteOn
-    
+
     // Step 2: Should send noteOff for C4 (duration expired)
     liveLoop.tick(2, 0.25);
     expect(mockEngine.events).toHaveLength(2);
     expect(mockEngine.events[1]).toMatchObject({
       type: "noteOff",
-      data: { channel: 1, note: 60 } // noteOff for C4
+      data: { channel: 1, note: 60 }, // noteOff for C4
     });
   });
 });

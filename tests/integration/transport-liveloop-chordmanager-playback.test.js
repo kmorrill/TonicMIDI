@@ -101,6 +101,7 @@ describe("Transport + ChordManager + RhythmManager + Two LiveLoops with varied c
       context: { chordManager, rhythmManager },
       midiChannel: 1,
       name: "ChordLoop",
+      role: "chordProvider",
     });
     //    b) kickLoop on channel 10 (DownbeatKickPattern referencing the rhythmManager)
     kickLoop = new LiveLoop(midiBus, {
@@ -108,6 +109,7 @@ describe("Transport + ChordManager + RhythmManager + Two LiveLoops with varied c
       context: { rhythmManager },
       midiChannel: 10,
       name: "DownbeatKickLoop",
+      role: "kickProvider",
     });
 
     // 7) Create a TransportManager that advances steps every 6 pulses
@@ -169,12 +171,15 @@ describe("Transport + ChordManager + RhythmManager + Two LiveLoops with varied c
     const kickOffEvents = simplified.filter(
       (e) => e.type === "noteOff" && e.channel === 10 && e.note === 36
     );
-    
+
     // Log actual events to help us debug
-    console.log("All kick events with steps:", kickOnEvents.map(e => ({
-      type: e.type,
-      step: e.step
-    })));
+    console.log(
+      "All kick events with steps:",
+      kickOnEvents.map((e) => ({
+        type: e.type,
+        step: e.step,
+      }))
+    );
 
     expect(kickOnEvents.length).toBe(2);
     expect(kickOffEvents.length).toBe(2);
