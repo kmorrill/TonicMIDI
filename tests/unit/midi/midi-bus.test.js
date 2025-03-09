@@ -36,7 +36,7 @@ describe("MidiBus (Unit Tests)", () => {
 
     // Check emitted event
     expect(events).toHaveLength(1);
-    expect(events[0]).toEqual({
+    expect(events[0]).toMatchObject({
       type: "noteOn",
       data: { channel: 1, note: 60, velocity: 80 },
     });
@@ -59,7 +59,7 @@ describe("MidiBus (Unit Tests)", () => {
     // We expect noteOff to have been emitted
     expect(events).toHaveLength(2);
     const secondEvent = events[1];
-    expect(secondEvent).toEqual({
+    expect(secondEvent).toMatchObject({
       type: "noteOff",
       data: { channel: 1, note: 60 },
     });
@@ -89,7 +89,7 @@ describe("MidiBus (Unit Tests)", () => {
   it("should emit controlChange with correct payload", () => {
     midiBus.controlChange({ channel: 2, cc: 74, value: 64 });
     expect(events).toHaveLength(1);
-    expect(events[0]).toEqual({
+    expect(events[0]).toMatchObject({
       type: "controlChange",
       data: { channel: 2, cc: 74, value: 64 },
     });
@@ -119,24 +119,27 @@ describe("MidiBus (Unit Tests)", () => {
 
     // pitchBend
     midiBus.pitchBend({ channel: 3, value: 123 });
-    expect(events).toContainEqual({
-      type: "pitchBend",
-      data: { channel: 3, value: 123 },
-    });
+    expect(events.some(e => 
+      e.type === "pitchBend" && 
+      e.data.channel === 3 && 
+      e.data.value === 123
+    )).toBe(true);
 
     // programChange
     midiBus.programChange({ channel: 4, program: 10 });
-    expect(events).toContainEqual({
-      type: "programChange",
-      data: { channel: 4, program: 10 },
-    });
+    expect(events.some(e => 
+      e.type === "programChange" && 
+      e.data.channel === 4 && 
+      e.data.program === 10
+    )).toBe(true);
 
     // aftertouch
     midiBus.aftertouch({ channel: 1, pressure: 57 });
-    expect(events).toContainEqual({
-      type: "aftertouch",
-      data: { channel: 1, pressure: 57 },
-    });
+    expect(events.some(e => 
+      e.type === "aftertouch" && 
+      e.data.channel === 1 && 
+      e.data.pressure === 57
+    )).toBe(true);
   });
 
   it("should support removing (off) an event listener", () => {

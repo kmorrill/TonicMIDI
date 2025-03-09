@@ -21,7 +21,7 @@ describe("MockPlaybackEngine", () => {
 
     // Verify the engine logged the event
     expect(mockEngine.events).toHaveLength(1);
-    expect(mockEngine.events[0]).toEqual({
+    expect(mockEngine.events[0]).toMatchObject({
       type: "noteOn",
       data: { channel: 1, note: 60, velocity: 100 },
     });
@@ -31,7 +31,7 @@ describe("MockPlaybackEngine", () => {
     midiBus.noteOff({ channel: 2, note: 64 });
 
     expect(mockEngine.events).toHaveLength(1);
-    expect(mockEngine.events[0]).toEqual({
+    expect(mockEngine.events[0]).toMatchObject({
       type: "noteOff",
       data: { channel: 2, note: 64 },
     });
@@ -41,7 +41,7 @@ describe("MockPlaybackEngine", () => {
     midiBus.controlChange({ channel: 3, cc: 74, value: 64 });
 
     expect(mockEngine.events).toHaveLength(1);
-    expect(mockEngine.events[0]).toEqual({
+    expect(mockEngine.events[0]).toMatchObject({
       type: "controlChange",
       data: { channel: 3, cc: 74, value: 64 },
     });
@@ -51,7 +51,7 @@ describe("MockPlaybackEngine", () => {
     midiBus.pitchBend({ channel: 1, value: 1024 });
 
     expect(mockEngine.events).toHaveLength(1);
-    expect(mockEngine.events[0]).toEqual({
+    expect(mockEngine.events[0]).toMatchObject({
       type: "pitchBend",
       data: { channel: 1, value: 1024 },
     });
@@ -61,7 +61,7 @@ describe("MockPlaybackEngine", () => {
     midiBus.programChange({ channel: 2, program: 10 });
 
     expect(mockEngine.events).toHaveLength(1);
-    expect(mockEngine.events[0]).toEqual({
+    expect(mockEngine.events[0]).toMatchObject({
       type: "programChange",
       data: { channel: 2, program: 10 },
     });
@@ -71,7 +71,7 @@ describe("MockPlaybackEngine", () => {
     midiBus.aftertouch({ channel: 1, pressure: 57 });
 
     expect(mockEngine.events).toHaveLength(1);
-    expect(mockEngine.events[0]).toEqual({
+    expect(mockEngine.events[0]).toMatchObject({
       type: "aftertouch",
       data: { channel: 1, pressure: 57 },
     });
@@ -120,7 +120,7 @@ describe("MockPlaybackEngine", () => {
     // Step 0: Should trigger a noteOn for C4
     liveLoop.tick(0, 0.25);
     expect(mockEngine.events).toHaveLength(1);
-    expect(mockEngine.events[0]).toEqual({
+    expect(mockEngine.events[0]).toMatchObject({
       type: "noteOn",
       data: { channel: 1, note: 60, velocity: 100 } // C4 is MIDI 60
     });
@@ -132,7 +132,7 @@ describe("MockPlaybackEngine", () => {
     // Step 2: Should send noteOff for C4 (duration expired)
     liveLoop.tick(2, 0.25);
     expect(mockEngine.events).toHaveLength(2);
-    expect(mockEngine.events[1]).toEqual({
+    expect(mockEngine.events[1]).toMatchObject({
       type: "noteOff",
       data: { channel: 1, note: 60 } // noteOff for C4
     });

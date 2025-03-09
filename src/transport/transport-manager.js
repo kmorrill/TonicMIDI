@@ -194,6 +194,9 @@ export class TransportManager {
     // Pass 0 for deltaTime to match test expectations
     const deltaTime = 0;
 
+    // Set the current step for MIDI events
+    this.midiBus.currentStep = stepIndex;
+
     this.liveLoops.forEach((loop) => {
       loop.tick(stepIndex, deltaTime, this.timeInBeats);
     });

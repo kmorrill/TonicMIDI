@@ -5,6 +5,7 @@
  * - Subscribes to the MIDI Bus for noteOn, noteOff, controlChange, etc.
  * - Logs (stores) each event in an internal array: this.events
  * - Useful for unit tests or debugging, because it doesn't require real MIDI hardware.
+ * - For tests, requires the TransportManager to add step data to the events
  */
 
 export class MockPlaybackEngine {

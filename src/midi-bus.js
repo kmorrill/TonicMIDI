@@ -16,6 +16,7 @@ export class MidiBus {
       pitchBend: [],
       programChange: [],
       aftertouch: [],
+      midiMessage: [],
     };
 
     /**
@@ -24,6 +25,12 @@ export class MidiBus {
      * This helps us ensure that we can turn off all active notes (stopAllNotes) if needed.
      */
     this.activeNotes = new Map();
+    
+    /**
+     * TransportManager can set this to help track which step an event belongs to
+     * Useful for tests that need to validate step timing
+     */
+    this.currentStep = 0;
   }
 
   /**
@@ -72,7 +79,8 @@ export class MidiBus {
     // Record active note
     this.activeNotes.set(key, { channel, note, velocity });
     // Emit event so subscribers (e.g., a playback engine) can handle it.
-    this.emit("noteOn", { channel, note, velocity });
+    // Include the current step for testing/analysis
+    this.emit("noteOn", { channel, note, velocity, step: this.currentStep });
   }
 
   /**
@@ -87,8 +95,8 @@ export class MidiBus {
     if (this.activeNotes.has(key)) {
       this.activeNotes.delete(key);
     }
-    // Emit event
-    this.emit("noteOff", { channel, note });
+    // Emit event with the current step
+    this.emit("noteOff", { channel, note, step: this.currentStep });
   }
 
   /**
