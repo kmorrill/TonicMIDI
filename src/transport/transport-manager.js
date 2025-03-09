@@ -197,9 +197,20 @@ export class TransportManager {
     // Set the current step for MIDI events
     this.midiBus.currentStep = stepIndex;
 
-    this.liveLoops.forEach((loop) => {
-      loop.tick(stepIndex, deltaTime, this.timeInBeats);
-    });
+    // 1) kick provider pattern(s) second
+    this.liveLoops
+      .filter((loop) => loop.role === "kickProvider")
+      .forEach((loop) => loop.tick(stepIndex, 0, this.timeInBeats));
+
+    // 2) chord provider pattern(s) first
+    this.liveLoops
+      .filter((loop) => loop.role === "chordProvider")
+      .forEach((loop) => loop.tick(stepIndex, 0, this.timeInBeats));
+
+    // 3) all others last
+    this.liveLoops
+      .filter((loop) => !loop.role)
+      .forEach((loop) => loop.tick(stepIndex, 0, this.timeInBeats));
   }
 
   /**
