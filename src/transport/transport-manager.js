@@ -27,7 +27,11 @@ export class TransportManager {
     { liveLoops = [], pulsesPerStep = 6, highResolution = false } = {}
   ) {
     this.midiBus = midiBus;
-    this.liveLoops = liveLoops;
+
+    this.liveLoops = [];
+    for (const loop of liveLoops) {
+      this.addLiveLoop(loop);
+    }
 
     this.pulsesPerStep = pulsesPerStep;
     // highResolution is deprecated - we now always update LFOs at high resolution
@@ -197,26 +201,60 @@ export class TransportManager {
     // Set the current step for MIDI events
     this.midiBus.currentStep = stepIndex;
 
+    // Log current step and time information for debugging
+    console.log(`TransportManager: calling patterns for step=${stepIndex}, timeInBeats=${this.timeInBeats.toFixed(3)}`);
+
     // 1) kick provider pattern(s) second
     this.liveLoops
       .filter((loop) => loop.role === "kickProvider")
-      .forEach((loop) => loop.tick(stepIndex, 0, this.timeInBeats));
+      .forEach((loop) => {
+        console.log(`Calling kick provider tick() for ${loop.name}, step=${stepIndex}`);
+        loop.tick(stepIndex, 0, this.timeInBeats);
+      });
 
     // 2) chord provider pattern(s) first
     this.liveLoops
       .filter((loop) => loop.role === "chordProvider")
-      .forEach((loop) => loop.tick(stepIndex, 0, this.timeInBeats));
+      .forEach((loop) => {
+        console.log(`Calling chord provider tick() for ${loop.name}, step=${stepIndex}`);
+        loop.tick(stepIndex, 0, this.timeInBeats);
+      });
 
-    // 3) all others last
+    // 3) all others last (those without a role or with a role that isn't chordProvider/kickProvider)
     this.liveLoops
-      .filter((loop) => !loop.role)
-      .forEach((loop) => loop.tick(stepIndex, 0, this.timeInBeats));
+      .filter((loop) => loop.role !== "chordProvider" && loop.role !== "kickProvider")
+      .forEach((loop) => {
+        console.log(`Calling other tick() for ${loop.name || ""}, step=${stepIndex}`);
+        loop.tick(stepIndex, 0, this.timeInBeats);
+      });
   }
 
   /**
    * If we want to add another LiveLoop after creation
    */
   addLiveLoop(liveLoop) {
+    // Add extra logging to debug
+    console.log(`Adding LiveLoop with role: "${liveLoop.role}"`);
+    
+    // Check for duplicate chord providers or kick providers
+    if (liveLoop.role === "chordProvider") {
+      // Check if we already have a chord provider
+      const existingChordProviders = this.liveLoops.filter(l => l.role === "chordProvider");
+      if (existingChordProviders.length > 0) {
+        console.log(`Attempt to add second chordProvider denied. Existing providers: ${existingChordProviders.length}`);
+        throw new Error("Only one chord provider is allowed");
+      }
+    }
+    
+    if (liveLoop.role === "kickProvider") {
+      // Check if we already have a kick provider
+      const existingKickProviders = this.liveLoops.filter(l => l.role === "kickProvider");
+      if (existingKickProviders.length > 0) {
+        console.log(`Attempt to add second kickProvider denied. Existing providers: ${existingKickProviders.length}`);
+        throw new Error("Only one kick provider is allowed");
+      }
+    }
+
     this.liveLoops.push(liveLoop);
   }
 }

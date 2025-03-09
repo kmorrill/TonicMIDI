@@ -1,10 +1,7 @@
 /**
  * src/chord-manager.js
  *
- * A *simplified* ChordManager that tracks only the current chord
- * (root note + chord notes) for a given beat or step. Exactly one
- * pattern (the “chord provider”) is responsible for calling
- * setCurrentChord() each time the chord changes or each step.
+ * Revised so ONLY the authorized provider can set chords.
  */
 
 export class ChordManager {
@@ -21,17 +18,42 @@ export class ChordManager {
      * @type {string[]}
      */
     this.chordNotes = [];
+
+    /**
+     * Tracks the ID (string or number) of the one pattern/loop
+     * that is allowed to set chords.
+     * @private
+     */
+    this._authorizedProvider = null;
   }
 
   /**
-   * Sets the current chord info for this step.
-   * Typically called by the "chord provider" pattern.
+   * Called typically by TransportManager or some setup code
+   * to designate which pattern/loop is allowed to set chords.
    *
-   * @param {string} rootNote - e.g. "C4" (if you have octaves),
-   *   or "C" (if you prefer just letter names)
-   * @param {string[]} [chordNotes=[]] - e.g. ["C4", "E4", "G4"] or empty if no chord
+   * @param {string|number} providerId
    */
-  setCurrentChord(rootNote, chordNotes = []) {
+  authorizeProvider(providerId) {
+    this._authorizedProvider = providerId;
+  }
+
+  /**
+   * Sets the current chord info for this step IF callerId
+   * matches the authorized provider.
+   *
+   * @param {string|number} callerId - The ID of the pattern/loop calling this.
+   * @param {string} rootNote - e.g. "C4" (if you have octaves),
+   *   or "C" (if you prefer just letter names).
+   * @param {string[]} [chordNotes=[]] - e.g. ["C4", "E4", "G4"] or empty if no chord.
+   */
+  setCurrentChord(callerId, rootNote, chordNotes = []) {
+    if (callerId !== this._authorizedProvider) {
+      console.warn(
+        `ChordManager: Unauthorized provider (${callerId}) tried to set chord. Ignoring.`
+      );
+      return;
+    }
+
     this.rootNote = rootNote;
     this.chordNotes = chordNotes;
   }
@@ -53,10 +75,15 @@ export class ChordManager {
   }
 
   /**
-   * Clears the chord data. Useful if you want to explicitly blank it out
-   * at certain times. This is optional.
+   * Clears the chord data (only the authorized provider can do so).
    */
-  clearChord() {
+  clearChord(callerId) {
+    if (callerId !== this._authorizedProvider) {
+      console.warn(
+        `ChordManager: Unauthorized provider (${callerId}) tried to clear chord. Ignoring.`
+      );
+      return;
+    }
     this.rootNote = null;
     this.chordNotes = [];
   }

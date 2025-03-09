@@ -178,6 +178,9 @@ export class LiveLoop {
 
     /** @type {number} */
     this.transpose = transpose;
+    
+    /** @type {string|null} */
+    this.role = role;
 
     /** @private */
     this.changeQueue = [];

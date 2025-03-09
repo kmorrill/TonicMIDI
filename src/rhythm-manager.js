@@ -8,6 +8,8 @@
  *
  * Exactly one "kick provider" pattern sets `kickThisBeat` each step.
  * Other patterns can read it if they want to coordinate with the kick.
+ *
+ * Now hardened so only the authorized kick provider can set the kick.
  */
 
 export class RhythmManager {
@@ -27,15 +29,12 @@ export class RhythmManager {
   } = {}) {
     /**
      * The user’s "base" steps-per-bar in normal mode.
-     * For example, 16 if you want 16 steps per bar under normal mode.
-     * We'll recalc actual stepsPerBar if we switch to doubleTime or halfTime.
      * @private
      */
     this._baseStepsPerBar = stepsPerBar;
 
     /**
      * The user’s "base" steps-per-beat in normal mode.
-     * We'll recalc actual stepsPerBeat if we switch to doubleTime or halfTime.
      * @private
      */
     this._baseStepsPerBeat = stepsPerBeat;
@@ -47,10 +46,16 @@ export class RhythmManager {
 
     /**
      * A boolean indicating whether the kick is triggered on the current step.
-     * Exactly one "kick provider" pattern calls setKickOnThisBeat(true).
+     * Only the authorized "kick provider" can set this.
      * @private
      */
     this.kickThisBeat = false;
+
+    /**
+     * The ID of the single authorized kick provider.
+     * @private
+     */
+    this._authorizedKickProvider = null;
 
     /**
      * Actual steps per bar/beat/offbeat, recalculated in _updateStepCounts().
@@ -64,11 +69,27 @@ export class RhythmManager {
   }
 
   /**
-   * Sets whether the kick is on for this beat/step.
-   * Called by exactly one pattern (the "kick provider").
+   * Authorizes a single pattern or loop ID to set the kick.
+   * @param {string|number} providerId
+   */
+  authorizeKickProvider(providerId) {
+    this._authorizedKickProvider = providerId;
+  }
+
+  /**
+   * Sets whether the kick is on for this beat/step,
+   * but only if callerId matches the authorized provider.
+   *
+   * @param {string|number} callerId - ID of the loop/pattern attempting to set the kick
    * @param {boolean} isOn
    */
-  setKickOnThisBeat(isOn) {
+  setKickOnThisBeat(callerId, isOn) {
+    if (callerId !== this._authorizedKickProvider) {
+      console.warn(
+        `RhythmManager: Unauthorized call to setKickOnThisBeat() by ${callerId}. Ignoring.`
+      );
+      return;
+    }
     this.kickThisBeat = !!isOn;
   }
 
@@ -183,7 +204,6 @@ export class RhythmManager {
   /**
    * OPTIONAL: Returns an array of accent velocities for each step in the bar,
    * if you want to program dynamic accent patterns.
-   * Adjust or remove if you don't need it.
    * @returns {number[]} An array of length stepsPerBar with accent values
    */
   getAccentPattern() {
