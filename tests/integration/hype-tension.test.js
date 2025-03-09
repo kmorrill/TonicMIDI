@@ -32,9 +32,6 @@ import { ChordPattern } from "../../src/patterns/chord-pattern.js";
 import { DrumPattern as BaseDrumPattern } from "../../src/patterns/drum-pattern.js";
 class DrumPattern extends BaseDrumPattern {
   getNotes(stepIndex, context) {
-    if (context && context.energyState?.hypeLevel === "full") {
-      context.energyState.hypeLevel = "high";
-    }
     return super.getNotes(stepIndex, context);
   }
 }
@@ -134,7 +131,7 @@ describe("EnergyManager hype + tension integration test", () => {
       pattern: chordPattern,
       globalContext,
       context: {
-        energyManager: null // We'll set this after creating the EnergyManager
+        energyManager: null, // We'll set this after creating the EnergyManager
       },
       midiChannel: 1,
       name: "Chord",
@@ -144,7 +141,7 @@ describe("EnergyManager hype + tension integration test", () => {
       pattern: drumPattern,
       globalContext,
       context: {
-        energyManager: null // We'll set this after creating the EnergyManager
+        energyManager: null, // We'll set this after creating the EnergyManager
       },
       midiChannel: 2,
       name: "Drums",
@@ -155,14 +152,14 @@ describe("EnergyManager hype + tension integration test", () => {
       globalContext,
       liveLoops: [chordLoop, drumLoop],
     });
-    
+
     // Now set the energyManager in each LiveLoop's context
     chordLoop.setContext({
-      energyManager: energyManager
+      energyManager: energyManager,
     });
-    
+
     drumLoop.setContext({
-      energyManager: energyManager
+      energyManager: energyManager,
     });
 
     // 8) TransportManager
@@ -227,7 +224,7 @@ describe("EnergyManager hype + tension integration test", () => {
     midiBus.emit("midiMessage", { data: [0xfc] });
     // Then start again (0xFA)
     midiBus.emit("midiMessage", { data: [0xfa] });
-    
+
     // The first step should trigger the chord with step index 0
     // Just 16 steps = 16*6 = 96 pulses
     for (let i = 0; i < 96; i++) {
