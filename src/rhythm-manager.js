@@ -1,189 +1,237 @@
 /**
  * src/rhythm-manager.js
  *
- * The RhythmManager provides information about rhythmic structure and beats.
- * It can identify downbeats, offbeats, and other subdivision points in the step sequence.
- * Patterns can query this manager to create rhythmic elements that are in sync with each other.
+ * A simplified RhythmManager that tracks:
+ *   - The current subdivision ("normal", "doubleTime", "halfTime", etc.).
+ *   - Basic step-per-beat and step-per-bar info.
+ *   - Whether there's a kick on this beat (a single boolean).
+ *
+ * Exactly one "kick provider" pattern sets `kickThisBeat` each step.
+ * Other patterns can read it if they want to coordinate with the kick.
  */
 
 export class RhythmManager {
   /**
    * @param {Object} options
-   * @param {number} [options.stepsPerBar=16] - Number of steps in one bar/measure
-   * @param {number} [options.stepsPerBeat=4] - Number of steps in one beat (quarter note)
-   * @param {string} [options.subdivision="normal"] - Current rhythmic subdivision ("normal", "doubleTime", "halfTime", etc.)
+   * @param {number} [options.stepsPerBar=16]
+   *   Number of sequencer steps in one bar (measure) under "normal" subdivision.
+   * @param {number} [options.stepsPerBeat=4]
+   *   Number of steps per quarter note under "normal" subdivision.
+   * @param {string} [options.subdivision="normal"]
+   *   Which subdivision is active: "normal", "doubleTime", "halfTime", etc.
    */
-  constructor({ stepsPerBar = 16, stepsPerBeat = 4, subdivision = "normal" } = {}) {
-    this.stepsPerBar = stepsPerBar;
-    this.stepsPerBeat = stepsPerBeat;
+  constructor({
+    stepsPerBar = 16,
+    stepsPerBeat = 4,
+    subdivision = "normal",
+  } = {}) {
+    /**
+     * The user’s "base" steps-per-bar in normal mode.
+     * For example, 16 if you want 16 steps per bar under normal mode.
+     * We'll recalc actual stepsPerBar if we switch to doubleTime or halfTime.
+     * @private
+     */
+    this._baseStepsPerBar = stepsPerBar;
+
+    /**
+     * The user’s "base" steps-per-beat in normal mode.
+     * We'll recalc actual stepsPerBeat if we switch to doubleTime or halfTime.
+     * @private
+     */
+    this._baseStepsPerBeat = stepsPerBeat;
+
+    /**
+     * The current subdivision setting: "normal", "doubleTime", "halfTime", etc.
+     */
     this.subdivision = subdivision;
-    
-    // Calculate steps per offbeat based on time signature (assumed 4/4 for simplicity)
+
+    /**
+     * A boolean indicating whether the kick is triggered on the current step.
+     * Exactly one "kick provider" pattern calls setKickOnThisBeat(true).
+     * @private
+     */
+    this.kickThisBeat = false;
+
+    /**
+     * Actual steps per bar/beat/offbeat, recalculated in _updateStepCounts().
+     */
+    this.stepsPerBar = this._baseStepsPerBar;
+    this.stepsPerBeat = this._baseStepsPerBeat;
     this.stepsPerOffbeat = Math.floor(this.stepsPerBeat / 2);
-    
-    // For more complex rhythm patterns, could store accent patterns, etc.
+
+    // Initialize based on the current subdivision
     this._updateStepCounts();
   }
 
   /**
-   * Checks if the given step is a downbeat (first beat of a bar)
-   * 
-   * @param {number} stepIndex - The current step index
-   * @returns {boolean} True if the step is a downbeat
+   * Sets whether the kick is on for this beat/step.
+   * Called by exactly one pattern (the "kick provider").
+   * @param {boolean} isOn
+   */
+  setKickOnThisBeat(isOn) {
+    this.kickThisBeat = !!isOn;
+  }
+
+  /**
+   * Returns true if the kick is on for this beat.
+   * @returns {boolean}
+   */
+  isKickOnThisBeat() {
+    return this.kickThisBeat;
+  }
+
+  /**
+   * Checks if the given step is the downbeat (stepIndex % stepsPerBar === 0).
+   * e.g. in 16-step bars, step 0,16,32,... are downbeats.
+   * @param {number} stepIndex
+   * @returns {boolean}
    */
   isDownbeat(stepIndex) {
     return stepIndex % this.stepsPerBar === 0;
   }
 
   /**
-   * Checks if the given step is a beat (quarter note in 4/4)
-   * 
-   * @param {number} stepIndex - The current step index
-   * @returns {boolean} True if the step is a beat
+   * Checks if the given step is a quarter-note beat (stepIndex % stepsPerBeat === 0).
+   * @param {number} stepIndex
+   * @returns {boolean}
    */
   isBeat(stepIndex) {
     return stepIndex % this.stepsPerBeat === 0;
   }
 
   /**
-   * Checks if the given step is an offbeat (eighth note between beats in 4/4)
-   * 
-   * @param {number} stepIndex - The current step index
-   * @returns {boolean} True if the step is an offbeat
+   * Checks if the given step is an offbeat (e.g., stepIndex % stepsPerBeat === stepsPerOffbeat).
+   * In default 4/4, that's stepIndex % 4 === 2 for offbeats.
+   * @param {number} stepIndex
+   * @returns {boolean}
    */
   isOffbeat(stepIndex) {
     return stepIndex % this.stepsPerBeat === this.stepsPerOffbeat;
   }
 
   /**
-   * Gets the current subdivision of the step
-   * 
-   * @param {number} stepIndex - The current step index
-   * @returns {number} 0 for downbeat, 1 for other beats, 2 for offbeats, 3 for other subdivisions
+   * Returns a small integer describing the position in the subdivision:
+   *   0 => downbeat
+   *   1 => any other beat
+   *   2 => offbeat
+   *   3 => everything else
+   * @param {number} stepIndex
+   * @returns {number} 0..3
    */
   getSubdivision(stepIndex) {
     if (this.isDownbeat(stepIndex)) return 0;
     if (this.isBeat(stepIndex)) return 1;
     if (this.isOffbeat(stepIndex)) return 2;
-    return 3; // Other subdivision
+    return 3;
   }
 
   /**
-   * Returns the current beat number within the bar (1-based)
-   * 
-   * @param {number} stepIndex - The current step index
-   * @returns {number} Beat number (1, 2, 3, 4 in 4/4 time)
+   * Returns the beat number (1-based) within the bar.
+   * For example, if stepsPerBeat=4, stepsPerBar=16,
+   * stepIndex=0..3 => beat#1, stepIndex=4..7 => beat#2, etc.
+   * @param {number} stepIndex
+   * @returns {number}
    */
   getBeatNumber(stepIndex) {
     return Math.floor((stepIndex % this.stepsPerBar) / this.stepsPerBeat) + 1;
   }
 
   /**
-   * Changes the subdivision setting, affecting the rhythm feel
-   * 
-   * @param {string} subdivision - "normal", "doubleTime", "halfTime", etc.
+   * Allows external code (EnergyManager, etc.) to set the subdivision:
+   * "normal", "doubleTime", or "halfTime". Then we recalc stepsPerBar/Beat.
+   *
+   * @param {string} subdivision
    */
   setSubdivision(subdivision) {
-    if (this.subdivision === subdivision) return;
-    
+    if (this.subdivision === subdivision) {
+      // No change
+      return;
+    }
     this.subdivision = subdivision;
     this._updateStepCounts();
   }
 
   /**
-   * Updates step counts based on the current subdivision setting
+   * Internal method to recompute stepsPerBar, stepsPerBeat, stepsPerOffbeat
+   * based on the chosen subdivision.
    * @private
    */
   _updateStepCounts() {
-    const originalStepsPerBar = 16; // Default 16 steps per bar in "normal" mode
-    const originalStepsPerBeat = 4;  // Default 4 steps per beat in "normal" mode
-    
-    switch(this.subdivision) {
+    switch (this.subdivision) {
       case "doubleTime":
-        // Double-time feel - twice as many events in the same time
-        this.stepsPerBar = originalStepsPerBar / 2;
-        this.stepsPerBeat = originalStepsPerBeat / 2;
+        // If base is 16 steps, doubleTime => 32 steps
+        this.stepsPerBar = this._baseStepsPerBar * 2; // e.g. 16 -> 32
+        this.stepsPerBeat = this._baseStepsPerBeat * 2; // e.g. 4 -> 8
         break;
+
       case "halfTime":
-        // Half-time feel - half as many events, more space
-        this.stepsPerBar = originalStepsPerBar * 2;
-        this.stepsPerBeat = originalStepsPerBeat * 2; 
+        // If base is 16 steps, halfTime => 8 steps
+        this.stepsPerBar = Math.floor(this._baseStepsPerBar / 2); // e.g. 16 -> 8
+        this.stepsPerBeat = Math.floor(this._baseStepsPerBeat / 2); // e.g. 4 -> 2
         break;
-      case "triplet":
-        // Triplet feel - 3 subdivisions per beat instead of 2
-        this.stepsPerBar = Math.floor(originalStepsPerBar * (2/3));
-        this.stepsPerBeat = Math.floor(originalStepsPerBeat * (2/3));
-        break;
+
       case "normal":
       default:
-        // Reset to normal timing
-        this.stepsPerBar = originalStepsPerBar;
-        this.stepsPerBeat = originalStepsPerBeat;
+        // Reset to the base
+        this.stepsPerBar = this._baseStepsPerBar; // 16
+        this.stepsPerBeat = this._baseStepsPerBeat; // 4
         break;
     }
-    
-    // Update dependent values
     this.stepsPerOffbeat = Math.floor(this.stepsPerBeat / 2);
   }
-  
+
   /**
-   * Generates an accent pattern for the current rhythmic feel
-   * This could be used by drum patterns to emphasize certain beats
-   * 
-   * @returns {number[]} Array of accent values (0-127) for each step in a bar
+   * OPTIONAL: Returns an array of accent velocities for each step in the bar,
+   * if you want to program dynamic accent patterns.
+   * Adjust or remove if you don't need it.
+   * @returns {number[]} An array of length stepsPerBar with accent values
    */
   getAccentPattern() {
     const accentPattern = new Array(this.stepsPerBar).fill(0);
-    
-    // Set accents based on subdivision type
-    switch(this.subdivision) {
+
+    // Simple example for "normal", "doubleTime", and "halfTime"
+    switch (this.subdivision) {
       case "normal":
-        // Standard 4/4 accent pattern: strong on 1, medium on 3, weak on 2 & 4
-        for (let i = 0; i < this.stepsPerBar; i += this.stepsPerBeat) {
-          if (i === 0) {
-            accentPattern[i] = 120; // Downbeat (beat 1) - strong accent
-          } else if (i === this.stepsPerBeat * 2) {
-            accentPattern[i] = 100; // Beat 3 - medium accent
-          } else {
-            accentPattern[i] = 90;  // Beats 2 & 4 - lighter accent
-          }
-          
-          // Add light accents on offbeats
-          if (i + this.stepsPerOffbeat < this.stepsPerBar) {
-            accentPattern[i + this.stepsPerOffbeat] = 70;
-          }
-        }
-        break;
-        
-      case "doubleTime":
-        // Faster feel with more regular accents
+        // Standard 4/4 approach
         for (let i = 0; i < this.stepsPerBar; i++) {
           if (i % this.stepsPerBeat === 0) {
-            accentPattern[i] = 110; // Every beat gets a strong accent
-          } else if (i % (this.stepsPerBeat/2) === 0) {
-            accentPattern[i] = 90;  // "and" of each beat gets medium accent
-          } else {
-            accentPattern[i] = 70;  // Other subdivisions get light accents
+            if (i === 0) accentPattern[i] = 120; // strong downbeat
+            else if (i === this.stepsPerBeat * 2) accentPattern[i] = 100; // mid
+            else accentPattern[i] = 90;
+          } else if (i % (this.stepsPerBeat / 2) === 0) {
+            accentPattern[i] = 70; // offbeat
           }
         }
         break;
-        
+
+      case "doubleTime":
+        // Twice as many steps in the bar
+        for (let i = 0; i < this.stepsPerBar; i++) {
+          // e.g., step multiple of stepsPerBeat => strong accent
+          if (i % this.stepsPerBeat === 0) {
+            accentPattern[i] = 110;
+          } else if (i % (this.stepsPerBeat / 2) === 0) {
+            accentPattern[i] = 80;
+          }
+        }
+        break;
+
       case "halfTime":
-        // Slower feel with stronger downbeats and less frequent accents
+        // Half as many steps => a slower feel
         for (let i = 0; i < this.stepsPerBar; i++) {
           if (i === 0) {
-            accentPattern[i] = 127; // Very strong downbeat
-          } else if (i % this.stepsPerBar === this.stepsPerBar/2) {
-            accentPattern[i] = 110; // Medium accent on beat 3
+            accentPattern[i] = 127; // super strong downbeat
+          } else if (i === Math.floor(this.stepsPerBar / 2)) {
+            accentPattern[i] = 110; // mid-bar accent
           } else if (i % this.stepsPerBeat === 0) {
-            accentPattern[i] = 90;  // Light accent on other beats
-          } else if (i % (this.stepsPerBeat/2) === 0) {
-            accentPattern[i] = 70;  // Very light accent on offbeats
+            accentPattern[i] = 90;
+          } else if (i % (this.stepsPerBeat / 2) === 0) {
+            accentPattern[i] = 70;
           }
         }
         break;
     }
-    
+
     return accentPattern;
   }
 }

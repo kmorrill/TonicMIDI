@@ -108,10 +108,14 @@ describe("EnergyManager hype + tension integration test", () => {
       rhythmManager,
     });
 
-    // 4) Build a ChordPattern
+    // 4) Build a ChordPattern with the same progression as the ChordManager
     const chordPattern = new ChordPattern({
       length: 16,
       voicingType: "close",
+      progression: [
+        { root: "C", type: "maj", duration: 16 },
+        { root: "C", type: "maj", duration: 16 },
+      ],
     });
 
     // 5) Build a DrumPattern (with an override mapping "full" -> "high")
@@ -129,6 +133,9 @@ describe("EnergyManager hype + tension integration test", () => {
     chordLoop = new LiveLoop(midiBus, {
       pattern: chordPattern,
       globalContext,
+      context: {
+        energyManager: null // We'll set this after creating the EnergyManager
+      },
       midiChannel: 1,
       name: "Chord",
     });
@@ -136,6 +143,9 @@ describe("EnergyManager hype + tension integration test", () => {
     drumLoop = new LiveLoop(midiBus, {
       pattern: drumPattern,
       globalContext,
+      context: {
+        energyManager: null // We'll set this after creating the EnergyManager
+      },
       midiChannel: 2,
       name: "Drums",
     });
@@ -144,6 +154,15 @@ describe("EnergyManager hype + tension integration test", () => {
     energyManager = new CustomEnergyManager({
       globalContext,
       liveLoops: [chordLoop, drumLoop],
+    });
+    
+    // Now set the energyManager in each LiveLoop's context
+    chordLoop.setContext({
+      energyManager: energyManager
+    });
+    
+    drumLoop.setContext({
+      energyManager: energyManager
     });
 
     // 8) TransportManager
@@ -203,7 +222,14 @@ describe("EnergyManager hype + tension integration test", () => {
     mockEngine.clearEvents();
     energyManager.setTensionLevel("high");
 
-    // Another 16 steps => next chord boundary
+    // Reset the transport to make sure we hit a chord boundary
+    // First stop (0xFC), which also resets the step index to 0
+    midiBus.emit("midiMessage", { data: [0xfc] });
+    // Then start again (0xFA)
+    midiBus.emit("midiMessage", { data: [0xfa] });
+    
+    // The first step should trigger the chord with step index 0
+    // Just 16 steps = 16*6 = 96 pulses
     for (let i = 0; i < 96; i++) {
       midiBus.emit("midiMessage", { data: [0xf8] });
     }

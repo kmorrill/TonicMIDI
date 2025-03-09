@@ -1,3 +1,4 @@
+// File: src/patterns/drum-pattern.js
 import { BasePattern } from "./base-pattern.js";
 
 /**
@@ -34,6 +35,13 @@ import { BasePattern } from "./base-pattern.js";
  *   drumMap,
  *   patternLength: 16
  * });
+ *
+ * // In a LiveLoop:
+ * const loop = new LiveLoop(midiBus, {
+ *   pattern: drumPattern,
+ *   context: { energyManager, rhythmManager },
+ *   name: "Drums"
+ * });
  * ```
  */
 export class DrumPattern extends BasePattern {
@@ -69,11 +77,14 @@ export class DrumPattern extends BasePattern {
     this.patternLength = patternLength;
 
     /** @private */
-    this.currentHype = "medium"; // The default "energy" or "intensity" level
+    this.currentHype = "medium"; // The default intensity/hype level
 
     // Generate "low" & "high" from the provided medium pattern
     const { low, medium, high } = this._inferLowAndHighPatterns(mediumPattern);
-    /** @private */
+    /**
+     * @private
+     * patterns.low, patterns.medium, patterns.high
+     */
     this.patterns = { low, medium, high };
   }
 
@@ -94,7 +105,8 @@ export class DrumPattern extends BasePattern {
     for (const drumName in mediumPattern) {
       const medArray = mediumPattern[drumName];
 
-      // "Low" pattern tries to keep strong beats and occasionally keeps others.
+      // "Low" pattern tries to keep strong beats (multiple of 4) if originally a hit,
+      // and occasionally keeps others.
       const lowArray = medArray.map((val, idx) => {
         // Keep if it's a strong beat & originally a hit
         if (idx % 4 === 0 && val === 1) return 1;
@@ -123,42 +135,53 @@ export class DrumPattern extends BasePattern {
   }
 
   /**
-   * **Pattern Interface Method (public)**
-   * Called on each step to retrieve an array of note objects (if any) that
-   * should be played at this step. Typically, the LiveLoop calls this on your
-   * behalf—most users won't call this manually.
-   *
-   * If `context.energyState?.hypeLevel` is provided, that overrides the internal
-   * `currentHype` to switch between "low", "medium", or "high" variants. Otherwise,
-   * `currentHype` stays what it was previously.
+   * Called on each step by the LiveLoop. Determines which variant ("low","medium","high")
+   * to use based on hype level from `energyManager` or from `context.energyState`.
+   * Then returns note objects for any hits on this step. Also, if we see a "kick" drum
+   * hit, we set `rhythmManager.setKickOnThisBeat(true)`.
    *
    * @param {number} stepIndex
-   *   The current step index (0-based), as provided by a LiveLoop or TransportManager.
    * @param {Object} [context]
-   *   A context object that might include `energyState`, e.g. `{ hypeLevel: "high" }`.
+   *   Typically includes { energyManager, rhythmManager }, or possibly { energyState }.
    * @returns {Array<{ note: string, velocity: number, durationSteps: number }>}
-   *   An array of note objects. Each note object includes `note` (e.g. "C3"),
-   *   `velocity` (constant 100 here), and `durationSteps` (always 1 for a single-step hit).
-   *
-   * @private
    */
   getNotes(stepIndex, context) {
-    // Optionally override hype level from context
-    if (context && context.energyState?.hypeLevel) {
-      this.currentHype = context.energyState.hypeLevel;
+    // 1) Possibly override hype level from energyManager or from context.energyState
+    if (context) {
+      // if there's an energyManager with getHypeLevel() method, use it
+      if (
+        context.energyManager &&
+        typeof context.energyManager.getHypeLevel === "function"
+      ) {
+        const managerHype = context.energyManager.getHypeLevel();
+        if (["low", "medium", "high"].includes(managerHype)) {
+          this.currentHype = managerHype;
+        }
+      }
+      // fallback to older pattern: context.energyState?.hypeLevel
+      else if (context.energyState?.hypeLevel) {
+        this.currentHype = context.energyState.hypeLevel;
+      }
     }
 
-    const patternSet = this.patterns[this.currentHype];
-    if (!patternSet) return [];
+    // 2) Retrieve the correct variant (low, medium, or high)
+    const patternSet = this.patterns[this.currentHype] || this.patterns.medium;
 
+    // 3) Within the bar, figure out which step we're on
     const stepInBar = stepIndex % this.patternLength;
-    const hits = [];
 
+    // 4) If we have a rhythmManager, assume no kick this beat by default
+    if (context && context.rhythmManager) {
+      context.rhythmManager.setKickOnThisBeat(false);
+    }
+
+    // 5) Collect hits for this step
+    const hits = [];
     for (const drumName in patternSet) {
       const drumArray = patternSet[drumName];
       if (!drumArray || !Array.isArray(drumArray)) continue;
 
-      // If we have a '1' at the current step, it's a hit.
+      // If there's a '1' at stepInBar, that means a hit
       if (drumArray[stepInBar] === 1) {
         const note = this.drumMap[drumName] || "C3";
         hits.push({
@@ -166,6 +189,11 @@ export class DrumPattern extends BasePattern {
           velocity: 100,
           durationSteps: 1,
         });
+
+        // If this part is "kick", set the rhythmManager's kick flag
+        if (drumName === "kick" && context && context.rhythmManager) {
+          context.rhythmManager.setKickOnThisBeat(true);
+        }
       }
     }
 
@@ -173,24 +201,15 @@ export class DrumPattern extends BasePattern {
   }
 
   /**
-   * **Pattern Interface Method (public)**
-   * Returns the total number of steps this pattern spans before repeating.
-   *
+   * Returns the total number of steps in this pattern’s loop. Usually 16.
    * @returns {number}
-   *   The pattern length. Defaults to 16 if none was specified.
-   *
-   * @private
    */
   getLength() {
     return this.patternLength;
   }
 
   /**
-   * Manually override the hype level for this drum pattern. Typically, you won't
-   * call this directly. An EnergyManager can automatically adjust the pattern's
-   * hype level by including `hypeLevel` in the context (see `getNotes` above).
-   *
-   * @private
+   * Allows manual override of hype level if you’re not using context.energyManager.
    * @param {string} level - "low", "medium", or "high"
    */
   setHypeLevel(level) {

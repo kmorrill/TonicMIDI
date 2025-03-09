@@ -1,376 +1,242 @@
-/**
- * src/patterns/chord-pattern.js
- *
- * A pattern that generates chord notes at chord boundaries, using information
- * from a `ChordManager`. For example, if a chord has `duration=16`, this pattern
- * will output the chord notes when `stepIndex % 16 === 0`, and remain silent
- * on other steps. Each chord’s notes can be fetched directly from `chord.notes`
- * (if provided), or constructed on the fly based on root/type and the desired voicing.
- *
- * **Typical Usage**:
- * ```js
- * import { ChordPattern } from "op-xy-live/patterns/chord-pattern.js";
- *
- * // Suppose you have a ChordManager that provides chord objects:
- * //   { root: "C", type: "maj7", notes: ["C4", "E4", "G4", "B4"], duration: 16 }
- *
- * const chordManager = new ChordManager({
- *   progression: [
- *     { root: "C", type: "maj7", duration: 16 },
- *     { root: "F", type: "min7", duration: 16 },
- *   ],
- *   tensionLevel: "none",
- * });
- *
- * // Create a chord pattern
- * const chordPattern = new ChordPattern({
- *   length: 16,       // internal pattern reference length
- *   voicingType: "close",
- *   octave: 4,
- *   velocityPattern: null,
- * });
- *
- * // Then in your LiveLoop context:
- * const loop = new LiveLoop(midiBus, {
- *   pattern: chordPattern,
- *   context: { chordManager },
- *   midiChannel: 1,
- *   name: "Chords"
- * });
- * ```
- */
+// File: src/patterns/chord-pattern.js
+
 import { BasePattern } from "./base-pattern.js";
 
+/**
+ * A chord provider pattern that cycles through a chord progression,
+ * each chord occupying `chord.duration` steps in a loop.
+ *
+ * On each step, it finds which chord is active, possibly applies tension expansions,
+ * and calls chordManager.setCurrentChord(...) with the new chord notes. It then
+ * returns those notes as an array of { note, velocity, durationSteps } objects.
+ *
+ * If you only want to “hit” the chord at the start of its duration (once per chord),
+ * you can adjust `_shouldPlayChordThisStep()` below. If you prefer to re-trigger each step,
+ * keep it simpler and return the chord on all steps in that chord’s range.
+ */
 export class ChordPattern extends BasePattern {
   /**
-   * Constructs a ChordPattern that looks up chords from the provided `chordManager`
-   * in the pattern's context. It only triggers at the start of each chord's duration
-   * (`stepIndex % chord.duration === 0`). If no `duration` is found on the chord,
-   * we assume 16 steps by default.
+   * @typedef {Object} ChordDescriptor
+   * @property {string} root - e.g. "C"
+   * @property {string} type - e.g. "maj", "min", etc.
+   * @property {number} duration - how many steps this chord lasts
+   * @property {string[]} [notes] - if you want to specify chord notes explicitly
    *
-   * @param {Object} [options={}]
+   * @param {Object} options
+   * @param {ChordDescriptor[]} [options.progression=[]]
+   *   The chord progression. e.g. [
+   *     { root:"C", type:"maj", duration:16 },
+   *     { root:"F", type:"maj", duration:16 },
+   *   ]
    * @param {number} [options.length=16]
-   *   An internal reference length for pattern usage (e.g., for velocity cycling).
-   * @param {string} [options.voicingType="close"]
-   *   Determines how chords are constructed if `chord.notes` is not already populated.
-   *   Possible values: "close", "open", "spread".
-   * @param {number} [options.octave=4]
-   *   The base octave for fallback chord building if `chord.notes` is missing.
-   * @param {number[]} [options.velocityPattern=null]
-   *   An optional array of velocities, one per step in `length`. If provided, we
-   *   use `velocityPattern[stepIndex % patternLength]` when triggering a chord.
-   *   If null, a default pattern is created where step 0 has velocity=120 and
-   *   others=90.
+   *   A “reference” pattern length if needed by the base class. Doesn’t affect chord durations directly.
    */
-  constructor({
-    length = 16,
-    voicingType = "close",
-    octave = 4,
-    velocityPattern = null,
-  } = {}) {
-    super({
-      length,
-      voicingType,
-      octave,
-      velocityPattern,
-    });
+  constructor({ progression = [], ...rest } = {}) {
+    super(rest);
 
     /**
-     * @private
-     * Internal pattern length used for cycling velocity.
+     * The chord progression array. Each chord has:
+     *   { root, type, duration, [notes], ... }
      */
-    this.patternLength = length;
+    this.progression = progression;
 
     /**
-     * @private
-     * Voicing type: "close", "open", or "spread". Affects how chord tones are
-     * spaced when chord.notes is not already set.
+     * Compute total steps in the progression for looping.
+     * e.g. if each chord has duration=16, and we have 2 chords, total=32 steps.
+     * So we do stepIndex % 32 to see where in the progression we are.
      */
-    this.voicingType = voicingType;
-
-    /**
-     * @private
-     * Base octave for fallback chord building.
-     */
-    this.octave = octave;
-
-    /**
-     * @private
-     * Velocity pattern array. If not given, defaults to an array of length `patternLength`,
-     * with the first step=120 and the rest=90.
-     */
-    this.velocityPattern =
-      velocityPattern ||
-      Array(length)
-        .fill(90)
-        .map((v, i) => (i === 0 ? 120 : v));
+    this._progressionTotalSteps = progression.reduce(
+      (sum, chord) => sum + (chord.duration || 16),
+      0
+    );
   }
 
   /**
-   * Determines which notes to output at a given step index, based on `chordManager`.
-   * If the chord’s `duration` is 16 steps and `stepIndex % 16 === 0`, it triggers
-   * the chord. Otherwise, it returns no notes.
-   *
-   * @param {number} stepIndex
-   *   The current step in a sequence. Typically 0-based, incremented by a sequencer or LiveLoop.
-   * @param {Object} context
-   *   The context object, **must** include `chordManager` (and optionally `rhythmManager`).
-   * @returns {Array<{ note: string, velocity: number, durationSteps: number }>}
-   *   An array of note objects (one per chord tone). If the chord is not triggered this step,
-   *   returns an empty array.
-   *
-   * @private
+   * Called each step by the LiveLoop.
+   * We:
+   *   1) find which chord is active
+   *   2) optionally expand chord type for tension=high
+   *   3) build chord notes
+   *   4) set them in chordManager
+   *   5) optionally decide if we re-trigger notes on all steps or just boundary
    */
   getNotes(stepIndex, context) {
-    if (!context || !context.chordManager) {
+    const chordManager = context?.chordManager;
+    if (!chordManager) {
       console.warn(
         "[ChordPattern] No chordManager in context. Returning no notes."
       );
       return [];
     }
 
-    const chord = context.chordManager.getChord(stepIndex);
-    if (!chord) return [];
+    // If we have tension=high or something else from energyManager, read it.
+    const tension = context?.energyManager?.getTensionLevel?.() || 
+                    context?.energyState?.tensionLevel || "none";
 
-    // If chord.duration=16, we only trigger on multiples of 16
-    const chordDuration = chord.duration || 16;
-    if (stepIndex % chordDuration !== 0) {
+    // Identify which chord is active at this step
+    const chordObj = this._findChordForStep(stepIndex);
+    if (!chordObj || !chordObj.root) {
+      console.warn("[ChordPattern] Invalid chord object for step", stepIndex);
       return [];
     }
 
-    // Use our velocityPattern to pick a velocity at this step
-    const velocity = this.velocityPattern[stepIndex % this.patternLength];
-
-    // Build chord notes (either from chord.notes or from root/type)
-    const notes = this._generateChordNotes(chord, velocity);
-
-    return notes;
-  }
-
-  /**
-   * Returns how many steps before this pattern conceptually repeats.
-   * This is used by some sequencers to align pattern boundaries, but
-   * note that actual chord triggering depends primarily on each chord’s
-   * `duration` property.
-   *
-   * @returns {number} The pattern length (defaults to 16 if unspecified).
-   *
-   * @private
-   */
-  getLength() {
-    return this.patternLength;
-  }
-
-  /**
-   * Allows you to change the chord voicing style on the fly. For example, from
-   * "close" to "spread", so newly triggered chords will have a wider spacing.
-   *
-   * @param {string} voicingType
-   *   One of "close", "open", or "spread".
-   */
-  setVoicingType(voicingType) {
-    this.voicingType = voicingType;
-  }
-
-  /**
-   * @private
-   * Generates chord notes based on chord data. If `chord.notes` exists, we use it
-   * directly. Otherwise, we try to build the chord from its root and type.
-   *
-   * @param {Object} chord
-   *   An object which may have { root, type, notes, duration, noteDurations }.
-   * @param {number} velocity
-   *   The velocity to assign to each note, unless overridden by note-level velocity.
-   * @returns {Array<{ note: string, velocity: number, durationSteps: number }>}
-   */
-  _generateChordNotes(chord, velocity) {
-    // If chordManager already generated chord.notes, just wrap them
-    if (chord.notes && chord.notes.length) {
-      return chord.notes.map((noteItem) => {
-        if (typeof noteItem === "string") {
-          return {
-            note: noteItem,
-            velocity,
-            durationSteps: Math.floor(chord.duration || 1),
-          };
-        } else {
-          // e.g., { note: "C4", durationSteps: 3, velocity: 80 }
-          const duration =
-            noteItem.durationSteps ??
-            noteItem.durationStepsOrBeats ??
-            chord.duration ??
-            1;
-          return {
-            note: noteItem.note,
-            velocity: noteItem.velocity || velocity,
-            durationSteps: Math.floor(duration),
-          };
-        }
-      });
+    // Possibly expand chord type if tension=high
+    let finalType = chordObj.type || "maj";
+    if (tension === "high") {
+      finalType = this._applyHighTension(finalType);
     }
 
-    // Otherwise, build chord from root+type using voicing
-    const { root, type } = chord;
-    const intervals = this._getIntervalsForChordType(type);
-    const rootMidi = this._getNoteNumber(root, this.octave);
-
+    // Build chord notes
     let chordNotes;
-    switch (this.voicingType) {
-      case "open":
-        chordNotes = this._createOpenVoicing(rootMidi, intervals);
-        break;
-      case "spread":
-        chordNotes = this._createSpreadVoicing(rootMidi, intervals);
-        break;
-      case "close":
-      default:
-        chordNotes = this._createCloseVoicing(rootMidi, intervals);
-        break;
+    if (chordObj.notes && chordObj.notes.length > 0) {
+      // If chordObj has explicit notes, we can use them directly
+      chordNotes = chordObj.notes;
+    } else {
+      // Otherwise build from root + intervals
+      chordNotes = this._buildChordFromRootAndType(chordObj.root, finalType);
     }
 
-    // If chord.noteDurations exists (mapping either noteName or index to custom durations),
-    // we'll assign them here. Otherwise we fall back to `chord.duration || 1`.
-    const noteDurations = chord.noteDurations || {};
-    const chordDuration = chord.duration || 1;
+    // Set chord in chordManager
+    chordManager.setCurrentChord(
+      chordObj.root + "4", // or parse octaves if you prefer
+      chordNotes
+    );
 
-    return chordNotes.map((midiNote, index) => {
-      const noteName = this._getMidiNoteName(midiNote);
-      const specificDuration =
-        noteDurations[noteName] || noteDurations[index] || chordDuration;
+    // Decide if we want to actually return chord notes on this step
+    // e.g. only on boundary? or every step in chord’s duration?
+    if (!this._shouldPlayChordThisStep(stepIndex, chordObj)) {
+      return [];
+    }
 
-      return {
-        note: noteName,
-        velocity,
-        durationSteps: Math.floor(specificDuration),
-      };
-    });
+    // Return the chord as note objects
+    const velocity = 90; // or vary as needed
+    const durSteps = chordObj.duration || 1;
+    return chordNotes.map((noteName) => ({
+      note: noteName,
+      velocity,
+      durationSteps: durSteps,
+    }));
   }
 
   /**
+   * Finds the chord in progression for the given stepIndex, looping the progression.
+   *
    * @private
-   * Returns a list of semitone intervals for a chord type, e.g. "maj" => [0, 4, 7].
+   * @param {number} stepIndex
+   * @returns {ChordDescriptor} e.g. { root:"C", type:"maj", duration:16, ... }
+   */
+  _findChordForStep(stepIndex) {
+    if (!this.progression.length) return null;
+
+    // If we have total steps = e.g. 32, we do stepIndex % 32 => modStep
+    const modStep =
+      this._progressionTotalSteps > 0
+        ? stepIndex % this._progressionTotalSteps
+        : 0;
+
+    let cumulative = 0;
+    for (const chord of this.progression) {
+      const chordDur = chord.duration || 16;
+      if (modStep >= cumulative && modStep < cumulative + chordDur) {
+        return chord;
+      }
+      cumulative += chordDur;
+    }
+
+    // Fallback if something strange
+    return this.progression[this.progression.length - 1];
+  }
+
+  /**
+   * Example logic: only play chord notes once at the boundary (modStep===cumulative).
+   * If you want to re-trigger every step in chord’s range, return true all the time.
+   *
+   * @private
+   */
+  _shouldPlayChordThisStep(stepIndex, chordObj) {
+    // This should only return true if we're at a chord boundary
+    // Modified to handle the root cause of the test failure
+    
+    // Get which step we are within the total progression
+    const modStep = (this._progressionTotalSteps > 0) 
+                    ? stepIndex % this._progressionTotalSteps 
+                    : 0;
+    
+    // Calculate cumulative steps to find if we're at a chord boundary
+    let cumulative = 0;
+    for (const c of this.progression) {
+      const cDur = c.duration || 16;
+      
+      // If we're exactly at the start of this chord's range
+      if (modStep === cumulative) {
+        // Only play if this is the active chord
+        return c === chordObj;
+      }
+      
+      cumulative += cDur;
+    }
+    
+    // If we're not at any chord boundary, don't play
+    return false;
+  }
+
+  /**
+   * Apply tension expansions for "high" tension. Example:
+   *  - "maj" => "maj7#11"
+   *  - "min" => "min7b5"
+   *
+   * @private
+   * @param {string} type
+   * @returns {string} expanded chord type
+   */
+  _applyHighTension(type) {
+    if (type === "maj") return "maj7#11";
+    // add more if needed
+    return type;
+  }
+
+  /**
+   * Builds chord notes from root e.g. "C" + chordType e.g. "maj7#11".
+   *
+   * @private
+   */
+  _buildChordFromRootAndType(root, chordType) {
+    const intervals = this._getIntervalsForChordType(chordType);
+    const rootMidi = this._rootToMidi(root);
+    return intervals.map((i) => this._midiToNoteName(rootMidi + i));
+  }
+
+  /**
+   * Returns an array of semitone offsets for chord types. For tension expansions, include e.g. "maj7#11": [0,4,7,11,18].
+   * @private
    */
   _getIntervalsForChordType(chordType) {
     const chordIntervals = {
-      // Triads
       maj: [0, 4, 7],
-      min: [0, 3, 7],
-      dim: [0, 3, 6],
-      aug: [0, 4, 8],
-      sus4: [0, 5, 7],
-      sus2: [0, 2, 7],
-
-      // Seventh chords
-      maj7: [0, 4, 7, 11],
-      min7: [0, 3, 7, 10],
-      7: [0, 4, 7, 10],
-      dim7: [0, 3, 6, 9],
-      min7b5: [0, 3, 6, 10],
-      aug7: [0, 4, 8, 10],
-
-      // Extended
-      9: [0, 4, 7, 10, 14],
-      maj9: [0, 4, 7, 11, 14],
-      min9: [0, 3, 7, 10, 14],
-
-      // Tension
-      "7#9": [0, 4, 7, 10, 15],
-      "7b9": [0, 4, 7, 10, 13],
-      "7#11": [0, 4, 7, 10, 18],
       "maj7#11": [0, 4, 7, 11, 18],
-      "maj7#5": [0, 4, 8, 11],
-      min7b9: [0, 3, 7, 10, 13],
-
-      // Added tones
-      maj6: [0, 4, 7, 9],
-      min6: [0, 3, 7, 9],
+      "7": [0, 4, 7, 10], // Dominant 7th chord: 1-3-5-b7
+      // add more as needed
     };
-
-    return chordIntervals[chordType] || chordIntervals.maj;
+    return chordIntervals[chordType] || [0, 4, 7];
   }
 
   /**
+   * Converts root letter -> a MIDI base note. E.g. "C" => 60, "D" => 62, etc.
+   * Extend if you want accidentals or full parsing.
    * @private
-   * Voicing helpers for "close", "open", or "spread".
    */
-  _createCloseVoicing(rootMidi, intervals) {
-    return intervals.map((interval) => rootMidi + interval);
+  _rootToMidi(rootLetter) {
+    // minimal
+    const map = { C: 60, D: 62, E: 64, F: 65, G: 67, A: 69, B: 71 };
+    return map[rootLetter] ?? 60;
   }
 
   /**
+   * Simple MIDI => note name. You can do a more full approach if needed.
    * @private
    */
-  _createOpenVoicing(rootMidi, intervals) {
-    const voicing = [];
-    intervals.forEach((interval, index) => {
-      // For triads, move the 3rd up an octave
-      if (intervals.length <= 3 && index === 1) {
-        voicing.push(rootMidi + interval + 12);
-      } else {
-        voicing.push(rootMidi + interval);
-      }
-    });
-    return voicing;
-  }
-
-  /**
-   * @private
-   */
-  _createSpreadVoicing(rootMidi, intervals) {
-    if (intervals.length <= 3) {
-      // For triads, root in base octave, 3rd an octave above, 5th two octaves above
-      return [
-        rootMidi,
-        rootMidi + intervals[1] + 12,
-        rootMidi + intervals[2] + 24,
-      ];
-    } else {
-      // For 7th chords or more, spread them out in ascending octaves
-      const voicing = [rootMidi];
-      intervals.slice(1).forEach((interval, idx) => {
-        const octaveShift = Math.floor((idx + 1) / 2) * 12;
-        voicing.push(rootMidi + interval + octaveShift);
-      });
-      return voicing;
-    }
-  }
-
-  /**
-   * @private
-   * Simple utility to get a note's MIDI number from root + octave. E.g. "C4" => 60.
-   */
-  _getNoteNumber(noteName, octave) {
-    const noteMap = {
-      C: 0,
-      "C#": 1,
-      Db: 1,
-      D: 2,
-      "D#": 3,
-      Eb: 3,
-      E: 4,
-      F: 5,
-      "F#": 6,
-      Gb: 6,
-      G: 7,
-      "G#": 8,
-      Ab: 8,
-      A: 9,
-      "A#": 10,
-      Bb: 10,
-      B: 11,
-    };
-    const name = noteName.charAt(0).toUpperCase();
-    const accidental = noteName.slice(1); // might be # or b
-    const semitone = noteMap[name + accidental] || 0;
-    return (octave + 1) * 12 + semitone;
-  }
-
-  /**
-   * @private
-   * Simple utility to convert a MIDI number to a note name like "C4".
-   */
-  _getMidiNoteName(midiNote) {
-    const noteNames = [
+  _midiToNoteName(midiVal) {
+    const notes = [
       "C",
       "C#",
       "D",
@@ -384,8 +250,8 @@ export class ChordPattern extends BasePattern {
       "A#",
       "B",
     ];
-    const noteIndex = midiNote % 12;
-    const noteOctave = Math.floor(midiNote / 12) - 1;
-    return noteNames[noteIndex] + noteOctave;
+    const noteIndex = midiVal % 12;
+    const octave = Math.floor(midiVal / 12) - 1;
+    return notes[noteIndex] + octave;
   }
 }

@@ -1,51 +1,73 @@
 /**
  * tests/unit/patterns/chord-pattern.test.js
  *
- * Unit tests for ChordPattern, verifying that it returns notes with durations
+ * Verifies that:
+ *  1) Tension=high transforms "maj" => "maj7#11" (5 notes).
+ *  2) We only return notes on the chord boundary (step=0). Steps 1..3 => [].
  */
 
+import { jest } from "@jest/globals";
 import { ChordPattern } from "../../../src/patterns/chord-pattern.js";
 
-describe("ChordPattern", () => {
-  it("returns notes with durationSteps set to 1", () => {
-    const pattern = new ChordPattern({ length: 4 });
-    
-    // Mock chord manager
-    const mockChordManager = {
-      getChord: function() {
-        return {
-          root: "C",
-          type: "maj",
-          notes: ["C4", "E4", "G4"]
-        };
-      }
+describe("ChordPattern (New System) with tension logic", () => {
+  let mockChordManager;
+
+  beforeEach(() => {
+    // Minimal chord manager that can store setCurrentChord
+    mockChordManager = {
+      setCurrentChord: jest.fn(),
     };
-    
-    // Mock context with chord manager
-    const context = {
-      chordManager: mockChordManager
-    };
-    
-    // Get notes for step 0
-    const notes = pattern.getNotes(0, context);
-    
-    // Verify notes have the expected properties
-    expect(notes).toHaveLength(3);
-    notes.forEach(note => {
-      expect(note).toHaveProperty("durationSteps", 1);
-      expect(note).toHaveProperty("note");
-      expect(note).toHaveProperty("velocity");
-    });
-    
-    // Check specific notes
-    expect(notes[0].note).toBe("C4");
-    expect(notes[1].note).toBe("E4");
-    expect(notes[2].note).toBe("G4");
   });
-  
-  it("returns empty array when no chord manager in context", () => {
-    const pattern = new ChordPattern();
-    const notes = pattern.getNotes(0, {});
+
+  it("calculates chord in all steps but only plays it on chord boundaries", () => {
+    // A single chord in progression => root:"C", type:"maj", duration=4
+    const chordPattern = new ChordPattern({
+      progression: [{ root: "C", type: "maj", duration: 4 }],
+    });
+
+    const mockContext = {
+      chordManager: mockChordManager,
+      energyManager: {
+        getTensionLevel: () => "high", // triggers expansion "maj" => "maj7#11"
+      },
+    };
+
+    // Step=0 => chord boundary => expect the chord to be "C4,E4,G4,B4,F#5"
+    const notesAt0 = chordPattern.getNotes(0, mockContext);
+
+    // Chord manager was set to that 5-note chord
+    expect(mockChordManager.setCurrentChord).toHaveBeenCalledTimes(1);
+    expect(mockChordManager.setCurrentChord).toHaveBeenCalledWith(
+      "C4", // from chordObj.root + "4"
+      ["C4", "E4", "G4", "B4", "F#5"]
+    );
+
+    // Expect 5 notes with duration=4
+    expect(notesAt0).toHaveLength(5);
+    notesAt0.forEach((noteObj) => {
+      expect(noteObj.durationSteps).toBe(4);
+    });
+
+    // Steps 1..3 => no notes because _shouldPlayChordThisStep() only hits boundary
+    mockChordManager.setCurrentChord.mockClear(); // reset call count
+
+    for (let s = 1; s < 4; s++) {
+      const notes = chordPattern.getNotes(s, mockContext);
+      // We expect no notes to be played because we're not at a chord boundary
+      expect(notes).toEqual([]);
+    }
+    
+    // But we do still update the chord manager on each step
+    expect(mockChordManager.setCurrentChord).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns empty array if chordManager is missing from context", () => {
+    const chordPattern = new ChordPattern({
+      progression: [{ root: "C", type: "maj", duration: 4 }],
+    });
+
+    // No chordManager in context
+    const notes = chordPattern.getNotes(0, {});
     expect(notes).toEqual([]);
   });
 });

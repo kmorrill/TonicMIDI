@@ -1,177 +1,86 @@
 /**
  * src/energy-manager.js
  *
- * The EnergyManager is an optional high-level orchestrator that adjusts
- * LiveLoops in real-time to reflect changes in "energy," such as hype or tension.
- * It does not handle transport or MIDI directly—only manipulates loops' patterns,
- * LFO parameters, muting/unmuting, etc.
- *
- * ### Example Usage
- * ```js
- * import { EnergyManager } from "op-xy-live";
- *
- * // Hypothetical loops:
- * //   drumLoop, bassLoop, melodyLoop
- * // These loops might have methods like setPattern, setMuted, etc.
- *
- * // Optional chord and rhythm managers:
- * //   chordManager (for harmonic context),
- * //   rhythmManager (for subdivisions & accent patterns),
- * //   OR a globalContext holding both.
- *
- * const manager = new EnergyManager({
- *   liveLoops: [drumLoop, bassLoop, melodyLoop],
- *   chordManager,
- *   rhythmManager
- * });
- *
- * // Increase activity across loops ("full"), e.g. unmute, busier patterns
- * manager.setHypeLevel("full");
- *
- * // Increase harmonic dissonance or remove root in bass for tension
- * manager.setTensionLevel("high");
- * ```
+ * A hybrid approach:
+ * - The manager does some big-picture changes (e.g. unmuting loops, storing "doubleTime")
+ * - Patterns can read hype/tension from here, plus "currentSubdivision",
+ *   and decide how to interpret that (like playing faster patterns).
  */
+
 export class EnergyManager {
   /**
-   * Constructs a new EnergyManager to control LiveLoops' "energy" and "tension" states.
-   * You can provide references to a chord manager, rhythm manager, or global context
-   * in order to propagate changes automatically (e.g., changing chords or subdivisions).
-   *
    * @param {object} options
-   * @param {Array}  [options.liveLoops=[]]
-   *   Array of LiveLoops that this manager will orchestrate (e.g. drumLoop, bassLoop).
-   * @param {object} [options.chordManager=null]
-   *   A ChordManager for harmonic updates (e.g. tension = "high" -> more dissonant chords).
-   * @param {object} [options.rhythmManager=null]
-   *   A RhythmManager for subdividing beats (e.g. hype = "full" -> double-time).
+   * @param {Array} [options.liveLoops=[]]
+   *   The loops we can directly manipulate (mute/unmute, etc.).
    * @param {object} [options.globalContext=null]
-   *   An optional GlobalContext reference that may hold both chordManager and rhythmManager.
+   *   If you maintain a global context, we can store it. (Optional)
    */
-  constructor({
-    liveLoops = [],
-    chordManager = null,
-    rhythmManager = null,
-    globalContext = null,
-  } = {}) {
-    /**
-     * The LiveLoops that this manager orchestrates.
-     * @type {Array}
-     */
+  constructor({ liveLoops = [], globalContext = null } = {}) {
     this.liveLoops = liveLoops;
-
-    /**
-     * The last-known hype level set by setHypeLevel.
-     * @type {string|null}
-     * @private
-     */
-    this.currentHypeLevel = null;
-
-    /**
-     * The last-known tension level set by setTensionLevel.
-     * @type {string|null}
-     * @private
-     */
-    this.currentTensionLevel = null;
-
-    /**
-     * A ChordManager for harmonic manipulations, if provided.
-     * @type {object|null}
-     * @private
-     */
-    this.chordManager = chordManager;
-
-    /**
-     * A RhythmManager for subdivision manipulations, if provided.
-     * @type {object|null}
-     * @private
-     */
-    this.rhythmManager = rhythmManager;
-
-    /**
-     * An optional GlobalContext that can unify chord and rhythm managers.
-     * @type {object|null}
-     * @private
-     */
     this.globalContext = globalContext;
+
+    // Defaults
+    this.currentHypeLevel = "low";
+    this.currentTensionLevel = "none";
+    this.currentSubdivision = "normal"; // e.g., "normal", "doubleTime", or "halfTime"
+    this.currentArrangementStyle = null;
   }
 
   /**
-   * Sets the "hype" level (e.g., "low", "medium", "full") across all managed LiveLoops.
-   * Use this to dynamically scale the energy or busyness of your arrangement.
-   *
-   * Common behaviors might include:
-   * - "low": Mute certain parts or use simpler patterns
-   * - "medium": Partially active patterns
-   * - "full": Unmute everything, busier rhythms, stronger LFOs, etc.
-   *
-   * If a globalContext or rhythmManager was provided, this method can also
-   * adjust subdivisions accordingly (e.g. halfTime, normal, doubleTime).
+   * Sets the hype level ("low","medium","full", etc.),
+   * does some big changes (unmute loops, etc.), and
+   * sets `this.currentSubdivision` so patterns can see it and interpret double-time or half-time.
    *
    * @param {string} level
-   *   A label for the desired energy state (e.g. "low", "medium", "full").
    */
   setHypeLevel(level) {
     this.currentHypeLevel = level;
-    console.log(`EnergyManager: Setting hype level to "${level}"`);
 
-    // If we have a global context, update it
-    if (this.globalContext) {
-      this.globalContext.setHypeLevel(level);
-    }
-    // Otherwise, if we have a local RhythmManager, adjust subdivisions
-    else if (this.rhythmManager) {
-      switch (level) {
-        case "full":
-          this.rhythmManager.setSubdivision("doubleTime");
-          break;
-        case "medium":
-          this.rhythmManager.setSubdivision("normal");
-          break;
-        case "low":
-          this.rhythmManager.setSubdivision("halfTime");
-          break;
-      }
-    }
-
-    // Example pattern logic. You can customize for your own loops & patterns.
     switch (level) {
-      case "full": {
-        // e.g. unmute all loops, pick busier patterns, intensify LFO
+      case "full":
+        // Example: store "doubleTime" so patterns can see it
+        this.currentSubdivision = "doubleTime";
+
+        // Unmute certain loops (e.g., Drums) and intensify LFO
         this.liveLoops.forEach((loop) => {
           if (loop.name === "Drums") {
             loop.setMuted(false);
-            // loop.setPattern(fullBusyDrumPattern, true);
+            if (loop.lfos && loop.lfos[0]) {
+              loop.lfos[0].setFrequency(2.0);
+              loop.lfos[0].setAmplitude(1.0);
+            }
           }
-          if (loop.lfos && loop.lfos[0]) {
-            loop.lfos[0].setFrequency(2.0);
-            loop.lfos[0].setAmplitude(1.0);
-          }
+          // Possibly unmute or adjust other loops
+          // e.g., loop.setMuted(false) for all
         });
         break;
-      }
 
-      case "medium": {
-        // A moderate setting
+      case "medium":
+        // "medium" => normal subdivision
+        this.currentSubdivision = "normal";
+        // Possibly partially unmute or set moderate patterns
         this.liveLoops.forEach((loop) => {
-          if (loop.name === "Pad") {
+          if (loop.name === "Drums") {
             loop.setMuted(false);
-            // loop.setPattern(mediumPadPattern);
+            // Maybe do lesser LFO freq
+            if (loop.lfos && loop.lfos[0]) {
+              loop.lfos[0].setFrequency(1.0);
+              loop.lfos[0].setAmplitude(0.8);
+            }
           }
         });
         break;
-      }
 
-      case "low": {
-        // Simplify or mute less-critical parts
+      case "low":
+        // "low" => halfTime
+        this.currentSubdivision = "halfTime";
+        // Possibly mute certain loops
         this.liveLoops.forEach((loop) => {
-          if (loop.name !== "Bass") {
+          if (loop.name === "Drums") {
             loop.setMuted(true);
           }
-          // loop.setPattern(sparsePattern, false);
         });
         break;
-      }
 
       default:
         console.warn(
@@ -182,89 +91,20 @@ export class EnergyManager {
   }
 
   /**
-   * Sets the "tension" level (e.g. "none", "low", "mid", "high") across
-   * all managed LiveLoops and optionally updates chord voicings or
-   * omits fundamental notes for dissonance.
-   *
-   * Examples:
-   * - "none": Very stable, e.g. close-voiced triads
-   * - "low": Slight added color tones
-   * - "mid": 7ths or 9ths for moderate tension
-   * - "high": Dissonant intervals, omitted fundamentals, etc.
+   * Sets the tension level. We do NOT push this to chordManager,
+   * but store it for patterns to read if they want dissonance or omit fundamentals, etc.
    *
    * @param {string} level
-   *   The desired tension level ("none", "low", "mid", "high").
    */
   setTensionLevel(level) {
     this.currentTensionLevel = level;
-
-    if (this.globalContext) {
-      this.globalContext.setTensionLevel(level);
-    } else if (this.chordManager) {
-      this.chordManager.setTensionLevel(level);
-    }
-
-    // Example direct loop manipulations:
     switch (level) {
-      case "high": {
-        this.liveLoops.forEach((loop) => {
-          if (loop.name === "Chord") {
-            if (
-              loop.pattern &&
-              typeof loop.pattern.setVoicingType === "function"
-            ) {
-              loop.pattern.setVoicingType("open");
-            }
-          }
-          if (loop.name === "Bass") {
-            loop.setTranspose(7);
-          }
-        });
+      case "none":
+      case "low":
+      case "mid":
+      case "high":
+        // No direct changes here, let patterns decide
         break;
-      }
-
-      case "mid": {
-        this.liveLoops.forEach((loop) => {
-          if (
-            loop.pattern &&
-            typeof loop.pattern.setVoicingType === "function"
-          ) {
-            loop.pattern.setVoicingType("close");
-          }
-          if (loop.name === "Bass") {
-            loop.setTranspose(0);
-          }
-        });
-        break;
-      }
-
-      case "low": {
-        this.liveLoops.forEach((loop) => {
-          if (
-            loop.pattern &&
-            typeof loop.pattern.setVoicingType === "function"
-          ) {
-            loop.pattern.setVoicingType("close");
-          }
-        });
-        break;
-      }
-
-      case "none": {
-        this.liveLoops.forEach((loop) => {
-          if (
-            loop.pattern &&
-            typeof loop.pattern.setVoicingType === "function"
-          ) {
-            loop.pattern.setVoicingType("close");
-          }
-          if (loop.name === "Bass") {
-            loop.setTranspose(0);
-          }
-        });
-        break;
-      }
-
       default:
         console.warn(
           `EnergyManager: Unknown tension level "${level}". No changes made.`
@@ -274,82 +114,66 @@ export class EnergyManager {
   }
 
   /**
-   * Adds a LiveLoop instance so that it can be controlled by this EnergyManager.
+   * Sets a broad arrangement style label (e.g. "wide", "minimal"),
+   * logs or manipulates loops if desired.
    *
+   * @param {string} style
+   */
+  setArrangementStyle(style) {
+    this.currentArrangementStyle = style;
+    console.log(`EnergyManager: Setting arrangement style to "${style}"`);
+
+    // If you want to do something with loops:
+    // e.g. if (style === "wide") { ...some changes... }
+  }
+
+  /**
+   * Getter for hype level
+   * @returns {string}
+   */
+  getHypeLevel() {
+    return this.currentHypeLevel;
+  }
+
+  /**
+   * Getter for tension level
+   * @returns {string}
+   */
+  getTensionLevel() {
+    return this.currentTensionLevel;
+  }
+
+  /**
+   * Getter for arrangement style
+   * @returns {string|null}
+   */
+  getArrangementStyle() {
+    return this.currentArrangementStyle;
+  }
+
+  /**
+   * Getter for current subdivision (e.g. "normal","doubleTime","halfTime"),
+   * which patterns can read if they want to interpret faster or slower patterns.
+   *
+   * @returns {string}
+   */
+  getSubdivision() {
+    return this.currentSubdivision;
+  }
+
+  /**
+   * Add a liveLoop after the manager is constructed
    * @param {object} loop
-   *   The LiveLoop instance to add.
    */
   addLiveLoop(loop) {
     this.liveLoops.push(loop);
   }
 
   /**
-   * Removes a previously added LiveLoop from EnergyManager control.
-   *
+   * Remove a previously added liveLoop
    * @param {object} loop
-   *   The LiveLoop instance to remove.
    */
   removeLiveLoop(loop) {
     this.liveLoops = this.liveLoops.filter((l) => l !== loop);
-  }
-
-  /**
-   * Sets a broad "arrangement style" that can be used to make coarse changes
-   * to LiveLoops. This might force wide chord voicings, bigger reverb sends,
-   * or drastically different patterns. The exact implementation is up to you.
-   *
-   * @param {string} style
-   *   A label for the arrangement style (e.g. "wide", "minimal", etc.).
-   */
-  setArrangementStyle(style) {
-    console.log(`EnergyManager: Setting arrangement style to "${style}"`);
-
-    switch (style) {
-      case "wide":
-        this.liveLoops.forEach((loop) => {
-          if (
-            loop.pattern &&
-            typeof loop.pattern.setVoicingType === "function"
-          ) {
-            loop.pattern.setVoicingType("spread");
-          }
-        });
-        break;
-
-      case "minimal":
-        this.liveLoops.forEach((loop) => {
-          if (
-            loop.pattern &&
-            typeof loop.pattern.setVoicingType === "function"
-          ) {
-            loop.pattern.setVoicingType("close");
-          }
-        });
-        break;
-
-      default:
-        console.warn(`Unknown arrangement style: ${style}`);
-        break;
-    }
-  }
-
-  /**
-   * Updates the ChordManager (either directly or via globalContext) to set
-   * a new chord progression. Any loops that depend on chordManager data
-   * should adapt automatically on their next cycle.
-   *
-   * @param {Array} progression
-   *   An array of chord objects (e.g. [{ root: "C", type: "maj7" }, ...]).
-   */
-  setChordProgression(progression) {
-    if (this.globalContext && this.globalContext.chordManager) {
-      this.globalContext.chordManager.setProgression(progression);
-    } else if (this.chordManager) {
-      this.chordManager.setProgression(progression);
-    } else {
-      console.warn(
-        "EnergyManager: No ChordManager available to set progression"
-      );
-    }
   }
 }
