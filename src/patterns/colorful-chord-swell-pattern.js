@@ -2,25 +2,28 @@
 
 import { BasePattern } from "./base-pattern.js";
 import { Scale, Chord, Note } from "@tonaljs/tonal";
+
 /*
-  The 'progression' submodule can help with diatonic chord naming or 
-  building progressions from scale degrees (I, ii, V, etc.).
+  ColorfulChordSwellPattern
+  -------------------------
+  A robust chord provider pattern that:
+   1) Maps 'color' to a mode (Ionian, Lydian, Aeolian, etc.).
+   2) Builds diatonic chords in that key/mode.
+   3) Randomly picks a progression of 4 chords (with optional tension-based variations).
+   4) Each chord "swells" over multiple steps:
+      - Single noteOn with multi-step duration
+      - Optional Expression CC ramp each step for a volume swell
+   5) Overlap or gap is controlled by `overlap` (positive => overlap, negative => gap).
+   6) chordComplexity => how extended chords are (7,9,13) or added tensions.
+   7) hype => scales velocity, tension => adds more borrowed chords or dissonances
+      (none/low/mid/high).
+   8) This version demonstrates a multi-level tension approach:
+      - none => no borrowed chords, fewer dissonances
+      - low => mild chance of borrowed chords or 7/9 intervals
+      - mid => bigger chance of borrowed chords, more 9/11/b9
+      - high => near-certain borrowed chord & big dissonances (#9, b9, 13).
 */
 
-/**
- * ColorfulChordSwellPattern
- *
- * A robust chord provider pattern that:
- *   1) Maps 'color' to a mode (Ionian, Lydian, Aeolian, etc.).
- *   2) Builds diatonic chords in that key/mode.
- *   3) Randomly picks a progression of 4 chords (with optional tension-based variations).
- *   4) Each chord "swells" over multiple steps:
- *      - Single noteOn with multi-step duration
- *      - Optional Expression CC ramp each step if you want a real volume swell
- *   5) Overlap or gap is controlled by `overlap` (positive => overlap, negative => gap).
- *   6) chordComplexity => how extended chords are (7,9,13) or added tensions.
- *   7) hype => scales velocity, tension => adds dissonances or borrowed chords.
- */
 export class ColorfulChordSwellPattern extends BasePattern {
   /**
    * @typedef {Object} ColorfulChordSwellOptions
@@ -35,6 +38,7 @@ export class ColorfulChordSwellPattern extends BasePattern {
    * @property {Function} [randomFn=Math.random]
    *   Random function for deterministic testing.
    */
+
   constructor({
     color = "warm",
     swellDuration = 16,
@@ -55,7 +59,9 @@ export class ColorfulChordSwellPattern extends BasePattern {
     this.chordComplexity = chordComplexity;
     this.randomFn = randomFn;
 
+    // Internal storage of chord schedule
     this.chordEvents = [];
+
     this._lastSig = "";
     this.lastHype = null;
     this.lastTension = null;
@@ -72,12 +78,13 @@ export class ColorfulChordSwellPattern extends BasePattern {
       chordComplexity
     );
 
-    // Build initial chord events
+    // Build initial chord events (assuming hype=low, tension=none to start)
     this._ensureChordEvents("low", "none");
   }
 
   /**
-   * The repeating length in steps of our chord cycle. Usually the last chord end.
+   * Each pass, we hold chords for 'swellDuration' steps. Then move to the next chord.
+   * So the total length is the endStep of the last chord event.
    */
   getLength() {
     if (!this.chordEvents.length) return 1;
@@ -85,8 +92,8 @@ export class ColorfulChordSwellPattern extends BasePattern {
   }
 
   /**
-   * Called every step by the LiveLoop. We only produce noteOn once at chord start,
-   * with multi-step duration. Optionally, each step we do an Expression CC to emulate “swell.”
+   * Called every step by the LiveLoop. We only produce noteOn once at the chord start,
+   * with multi-step duration. Optionally we do a CC "swell" each step.
    */
   getNotes(stepIndex, context = {}) {
     const hype = context.energyManager?.getHypeLevel?.() || "low";
@@ -98,14 +105,13 @@ export class ColorfulChordSwellPattern extends BasePattern {
     const cycleLen = this.getLength();
     const localStep = stepIndex % cycleLen;
 
-    // find which chord event is active in this step
+    // find which chord event is active
     const ev = this.chordEvents.find(
       (x) => localStep >= x.startStep && localStep < x.endStep
     );
 
     if (!ev) {
-      // gap if overlap < 0
-      // optionally clear chord from chordManager
+      // If there's a gap (e.g. overlap < 0), we might clear chord
       if (context.chordManager) {
         context.chordManager.clearChord(this._getProviderId());
       }
@@ -113,8 +119,10 @@ export class ColorfulChordSwellPattern extends BasePattern {
     }
 
     const chordLength = ev.endStep - ev.startStep;
+
+    // If this is the chord start, do noteOn
     if (localStep === ev.startStep) {
-      // This is chord's start => set chord in chordManager
+      // Post chord to chordManager
       if (context.chordManager) {
         context.chordManager.setCurrentChord(
           this._getProviderId(),
@@ -134,7 +142,6 @@ export class ColorfulChordSwellPattern extends BasePattern {
       );
 
       // Return note objects with multi-step duration
-      // The LiveLoop will do noteOn now + noteOff after chordLength
       return ev.chordNotes.map((noteName) => ({
         note: noteName,
         velocity,
@@ -142,19 +149,13 @@ export class ColorfulChordSwellPattern extends BasePattern {
       }));
     }
 
-    // If not chord start, no new notes.
-    // But we can do an expression CC ramp if you want a “swell” effect:
+    // If not chord start, no new notes. But possibly do a CC swell
     this._sendSwellCC(localStep, ev, hype, context);
-
     return [];
   }
 
-  // ----------------------------------------------------------------
-  // Internal Methods
-  // ----------------------------------------------------------------
-
   /**
-   * Rebuild chordEvents if color, swellDuration, overlap, chordComplexity, hype, or tension changed.
+   * If hype/tension/color/swellDuration/etc. changed, rebuild chordEvents.
    */
   _ensureChordEvents(hype, tension) {
     const sigObj = {
@@ -168,84 +169,114 @@ export class ColorfulChordSwellPattern extends BasePattern {
     const sig = JSON.stringify(sigObj);
 
     if (sig !== this._lastSig) {
+      // Log changes in hype/tension explicitly
+      if (this.lastHype !== hype) {
+        console.log(
+          `[ColorfulChordSwellPattern] Hype changed from ${this.lastHype} to ${hype}.`
+        );
+      }
+      if (this.lastTension !== tension) {
+        console.log(
+          `[ColorfulChordSwellPattern] Tension changed from ${this.lastTension} to ${tension}.`
+        );
+      }
+
       console.log(
-        "[ColorfulChordSwellPattern] Signature changed -> rebuilding chord events."
+        `[ColorfulChordSwellPattern] Rebuilding chord events because something changed:\n`,
+        sigObj
       );
+
       this._lastSig = sig;
       this.lastHype = hype;
       this.lastTension = tension;
+
       this._buildChordEvents(hype, tension);
     }
   }
 
   /**
-   * Build chord events array (like a small progression).
-   * We'll:
-   *   1) Map color => a scale (like Ionian, Lydian, Aeolian, etc.).
-   *   2) Pick a random root from possibleRoots, produce the scale.
-   *   3) Generate diatonic chords from that scale.
-   *   4) Pick a 4-chord progression from those diatonic chords, possibly add a borrowed chord if tension is high.
-   *   5) For each chord, add complexity if chordComplexity is high.
-   *   6) Each chord is `swellDuration` steps, the next chord starts at (start + swellDuration - overlap).
+   * The "heart" of the pattern building. We:
+   *   1) Determine scale from color => mode
+   *   2) Generate a set of diatonic chords
+   *   3) Possibly add borrowed chords if tension is >= low
+   *   4) Build a simple 4-chord progression
+   *   5) Possibly shorten chord durations if tension is high
+   *   6) Log each chord
    */
   _buildChordEvents(hype, tension) {
+    console.log(
+      `[ColorfulChordSwellPattern] _buildChordEvents => hype=${hype}, tension=${tension}`
+    );
+
     this.chordEvents = [];
 
-    // 1) Map color => mode
+    // Step 1) Map color => mode
     const mode = this._mapColorToMode(this.color);
 
-    // 2) Choose a random root
+    // Step 2) Choose a random root note from possibleRoots
     const possibleRoots = ["C", "D", "E", "F", "G", "A", "Bb", "Eb"];
     const root =
       possibleRoots[Math.floor(this.randomFn() * possibleRoots.length)];
-    const scaleName = `${root} ${mode}`; // e.g. "F Lydian"
+    const scaleName = `${root} ${mode}`;
 
     console.log(
-      "[ColorfulChordSwellPattern] _buildChordEvents:",
-      `mode=${mode}, root=${root}, scaleName=${scaleName}, hype=${hype}, tension=${tension}, chordComplexity=${this.chordComplexity}`
+      `\t[ColorfulChordSwellPattern] Using scaleName="${scaleName}" (color=${this.color})`
     );
 
-    // Get scale notes
+    // Attempt to get scale. If fail, fallback to C Ionian
     const scaleData = Scale.get(scaleName);
     if (!scaleData || !scaleData.notes || scaleData.notes.length < 1) {
-      // fallback if scale not recognized
       console.warn(
-        `Could not get scale for ${scaleName}, fallback to C major scale`
+        `\t[ColorfulChordSwellPattern] Could not load scale for ${scaleName}, fallback to C ionian`
       );
       scaleData.notes = Scale.get("C ionian").notes;
     }
 
-    // 3) Build diatonic chord set. For each scale degree, we can do:
+    // Step 3) Build diatonic chord set
     const diatonicChords = this._generateDiatonicChords(scaleData, mode);
 
-    // Possibly do a borrowed chord or secondary if tension is high
-    if (tension === "high") {
-      console.log(
-        "[ColorfulChordSwellPattern] tension='high' => adding borrowed chord"
-      );
-      const borrowed = this._borrowOrSecondaryDominant(
-        scaleData,
-        diatonicChords
-      );
-      if (borrowed) diatonicChords.push(borrowed);
+    // Possibly do borrowed chord if tension >= low (just one example approach)
+    const tFactor = this._tensionFactor(tension);
+
+    if (tFactor >= 1) {
+      // The higher the tension, the bigger the chance of adding a borrowed chord
+      const chanceBorrow = tFactor * 0.3; // none=0 => skip, low=0.3, mid=0.6, high=0.9
+      if (this.randomFn() < chanceBorrow) {
+        console.log(
+          `\t[ColorfulChordSwellPattern] tensionFactor=${tFactor} => adding borrowed chord`
+        );
+        const borrowed = this._borrowOrSecondaryDominant(
+          scaleData,
+          diatonicChords
+        );
+        if (borrowed) diatonicChords.push(borrowed);
+      }
     }
 
-    // 4) Pick a 4-chord progression
-    let chordCount = 4;
+    // Possibly shorten chord duration if tension is extremely high
+    let chordBars = this.swellDuration;
+    if (tFactor === 3) {
+      // For tension=high => shorten by 8 steps but not below 4
+      chordBars = Math.max(4, chordBars - 8);
+      console.log(
+        `\t[ColorfulChordSwellPattern] tension=high => chord length shortened to ${chordBars}`
+      );
+    }
+
+    // Step 4) Pick a 4-chord progression from diatonicChords
+    const chordCount = 4;
     let currentStart = 0;
     for (let i = 0; i < chordCount; i++) {
       const randChord =
         diatonicChords[Math.floor(this.randomFn() * diatonicChords.length)];
-      // e.g. { name: "Cmaj7", root: "C", type: "maj7" }
+      // e.g. { name: "Cmaj7", root: "C" }
 
-      // Build extended chord notes from complexity
-      let chordNotes = this._extendChord(randChord, hype, tension);
+      // Step 5) Extend chord
+      const chordNotes = this._extendChord(randChord, hype, tension);
 
-      // Figure out start/end
+      // Build event
       const chordStart = currentStart;
-      const chordEnd = chordStart + this.swellDuration;
-
-      // rootNote can be the chord's root at octave 4
+      const chordEnd = chordStart + chordBars;
       const rootNote = randChord.root + "4";
 
       this.chordEvents.push({
@@ -256,18 +287,25 @@ export class ColorfulChordSwellPattern extends BasePattern {
       });
 
       console.log(
-        `[ColorfulChordSwellPattern] Chord #${i + 1} =>`,
-        `rootNote=${rootNote}, chordNotes=${chordNotes}, start=${chordStart}, end=${chordEnd}`
+        `\t[ColorfulChordSwellPattern] Chord #${i + 1}: ${randChord.name}, ` +
+          `rootNote=${rootNote}, chordNotes=[${chordNotes.join(", ")}], ` +
+          `start=${chordStart}, end=${chordEnd}`
       );
 
-      currentStart = chordStart + this.swellDuration - this.overlap;
+      currentStart = chordStart + chordBars - this.overlap;
     }
+
+    // Log final chordEvents array
+    console.log(
+      `[ColorfulChordSwellPattern] Final chord progression built with ${this.chordEvents.length} chords.`
+    );
+    this.chordEvents.forEach((ev, idx) => {
+      console.log(`\tChord Event #${idx + 1}:`, ev);
+    });
   }
 
   /**
-   * Map color => a mode for the scale.
-   * Tweak to taste if you want more variety.
-   * e.g. "warm" => "ionian", "bright" => "lydian", "dark" => "aeolian", "mysterious" => "phrygian" or "locrian"
+   * Convert a color (warm, bright, dark, mysterious) into a modal name (ionian, lydian, aeolian, phrygian, etc.)
    */
   _mapColorToMode(color) {
     switch (color) {
@@ -284,23 +322,20 @@ export class ColorfulChordSwellPattern extends BasePattern {
   }
 
   /**
-   * Given a scale (notes & mode), generate the diatonic chords (I..VII).
-   * We’ll do triads or 7th-chords as a base.
+   * Simple helper: parse the scale, get each scale degree, and produce triad or 7th-chord.
    */
   _generateDiatonicChords(scaleData, mode) {
-    const notes = scaleData.notes; // e.g. ["F","G","A","Bb","C","D","E"] if "F Lydian"
+    const notes = scaleData.notes;
     if (notes.length < 7) return [];
 
     const diatonic = [];
     for (let i = 0; i < 7; i++) {
       const root = notes[i];
-      // Let's collect the 1-3-5-7 from scale steps (mod 7).
       const third = notes[(i + 2) % 7];
       const fifth = notes[(i + 4) % 7];
-      const seventh = notes[(i + 6) % 7]; // could do 6 for 7th
+      const seventh = notes[(i + 6) % 7];
 
       const chordPitchSet = [root, third, fifth, seventh].map((n) => n + "4");
-      // Use Tonal to interpret
       const chordData = Chord.detect(chordPitchSet);
 
       let chordName = chordData.length ? chordData[0] : root;
@@ -318,13 +353,12 @@ export class ColorfulChordSwellPattern extends BasePattern {
   }
 
   /**
-   * Possibly insert a borrowed chord or secondary dominant if tension=high.
-   * For example, pick a random chord that’s not strictly diatonic to add spice.
+   * Insert a borrowed chord or secondary dominant. Could scale up with tension.
    */
   _borrowOrSecondaryDominant(scaleData, diatonicChords) {
-    // A simplistic approach: pick a note a 5th above the scale root, build a 7 chord
+    // For example: pick a note a 5th above scale root => build a 7 chord
     const scaleRoot = scaleData.tonic || scaleData.notes[0] || "C";
-    const upFifth = Note.transpose(scaleRoot, "5P"); // e.g. "C" -> "G"
+    const upFifth = Note.transpose(scaleRoot, "5P"); // "C" => "G"
     const chordName = upFifth + "7";
     return {
       name: chordName,
@@ -333,52 +367,93 @@ export class ColorfulChordSwellPattern extends BasePattern {
   }
 
   /**
-   * Extend a base chord according to chordComplexity plus hype/tension.
-   * We'll parse the chord with Tonal, then add intervals (9, 13, #9) if complexity is high.
+   * Extend a chord by tension/hype/complexity. Different expansions for none/low/mid/high tension.
    */
   _extendChord(chordMeta, hype, tension) {
-    const baseChordName = chordMeta.name; // e.g. "Cmaj7"
-    const chordObj = Chord.get(baseChordName);
-    let chordNotes = chordObj.notes;
-    if (!chordNotes.length) {
-      // fallback: just use chord root
-      chordNotes = [chordMeta.root];
-    }
+    const tFactor = this._tensionFactor(tension);
 
-    // 1) convert each note => e.g. "C" => "C4"
+    // parse base chord
+    const baseChordName = chordMeta.name;
+    const chordObj = Chord.get(baseChordName);
+    let chordNotes = chordObj.notes.length ? chordObj.notes : [chordMeta.root];
+
+    // map them to octave "4"
     chordNotes = chordNotes.map((n) => n + "4");
 
-    // 2) If chordComplexity is 0.7 or higher, add 9 or 13
+    // Step 1) base extension from chordComplexity => add "9" or "13" sometimes
     const extProb = this.chordComplexity * 100;
     if (this.randomFn() * 100 < extProb) {
       const addInterval = this.randomFn() < 0.5 ? "9" : "13";
       chordNotes = this._addInterval(chordNotes, addInterval);
     }
 
-    // 3) If tension = "high", maybe add a #9 or b9
-    if (tension === "high") {
-      chordNotes = this._addInterval(
-        chordNotes,
-        this.randomFn() < 0.5 ? "#9" : "b9"
-      );
+    // Step 2) Additional tension expansions by level
+    switch (tFactor) {
+      case 1: // low tension
+        // maybe 30% chance to add a '7' or '9'
+        if (this.randomFn() < 0.3) {
+          const interval = this.randomFn() < 0.5 ? "7" : "9";
+          chordNotes = this._addInterval(chordNotes, interval);
+        }
+        break;
+      case 2: // mid tension
+        // maybe 40% chance to add '9' or '11'
+        if (this.randomFn() < 0.4) {
+          const interval = this.randomFn() < 0.5 ? "11" : "9";
+          chordNotes = this._addInterval(chordNotes, interval);
+        }
+        // maybe 25% chance to also add b9
+        if (this.randomFn() < 0.25) {
+          chordNotes = this._addInterval(chordNotes, "b9");
+        }
+        break;
+      case 3: // high tension
+        // existing approach => #9 or b9
+        chordNotes = this._addInterval(
+          chordNotes,
+          this.randomFn() < 0.5 ? "#9" : "b9"
+        );
+        // maybe also add a '13'
+        if (this.randomFn() < 0.5) {
+          chordNotes = this._addInterval(chordNotes, "13");
+        }
+        break;
+      default:
+        // tension=none => do nothing extra
+        break;
     }
 
-    // 4) If hype is high, we might do bigger voicings or spread out
+    // If hype is high, we spread voicings
     if (this._hypeFactor(hype) > 1.2) {
       console.log(
-        `[ColorfulChordSwellPattern] hype is high, spreading voicing for chord: ${baseChordName}`
+        `[ColorfulChordSwellPattern] hype is high => spreading voicing for chord: ${baseChordName}`
       );
       chordNotes = this._spreadVoicing(chordNotes, 1);
     }
 
     // remove duplicates
     chordNotes = [...new Set(chordNotes)];
-
     return chordNotes;
   }
 
   /**
-   * Add an interval (9,13,b9,#9, etc.) to existing chord notes.
+   * For tension => returns 0..3. e.g. none=0, low=1, mid=2, high=3
+   */
+  _tensionFactor(tension) {
+    switch (tension) {
+      case "low":
+        return 1;
+      case "mid":
+        return 2;
+      case "high":
+        return 3;
+      default:
+        return 0; // "none"
+    }
+  }
+
+  /**
+   * Add an interval (9, 13, b9, #9, 11, 7) to chordNotes. If rootNote is the 0th, we transpose root.
    */
   _addInterval(chordNotes, interval) {
     if (!chordNotes.length) return chordNotes;
@@ -391,20 +466,22 @@ export class ColorfulChordSwellPattern extends BasePattern {
   }
 
   /**
-   * Spread voicing by shifting one or two notes an octave up
+   * Spread voicing by shifting one or two top notes an octave up.
    */
   _spreadVoicing(chordNotes, noteCountToShift = 1) {
     let result = [...chordNotes];
     for (let i = 0; i < noteCountToShift && i < result.length; i++) {
       const index = result.length - 1 - i;
       const newNote = Note.transpose(result[index], "8P");
-      if (newNote) result[index] = newNote;
+      if (newNote) {
+        result[index] = newNote;
+      }
     }
     return result;
   }
 
   /**
-   * Return a hype factor: "low" => 1.0, "medium" => 1.2, "high" => 1.5, etc.
+   * The hype factor is unchanged from earlier code: "low"=1.0, "medium"=1.2, "high"=1.5
    */
   _hypeFactor(hype) {
     let factor;
@@ -426,8 +503,9 @@ export class ColorfulChordSwellPattern extends BasePattern {
   }
 
   /**
-   * Attempts to find a suitable CC param from deviceDefinition’s standard CC.
-   * If we don't find 'trackVolume' (or anything suitable), fallback to CC #11.
+   * If we want to do a dynamic Expression CC fade in/out, we do it here each step.
+   *   - symmetrical fade in/out over chord duration
+   *   - scaled by hype factor
    */
   _sendSwellCC(localStep, chordEvent, hype, context) {
     const { midiBus, deviceDefinition } = context;
@@ -437,7 +515,6 @@ export class ColorfulChordSwellPattern extends BasePattern {
     const stepInto = localStep - chordEvent.startStep;
     if (stepInto < 0 || stepInto >= chordLen) return;
 
-    // symmetrical fade in/out
     const half = chordLen / 2;
     let fraction;
     if (stepInto < half) {
@@ -451,6 +528,7 @@ export class ColorfulChordSwellPattern extends BasePattern {
     if (ccVal > 127) ccVal = 127;
     if (ccVal < 0) ccVal = 0;
 
+    // see if deviceDefinition has a "trackVolume" CC
     let ccParam = null;
     if (deviceDefinition) {
       const candidate = deviceDefinition.getCC("trackVolume");
@@ -459,17 +537,18 @@ export class ColorfulChordSwellPattern extends BasePattern {
       }
     }
 
+    // fallback is CC #11
     const finalCc = ccParam !== null ? ccParam : 11;
 
     midiBus.controlChange({
-      channel: 1,
+      channel: 1, // or whichever channel you prefer
       cc: finalCc,
       value: ccVal,
     });
   }
 
   /**
-   * The ID used when calling chordManager
+   * The ID used when calling chordManager (so it knows who sets the chord).
    */
   _getProviderId() {
     return "ColorfulChordSwellPattern";
