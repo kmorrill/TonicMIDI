@@ -19,6 +19,8 @@ export * from "./patterns/chord-pattern.js";
 export * from "./patterns/explicit-note-pattern.js";
 export * from "./patterns/contour-melody-pattern.js";
 export * from "./patterns/chord-pattern.js";
+export * from "./patterns/colorful-chord-swell-pattern.js";
+export * from "./patterns/evolving-locked-drum-pattern.js";
 
 // Exporting LFO module
 export { LFO } from "./lfo.js";

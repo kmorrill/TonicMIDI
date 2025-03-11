@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Colorful Chord Swell + Evolving Drum Demo</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 1rem;
+        background: #f0f0f0;
+      }
+      h1 {
+        margin-bottom: 0.5rem;
+      }
+      fieldset {
+        margin-bottom: 1rem;
+        border: 1px solid #ccc;
+        padding: 1rem;
+      }
+      label {
+        display: inline-block;
+        width: 150px;
+        font-weight: 600;
+      }
+      select,
+      input[type="number"],
+      input[type="range"],
+      button {
+        margin: 0.2rem 0;
+      }
+      #output {
+        width: 100%;
+        height: 200px;
+        background: #fff;
+        border: 1px solid #ccc;
+        padding: 8px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        font-size: 0.9rem;
+        margin-top: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ColorfulChordSwell & EvolvingLockedDrum Demo</h1>
+    <p>
+      <strong>Note:</strong> This demo uses an <em>external MIDI clock</em>.
+      Press <strong>Play</strong> on your DAW or hardware to start. Make sure
+      you have a MIDI input device providing clock to your browser.
+    </p>
+
+    <!-- PATTERN CONFIG FORM -->
+    <fieldset>
+      <legend>Chord Swell Pattern</legend>
+      <label for="colorSelect">Color:</label>
+      <select id="colorSelect">
+        <option value="warm" selected>Warm</option>
+        <option value="bright">Bright</option>
+        <option value="dark">Dark</option>
+        <option value="mysterious">Mysterious</option>
+      </select>
+      <br />
+
+      <label for="swellDuration">swellDuration:</label>
+      <input type="number" id="swellDuration" min="1" max="64" value="16" />
+      <br />
+
+      <label for="overlap">overlap:</label>
+      <input type="number" id="overlap" min="-8" max="8" value="2" />
+      <br />
+
+      <label for="chordComplexity">chordComplexity (0..1):</label>
+      <input
+        type="range"
+        id="chordComplexity"
+        min="0"
+        max="1"
+        step="0.1"
+        value="0.5"
+      />
+      <br />
+
+      <button id="updateChordBtn">Update Chord Pattern</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Evolving Drum Pattern</legend>
+      <label for="drumIntensity">drumIntensity (0..1):</label>
+      <input
+        type="range"
+        id="drumIntensity"
+        min="0"
+        max="1"
+        step="0.1"
+        value="0.5"
+      />
+      <br />
+
+      <label for="flavorSelect">flavor:</label>
+      <select id="flavorSelect">
+        <option value="ambient" selected>ambient</option>
+        <option value="tribal">tribal</option>
+        <option value="electronic">electronic</option>
+        <option value="lofi">lofi</option>
+      </select>
+      <br />
+
+      <button id="updateDrumsBtn">Update Drum Pattern</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Energy Manager Controls</legend>
+      <div>
+        <button data-hype="low">Set Hype: LOW</button>
+        <button data-hype="medium">Set Hype: MEDIUM</button>
+        <button data-hype="high">Set Hype: HIGH</button>
+      </div>
+      <div style="margin-top: 0.5rem">
+        <button data-tension="none">Set Tension: NONE</button>
+        <button data-tension="low">Set Tension: LOW</button>
+        <button data-tension="mid">Set Tension: MID</button>
+        <button data-tension="high">Set Tension: HIGH</button>
+      </div>
+    </fieldset>
+
+    <h2>Console Output</h2>
+    <div id="output"></div>
+
+    <!-- MAIN SCRIPT -->
+    <script type="module">
+      /********************************************************
+       * Import from your library. Paths may differ in your setup.
+       ********************************************************/
+      import {
+        MidiBus,
+        RealPlaybackEngine,
+        TransportManager,
+        LiveLoop,
+        EnergyManager,
+        GlobalContext,
+        ChordManager,
+        // Patterns
+        ColorfulChordSwellPattern,
+        EvolvingLockedDrumPattern,
+      } from "../src/index.js";
+
+      /********************************************************
+       * UTILITY: Mirror console logs to #output
+       ********************************************************/
+      const outputEl = document.getElementById("output");
+      const origLog = console.log;
+      console.log = (...args) => {
+        origLog(...args);
+        outputEl.textContent += args.join(" ") + "\n";
+        outputEl.scrollTop = outputEl.scrollHeight;
+      };
+
+      /********************************************************
+       * STEP 1: Setup MIDI I/O
+       ********************************************************/
+      const midiBus = new MidiBus();
+      const playbackEngine = new RealPlaybackEngine(midiBus);
+
+      async function initMidiIO() {
+        // 1) Wait for MIDI access
+        const midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+
+        // 2) Hook the first MIDI input for external clock
+        const inputs = Array.from(midiAccess.inputs.values());
+        if (inputs.length > 0) {
+          console.log("Using external MIDI clock from:", inputs[0].name);
+          inputs[0].onmidimessage = (evt) => {
+            midiBus.emit("midiMessage", { data: evt.data });
+          };
+        } else {
+          console.warn("No MIDI inputs found -> no external clock.");
+        }
+
+        // 3) Hook the first MIDI output for actual note output
+        const outputs = Array.from(midiAccess.outputs.values());
+        if (outputs.length > 0) {
+          console.log("Sending MIDI to:", outputs[0].name);
+          playbackEngine.midiOutputs = [outputs[0]];
+        } else {
+          console.warn("No MIDI outputs found -> cannot send notes!");
+        }
+      }
+
+      // Init the real engine
+      await playbackEngine.init();
+      await initMidiIO();
+
+      /********************************************************
+       * STEP 2: Setup Transport + EnergyManager
+       * By default, pulsesPerStep=6 => 4 steps per quarter note @ 24 PPQN
+       ********************************************************/
+      const transport = new TransportManager(midiBus, {
+        pulsesPerStep: 6,
+      });
+
+      // We'll have an energyManager, so we can set hype/tension from UI
+      const energyManager = new EnergyManager();
+
+      // Also a globalContext with a chordManager, if desired
+      const chordManager = new ChordManager();
+      chordManager.authorizeProvider("ColorfulChordSwellPattern"); // so it can set chords
+      const globalContext = new GlobalContext({
+        chordManager,
+        // Provide your own RhythmManager if you want; for simplicity we omit here
+        // or do: rhythmManager: new RhythmManager(),
+      });
+
+      // Let the energyManager know about these loops so it can unmute if needed
+      energyManager.globalContext = globalContext;
+
+      /********************************************************
+       * STEP 3: Create the Patterns and LiveLoops
+       ********************************************************/
+
+      // 3a) Chord Provider: "ColorfulChordSwellPattern"
+      let chordPattern = new ColorfulChordSwellPattern({
+        color: "warm",
+        swellDuration: 16,
+        overlap: 2,
+        chordComplexity: 0.5,
+      });
+
+      const chordLoop = new LiveLoop(midiBus, {
+        pattern: chordPattern,
+        midiChannel: 8,
+        name: "ColorfulChordLoop",
+        role: "chordProvider", // so it sets chord data on chordManager
+        globalContext: globalContext,
+      });
+      // The pattern calls chordManager.setCurrentChord("ColorfulChordSwellPattern", root, notes)
+
+      // 3b) Drum Provider: "EvolvingLockedDrumPattern"
+      let drumPattern = new EvolvingLockedDrumPattern({
+        patternLength: 16,
+        drumIntensity: 0.5,
+        flavor: "ambient",
+      });
+      const drumLoop = new LiveLoop(midiBus, {
+        pattern: drumPattern,
+        midiChannel: 1,
+        name: "EvolvingDrums",
+        role: "kickProvider", // so it can provide a main kick
+        globalContext: globalContext,
+      });
+
+      // Add both loops to the Transport
+      transport.addLiveLoop(chordLoop);
+      transport.addLiveLoop(drumLoop);
+
+      console.log(
+        "Ready! Press Play in your DAW/hardware to start external clock..."
+      );
+
+      /********************************************************
+       * STEP 4: Hook up the UI controls
+       ********************************************************/
+
+      // -- CHORD PATTERN CONFIG --
+      const colorSelect = document.getElementById("colorSelect");
+      const swellDurationInput = document.getElementById("swellDuration");
+      const overlapInput = document.getElementById("overlap");
+      const chordComplexityInput = document.getElementById("chordComplexity");
+      document
+        .getElementById("updateChordBtn")
+        .addEventListener("click", () => {
+          const newColor = colorSelect.value;
+          const newSwellDuration = parseInt(swellDurationInput.value, 10) || 16;
+          const newOverlap = parseInt(overlapInput.value, 10) || 0;
+          const newComplex = parseFloat(chordComplexityInput.value) || 0.5;
+
+          chordPattern = new ColorfulChordSwellPattern({
+            color: newColor,
+            swellDuration: newSwellDuration,
+            overlap: newOverlap,
+            chordComplexity: newComplex,
+          });
+          chordLoop.setPattern(chordPattern, true); // immediate
+          console.log(
+            "Updated ChordSwellPattern => color=",
+            newColor,
+            "swellDuration=",
+            newSwellDuration,
+            "overlap=",
+            newOverlap,
+            "chordComplexity=",
+            newComplex
+          );
+        });
+
+      // -- DRUM PATTERN CONFIG --
+      const drumIntensityRange = document.getElementById("drumIntensity");
+      const flavorSelect = document.getElementById("flavorSelect");
+      document
+        .getElementById("updateDrumsBtn")
+        .addEventListener("click", () => {
+          const newIntensity = parseFloat(drumIntensityRange.value);
+          const newFlavor = flavorSelect.value;
+
+          drumPattern = new EvolvingLockedDrumPattern({
+            patternLength: 16,
+            drumIntensity: newIntensity,
+            flavor: newFlavor,
+          });
+          drumLoop.setPattern(drumPattern, true); // immediate
+          console.log(
+            "Updated EvolvingLockedDrumPattern => intensity=",
+            newIntensity,
+            "flavor=",
+            newFlavor
+          );
+        });
+
+      // -- ENERGY MANAGER: HYPE / TENSION --
+      // "Set Hype" buttons
+      document.querySelectorAll("button[data-hype]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const newHype = btn.getAttribute("data-hype");
+          energyManager.setHypeLevel(newHype);
+          console.log("EnergyManager: setHypeLevel(", newHype, ")");
+        });
+      });
+      // "Set Tension" buttons
+      document.querySelectorAll("button[data-tension]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const newTension = btn.getAttribute("data-tension");
+          energyManager.setTensionLevel(newTension);
+          console.log("EnergyManager: setTensionLevel(", newTension, ")");
+        });
+      });
+    </script>
+  </body>
+</html>

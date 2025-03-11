@@ -175,6 +175,15 @@ export class DeviceDefinition {
     return this.listCCParams().filter((item) => !item.isStandard);
   }
 
+  /**
+   * A simple method that returns true if this.getCC(paramName) is not null, else false.
+   * @param {string} paramName - e.g. "filterCutoff", "customParam"
+   * @returns {boolean}
+   */
+  hasCapability(paramName) {
+    return this.getCC(paramName) !== null;
+  }
+
   // --------------------------------------------------------------------------
   // CHANNELS / ENGINES
   // --------------------------------------------------------------------------

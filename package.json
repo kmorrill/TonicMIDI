@@ -27,6 +27,7 @@
     "vite": "^6.2.0"
   },
   "dependencies": {
+    "@tonaljs/tonal": "^4.10.0",
     "@tonejs/midi": "^2.0.28",
     "webmidi": "^3.1.12"
   }
