@@ -12,7 +12,7 @@
  * Goal:
  *   - Start at "low" hype, "none" tension (defaults in GlobalContext).
  *   - Drums should be muted at "low" hype (but chords still play).
- *   - Then set hype to "full" → drums become unmuted/busier.
+ *   - Then set hype to "high" → drums become unmuted/busier.
  *   - Then set tension to "high" → chords become more dissonant ("maj7#11", etc.).
  *   - Verify the resulting MIDI events reflect these changes at the right steps.
  */
@@ -28,7 +28,6 @@ import { RhythmManager } from "../../src/rhythm-manager.js";
 import { LiveLoop } from "../../src/live-loop.js";
 import { ChordPattern } from "../../src/patterns/chord-pattern.js";
 
-/** We'll customize DrumPattern so that if hype="full", we treat it as "high" internally. */
 import { DrumPattern as BaseDrumPattern } from "../../src/patterns/drum-pattern.js";
 class DrumPattern extends BaseDrumPattern {
   getNotes(stepIndex, context) {
@@ -36,7 +35,7 @@ class DrumPattern extends BaseDrumPattern {
   }
 }
 
-/** Subclass EnergyManager so "low" only mutes Drums, "full" unmutes everything. */
+/** Subclass EnergyManager so "low" only mutes Drums, "high" unmutes everything. */
 class CustomEnergyManager extends EnergyManager {
   setHypeLevel(level) {
     this.currentHypeLevel = level;
@@ -56,7 +55,7 @@ class CustomEnergyManager extends EnergyManager {
         });
         break;
       }
-      case "full": {
+      case "high": {
         this.liveLoops.forEach((loop) => {
           loop.setMuted(false);
         });
@@ -115,7 +114,7 @@ describe("EnergyManager hype + tension integration test", () => {
       ],
     });
 
-    // 5) Build a DrumPattern (with an override mapping "full" -> "high")
+    // 5) Build a DrumPattern (with an override mapping "high" -> "high")
     const mediumDrumPattern = {
       kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
       snare: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -179,7 +178,7 @@ describe("EnergyManager hype + tension integration test", () => {
     midiBus.off("midiMessage", transport._handleIncomingClock);
   });
 
-  it("applies hype=full to unmute drums, tension=high to alter chord notes, with no stuck notes at stop", () => {
+  it("applies hype=high to unmute drums, tension=high to alter chord notes, with no stuck notes at stop", () => {
     mockEngine.clearEvents();
 
     // Start transport
@@ -201,9 +200,9 @@ describe("EnergyManager hype + tension integration test", () => {
     );
     expect(drumHitsBeforeHype.length).toBe(0);
 
-    // 2) hype=full => unmute drums
+    // 2) hype=high => unmute drums
     mockEngine.clearEvents();
-    energyManager.setHypeLevel("full");
+    energyManager.setHypeLevel("high");
 
     // Another 16 steps => 16*6=96 pulses
     for (let i = 0; i < 96; i++) {

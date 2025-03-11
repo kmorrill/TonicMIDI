@@ -55,11 +55,11 @@ describe("EnergyManager (Hybrid Approach)", () => {
   });
 
   describe("setHypeLevel", () => {
-    it('should set "full" hype => unmute Drums, intensify LFO, store "doubleTime"', () => {
-      manager.setHypeLevel("full");
+    it('should set "high" hype => unmute Drums, intensify LFO, store "doubleTime"', () => {
+      manager.setHypeLevel("high");
 
-      // The manager's internal hype changes to "full"
-      expect(manager.getHypeLevel()).toBe("full");
+      // The manager's internal hype changes to "high"
+      expect(manager.getHypeLevel()).toBe("high");
       // The manager's internal subdivision label => "doubleTime"
       expect(manager.getSubdivision()).toBe("doubleTime");
 

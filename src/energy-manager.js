@@ -27,17 +27,18 @@ export class EnergyManager {
   }
 
   /**
-   * Sets the hype level ("low","medium","full", etc.),
+   * Sets the hype level ("low","medium","high", etc.),
    * does some big changes (unmute loops, etc.), and
    * sets `this.currentSubdivision` so patterns can see it and interpret double-time or half-time.
    *
    * @param {string} level
    */
   setHypeLevel(level) {
+    console.log("[EnergyManager] setting hype to", level);
     this.currentHypeLevel = level;
 
     switch (level) {
-      case "full":
+      case "high":
         // Example: store "doubleTime" so patterns can see it
         this.currentSubdivision = "doubleTime";
 

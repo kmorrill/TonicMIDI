@@ -103,7 +103,7 @@
       <div>
         <button data-hype="low">Set Hype: LOW</button>
         <button data-hype="medium">Set Hype: MEDIUM</button>
-        <button data-hype="full">Set Hype: full</button>
+        <button data-hype="high">Set Hype: HIGH</button>
       </div>
       <div style="margin-top: 0.5rem">
         <button data-tension="none">Set Tension: NONE</button>
@@ -140,10 +140,10 @@
        * 2) Main async function to set up system, patterns, loops
        *******************************************************/
       (async function main() {
-        // Create the default system (MIDI bus, device manager, transport, etc.)
+        // 2A) Create the default system (MIDI bus, device manager, transport, etc.)
         const system = await createDefaultSystem();
 
-        // For convenience:
+        // Destructure the main items
         const {
           transport,
           energyManager,
@@ -151,7 +151,14 @@
           globalContext,
           midiOutputs,
         } = system;
-        chordManager.authorizeProvider("ColorfulChordSwellPattern"); // so chord pattern can set chords
+
+        // 2B) Put energyManager & chordManager in globalContext
+        //     so that any pattern can read them via context.energyManager, context.chordManager.
+        globalContext.energyManager = energyManager;
+        globalContext.chordManager = chordManager;
+
+        // Authorize our chord provider ID for chord changes
+        chordManager.authorizeProvider("ColorfulChordSwellPattern");
 
         // A) Create an initial chord pattern
         let chordPattern = new ColorfulChordSwellPattern({
@@ -162,13 +169,15 @@
         });
 
         // B) Create the chord loop
+        //    **Note** We pass only `globalContext`; no need to pass chordManager or energyManager.
         const chordLoop = new LiveLoop(system.midiBus, {
           pattern: chordPattern,
           midiChannel: 8,
           name: "ColorfulChordLoop",
           role: "chordProvider",
           globalContext,
-          // Pass device info if you like. If you want chord LFO automation, etc.
+
+          // If you want LFO -> device CC mapping, we still pass device info:
           deviceManager: system.deviceManager,
           midiOutputId: midiOutputs[0]?.id,
         });
@@ -178,25 +187,24 @@
           patternLength: 16,
           drumIntensity: 0.5,
           flavor: "ambient",
-          // This is crucial: the pattern code does name→note,
-          // so it needs the deviceDefinition from the appropriate device output
           deviceDefinition: system.deviceManager.getDeviceForOutput(
             midiOutputs[0]?.id
           ),
         });
 
-        // D) Create the drum loop
+        // D) Create the drum loop (kick provider)
         const drumLoop = new LiveLoop(system.midiBus, {
           pattern: drumPattern,
           midiChannel: 1,
           name: "EvolvingDrums",
           role: "kickProvider",
           globalContext,
+
           deviceManager: system.deviceManager,
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // E) Add both loops
+        // E) Add both loops to transport
         transport.addLiveLoop(chordLoop);
         transport.addLiveLoop(drumLoop);
 
@@ -262,14 +270,14 @@
         document.querySelectorAll("button[data-hype]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newHype = btn.getAttribute("data-hype");
-            system.energyManager.setHypeLevel(newHype);
+            energyManager.setHypeLevel(newHype);
             console.log("EnergyManager setHypeLevel:", newHype);
           });
         });
         document.querySelectorAll("button[data-tension]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newTension = btn.getAttribute("data-tension");
-            system.energyManager.setTensionLevel(newTension);
+            energyManager.setTensionLevel(newTension);
             console.log("EnergyManager setTensionLevel:", newTension);
           });
         });

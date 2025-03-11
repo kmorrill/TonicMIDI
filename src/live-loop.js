@@ -74,7 +74,7 @@ export class LiveLoop {
    * @property {object} [context={}]
    *   Optional local context passed to the pattern on `getNotes()`.
    * @property {object} [globalContext=null]
-   *   A shared context object (e.g. containing chordManager, rhythmManager).
+   *   A shared context object (e.g. containing chordManager, rhythmManager, energyManager).
    * @property {string} [name=""]
    *   A friendly name for this loop (useful for debugging or orchestration).
    * @property {boolean} [muted=false]
@@ -168,7 +168,11 @@ export class LiveLoop {
     /** @type {object} */
     this.context = context;
 
-    /** @type {object|null} */
+    /**
+     * This is where chordManager, energyManager, etc. might live
+     * if you added them to globalContext outside.
+     * @type {object|null}
+     */
     this.globalContext = globalContext;
 
     /** @type {string} */
@@ -192,7 +196,7 @@ export class LiveLoop {
     /** @private */
     this.midiOutputId = midiOutputId;
 
-    // If deviceManager + midiOutputId are provided, get a deviceDefinition
+    // If deviceManager + midiOutputId are provided, fetch the deviceDefinition
     if (this.deviceManager && this.midiOutputId) {
       this.deviceDefinition =
         this.deviceManager.getDeviceForOutput(this.midiOutputId) || null;
@@ -217,6 +221,7 @@ export class LiveLoop {
     /** @private */
     this._onChainComplete = null;
 
+    // If constructor had cycles, start chaining with the initial pattern
     if (typeof cycles === "number" && cycles > 0) {
       this._chainItems.push({
         pattern: this.pattern,
@@ -567,6 +572,7 @@ export class LiveLoop {
 
   /**
    * Sets or updates the global context reference.
+   * Typically contains managers (energyManager, chordManager, etc.).
    * @param {object} globalContext
    */
   setGlobalContext(globalContext) {
@@ -633,22 +639,34 @@ export class LiveLoop {
 
   /**
    * Merges local + global context for pattern usage
+   * so that `getNotes()` sees chordManager, energyManager, etc.
    * @private
    * @param {number} stepIndex
    * @returns {object}
    */
   _getEffectiveContext(stepIndex) {
+    // Start with a shallow copy of local context
     const effectiveContext = { ...this.context };
+
+    // Merge in global managers, if any
     if (this.globalContext) {
+      // e.g. chordManager, energyManager, rhythmManager...
       if (this.globalContext.chordManager) {
         effectiveContext.chordManager = this.globalContext.chordManager;
       }
       if (this.globalContext.rhythmManager) {
         effectiveContext.rhythmManager = this.globalContext.rhythmManager;
       }
-      if (this.globalContext.getEnergyState) {
-        effectiveContext.energyState = this.globalContext.getEnergyState();
+
+      // <-- NEW: If globalContext has energyManager, attach it
+      if (this.globalContext.energyManager) {
+        effectiveContext.energyManager = this.globalContext.energyManager;
       }
+
+      // You might still support older patterns reading .energyState
+      // if (this.globalContext.getEnergyState) {
+      //   effectiveContext.energyState = this.globalContext.getEnergyState();
+      // }
     }
 
     // Also directly add deviceDefinition for convenience
