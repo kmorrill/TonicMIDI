@@ -2,6 +2,7 @@
 import { DeviceDefinition, STANDARD_CC_NAMES } from "../device-definition.js";
 
 export class OpXyDevice extends DeviceDefinition {
+  static profileName = "OP-XY"; // the name that will show up in Web MIDI
   constructor() {
     super();
 

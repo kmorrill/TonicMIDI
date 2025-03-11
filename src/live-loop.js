@@ -147,6 +147,7 @@ export class LiveLoop {
       deviceDefinition = null,
       deviceManager = null,
       midiOutputId = null,
+
       // Chain mode
       cycles = null,
       role = null,
@@ -649,6 +650,13 @@ export class LiveLoop {
         effectiveContext.energyState = this.globalContext.getEnergyState();
       }
     }
+
+    // Also directly add deviceDefinition for convenience
+    // (provided we have deviceManager + midiOutputId or a direct deviceDefinition)
+    if (this.deviceDefinition) {
+      effectiveContext.deviceDefinition = this.deviceDefinition;
+    }
+
     return effectiveContext;
   }
 

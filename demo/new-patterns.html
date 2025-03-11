@@ -9,9 +9,6 @@
         margin: 1rem;
         background: #f0f0f0;
       }
-      h1 {
-        margin-bottom: 0.5rem;
-      }
       fieldset {
         margin-bottom: 1rem;
         border: 1px solid #ccc;
@@ -21,12 +18,6 @@
         display: inline-block;
         width: 150px;
         font-weight: 600;
-      }
-      select,
-      input[type="number"],
-      input[type="range"],
-      button {
-        margin: 0.2rem 0;
       }
       #output {
         width: 100%;
@@ -49,7 +40,6 @@
       you have a MIDI input device providing clock to your browser.
     </p>
 
-    <!-- PATTERN CONFIG FORM -->
     <fieldset>
       <legend>Chord Swell Pattern</legend>
       <label for="colorSelect">Color:</label>
@@ -113,7 +103,7 @@
       <div>
         <button data-hype="low">Set Hype: LOW</button>
         <button data-hype="medium">Set Hype: MEDIUM</button>
-        <button data-hype="high">Set Hype: HIGH</button>
+        <button data-hype="full">Set Hype: full</button>
       </div>
       <div style="margin-top: 0.5rem">
         <button data-tension="none">Set Tension: NONE</button>
@@ -126,27 +116,18 @@
     <h2>Console Output</h2>
     <div id="output"></div>
 
-    <!-- MAIN SCRIPT -->
     <script type="module">
-      /********************************************************
-       * Import from your library. Paths may differ in your setup.
-       ********************************************************/
+      /*******************************************************
+       * 1) Import createDefaultSystem + patterns, etc.
+       *******************************************************/
+      import { createDefaultSystem } from "../src/system/create-default-system.js";
       import {
-        MidiBus,
-        RealPlaybackEngine,
-        TransportManager,
         LiveLoop,
-        EnergyManager,
-        GlobalContext,
-        ChordManager,
-        // Patterns
         ColorfulChordSwellPattern,
         EvolvingLockedDrumPattern,
-      } from "../src/index.js";
+      } from "../src/index.js"; // or do more fine-grained imports
 
-      /********************************************************
-       * UTILITY: Mirror console logs to #output
-       ********************************************************/
+      // Utility to mirror console logs to #output
       const outputEl = document.getElementById("output");
       const origLog = console.log;
       console.log = (...args) => {
@@ -155,183 +136,144 @@
         outputEl.scrollTop = outputEl.scrollHeight;
       };
 
-      /********************************************************
-       * STEP 1: Setup MIDI I/O
-       ********************************************************/
-      const midiBus = new MidiBus();
-      const playbackEngine = new RealPlaybackEngine(midiBus);
+      /*******************************************************
+       * 2) Main async function to set up system, patterns, loops
+       *******************************************************/
+      (async function main() {
+        // Create the default system (MIDI bus, device manager, transport, etc.)
+        const system = await createDefaultSystem();
 
-      async function initMidiIO() {
-        // 1) Wait for MIDI access
-        const midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+        // For convenience:
+        const {
+          transport,
+          energyManager,
+          chordManager,
+          globalContext,
+          midiOutputs,
+        } = system;
+        chordManager.authorizeProvider("ColorfulChordSwellPattern"); // so chord pattern can set chords
 
-        // 2) Hook the first MIDI input for external clock
-        const inputs = Array.from(midiAccess.inputs.values());
-        if (inputs.length > 0) {
-          console.log("Using external MIDI clock from:", inputs[0].name);
-          inputs[0].onmidimessage = (evt) => {
-            midiBus.emit("midiMessage", { data: evt.data });
-          };
-        } else {
-          console.warn("No MIDI inputs found -> no external clock.");
-        }
+        // A) Create an initial chord pattern
+        let chordPattern = new ColorfulChordSwellPattern({
+          color: "warm",
+          swellDuration: 16,
+          overlap: 2,
+          chordComplexity: 0.5,
+        });
 
-        // 3) Hook the first MIDI output for actual note output
-        const outputs = Array.from(midiAccess.outputs.values());
-        if (outputs.length > 0) {
-          console.log("Sending MIDI to:", outputs[0].name);
-          playbackEngine.midiOutputs = [outputs[0]];
-        } else {
-          console.warn("No MIDI outputs found -> cannot send notes!");
-        }
-      }
+        // B) Create the chord loop
+        const chordLoop = new LiveLoop(system.midiBus, {
+          pattern: chordPattern,
+          midiChannel: 8,
+          name: "ColorfulChordLoop",
+          role: "chordProvider",
+          globalContext,
+          // Pass device info if you like. If you want chord LFO automation, etc.
+          deviceManager: system.deviceManager,
+          midiOutputId: midiOutputs[0]?.id,
+        });
 
-      // Init the real engine
-      await playbackEngine.init();
-      await initMidiIO();
+        // C) Create a drum pattern that includes a deviceDefinition
+        let drumPattern = new EvolvingLockedDrumPattern({
+          patternLength: 16,
+          drumIntensity: 0.5,
+          flavor: "ambient",
+          // This is crucial: the pattern code does name→note,
+          // so it needs the deviceDefinition from the appropriate device output
+          deviceDefinition: system.deviceManager.getDeviceForOutput(
+            midiOutputs[0]?.id
+          ),
+        });
 
-      /********************************************************
-       * STEP 2: Setup Transport + EnergyManager
-       * By default, pulsesPerStep=6 => 4 steps per quarter note @ 24 PPQN
-       ********************************************************/
-      const transport = new TransportManager(midiBus, {
-        pulsesPerStep: 6,
-      });
+        // D) Create the drum loop
+        const drumLoop = new LiveLoop(system.midiBus, {
+          pattern: drumPattern,
+          midiChannel: 1,
+          name: "EvolvingDrums",
+          role: "kickProvider",
+          globalContext,
+          deviceManager: system.deviceManager,
+          midiOutputId: midiOutputs[0]?.id,
+        });
 
-      // We'll have an energyManager, so we can set hype/tension from UI
-      const energyManager = new EnergyManager();
+        // E) Add both loops
+        transport.addLiveLoop(chordLoop);
+        transport.addLiveLoop(drumLoop);
 
-      // Also a globalContext with a chordManager, if desired
-      const chordManager = new ChordManager();
-      chordManager.authorizeProvider("ColorfulChordSwellPattern"); // so it can set chords
-      const globalContext = new GlobalContext({
-        chordManager,
-        // Provide your own RhythmManager if you want; for simplicity we omit here
-        // or do: rhythmManager: new RhythmManager(),
-      });
+        // Ready message
+        console.log("System ready! Press Play on external clock...");
 
-      // Let the energyManager know about these loops so it can unmute if needed
-      energyManager.globalContext = globalContext;
+        /*******************************************************
+         * 3) Hook up UI for chord + drum config
+         *******************************************************/
+        const colorSelect = document.getElementById("colorSelect");
+        const swellDurationInput = document.getElementById("swellDuration");
+        const overlapInput = document.getElementById("overlap");
+        const chordComplexityInput = document.getElementById("chordComplexity");
 
-      /********************************************************
-       * STEP 3: Create the Patterns and LiveLoops
-       ********************************************************/
+        document
+          .getElementById("updateChordBtn")
+          .addEventListener("click", () => {
+            const newColor = colorSelect.value;
+            const newSwellDuration =
+              parseInt(swellDurationInput.value, 10) || 16;
+            const newOverlap = parseInt(overlapInput.value, 10) || 0;
+            const newComplex = parseFloat(chordComplexityInput.value) || 0.5;
 
-      // 3a) Chord Provider: "ColorfulChordSwellPattern"
-      let chordPattern = new ColorfulChordSwellPattern({
-        color: "warm",
-        swellDuration: 16,
-        overlap: 2,
-        chordComplexity: 0.5,
-      });
-
-      const chordLoop = new LiveLoop(midiBus, {
-        pattern: chordPattern,
-        midiChannel: 8,
-        name: "ColorfulChordLoop",
-        role: "chordProvider", // so it sets chord data on chordManager
-        globalContext: globalContext,
-      });
-      // The pattern calls chordManager.setCurrentChord("ColorfulChordSwellPattern", root, notes)
-
-      // 3b) Drum Provider: "EvolvingLockedDrumPattern"
-      let drumPattern = new EvolvingLockedDrumPattern({
-        patternLength: 16,
-        drumIntensity: 0.5,
-        flavor: "ambient",
-      });
-      const drumLoop = new LiveLoop(midiBus, {
-        pattern: drumPattern,
-        midiChannel: 1,
-        name: "EvolvingDrums",
-        role: "kickProvider", // so it can provide a main kick
-        globalContext: globalContext,
-      });
-
-      // Add both loops to the Transport
-      transport.addLiveLoop(chordLoop);
-      transport.addLiveLoop(drumLoop);
-
-      console.log(
-        "Ready! Press Play in your DAW/hardware to start external clock..."
-      );
-
-      /********************************************************
-       * STEP 4: Hook up the UI controls
-       ********************************************************/
-
-      // -- CHORD PATTERN CONFIG --
-      const colorSelect = document.getElementById("colorSelect");
-      const swellDurationInput = document.getElementById("swellDuration");
-      const overlapInput = document.getElementById("overlap");
-      const chordComplexityInput = document.getElementById("chordComplexity");
-      document
-        .getElementById("updateChordBtn")
-        .addEventListener("click", () => {
-          const newColor = colorSelect.value;
-          const newSwellDuration = parseInt(swellDurationInput.value, 10) || 16;
-          const newOverlap = parseInt(overlapInput.value, 10) || 0;
-          const newComplex = parseFloat(chordComplexityInput.value) || 0.5;
-
-          chordPattern = new ColorfulChordSwellPattern({
-            color: newColor,
-            swellDuration: newSwellDuration,
-            overlap: newOverlap,
-            chordComplexity: newComplex,
+            chordPattern = new ColorfulChordSwellPattern({
+              color: newColor,
+              swellDuration: newSwellDuration,
+              overlap: newOverlap,
+              chordComplexity: newComplex,
+            });
+            chordLoop.setPattern(chordPattern, true);
+            console.log(
+              "ChordSwell updated:",
+              newColor,
+              newSwellDuration,
+              newOverlap,
+              newComplex
+            );
           });
-          chordLoop.setPattern(chordPattern, true); // immediate
-          console.log(
-            "Updated ChordSwellPattern => color=",
-            newColor,
-            "swellDuration=",
-            newSwellDuration,
-            "overlap=",
-            newOverlap,
-            "chordComplexity=",
-            newComplex
-          );
-        });
 
-      // -- DRUM PATTERN CONFIG --
-      const drumIntensityRange = document.getElementById("drumIntensity");
-      const flavorSelect = document.getElementById("flavorSelect");
-      document
-        .getElementById("updateDrumsBtn")
-        .addEventListener("click", () => {
-          const newIntensity = parseFloat(drumIntensityRange.value);
-          const newFlavor = flavorSelect.value;
+        const drumIntensityRange = document.getElementById("drumIntensity");
+        const flavorSelect = document.getElementById("flavorSelect");
+        document
+          .getElementById("updateDrumsBtn")
+          .addEventListener("click", () => {
+            const newIntensity = parseFloat(drumIntensityRange.value);
+            const newFlavor = flavorSelect.value;
 
-          drumPattern = new EvolvingLockedDrumPattern({
-            patternLength: 16,
-            drumIntensity: newIntensity,
-            flavor: newFlavor,
+            // Recreate the pattern with updated parameters (and pass deviceDefinition again)
+            drumPattern = new EvolvingLockedDrumPattern({
+              patternLength: 16,
+              drumIntensity: newIntensity,
+              flavor: newFlavor,
+              deviceDefinition: system.deviceManager.getDeviceForOutput(
+                midiOutputs[0]?.id
+              ),
+            });
+            drumLoop.setPattern(drumPattern, true);
+
+            console.log("Drum updated:", newIntensity, newFlavor);
           });
-          drumLoop.setPattern(drumPattern, true); // immediate
-          console.log(
-            "Updated EvolvingLockedDrumPattern => intensity=",
-            newIntensity,
-            "flavor=",
-            newFlavor
-          );
-        });
 
-      // -- ENERGY MANAGER: HYPE / TENSION --
-      // "Set Hype" buttons
-      document.querySelectorAll("button[data-hype]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const newHype = btn.getAttribute("data-hype");
-          energyManager.setHypeLevel(newHype);
-          console.log("EnergyManager: setHypeLevel(", newHype, ")");
+        // F) Hook up hype/tension
+        document.querySelectorAll("button[data-hype]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const newHype = btn.getAttribute("data-hype");
+            system.energyManager.setHypeLevel(newHype);
+            console.log("EnergyManager setHypeLevel:", newHype);
+          });
         });
-      });
-      // "Set Tension" buttons
-      document.querySelectorAll("button[data-tension]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const newTension = btn.getAttribute("data-tension");
-          energyManager.setTensionLevel(newTension);
-          console.log("EnergyManager: setTensionLevel(", newTension, ")");
+        document.querySelectorAll("button[data-tension]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const newTension = btn.getAttribute("data-tension");
+            system.energyManager.setTensionLevel(newTension);
+            console.log("EnergyManager setTensionLevel:", newTension);
+          });
         });
-      });
+      })();
     </script>
   </body>
 </html>

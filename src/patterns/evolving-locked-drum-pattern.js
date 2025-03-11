@@ -13,11 +13,18 @@ import { BasePattern } from "./base-pattern.js";
  *   a new 16-step pattern (with random logic). Until they change again, the pattern
  *   is locked, so each bar repeats the same hits.
  *
+ * **Device Definition Lookup**:
+ * If you pass `deviceDefinition` in the constructor options, any drum name
+ * like `"kick"`, `"snare"`, etc. will be converted to its MIDI note number
+ * via `deviceDefinition.getDrumNote(...)`.
+ *
  * Example usage:
+ * ```js
  *   const pattern = new EvolvingLockedDrumPattern({
  *     patternLength: 16,
  *     drumIntensity: 0.3,
- *     flavor: "lofi"
+ *     flavor: "lofi",
+ *     deviceDefinition: myOpXyDevice,  // so it can map drum names to MIDI notes
  *   });
  *
  *   const loop = new LiveLoop(midiBus, {
@@ -30,6 +37,7 @@ import { BasePattern } from "./base-pattern.js";
  *   // Then calls like:
  *   energyManager.setHypeLevel("medium");
  *   pattern.setDrumIntensity(0.8);  // triggers a fresh re-gen of the 16-step pattern
+ * ```
  */
 export class EvolvingLockedDrumPattern extends BasePattern {
   /**
@@ -43,6 +51,9 @@ export class EvolvingLockedDrumPattern extends BasePattern {
    * @param {string} [options.flavor="ambient"]
    *   A style label controlling which instruments are favored.
    *   (e.g. "ambient","tribal","electronic","lofi")
+   * @param {import("../device-definition.js").DeviceDefinition} [options.deviceDefinition=null]
+   *   If provided, drum names like "kick" or "snare" will be mapped to numeric
+   *   MIDI note values via `deviceDefinition.getDrumNote(...)`.
    */
   constructor(options = {}) {
     super(options);
@@ -50,6 +61,12 @@ export class EvolvingLockedDrumPattern extends BasePattern {
     this.patternLength = options.patternLength ?? 16;
     this.drumIntensity = options.drumIntensity ?? 0.5;
     this.flavor = options.flavor ?? "ambient";
+
+    /**
+     * The DeviceDefinition (optional). If present, we convert drum names to MIDI numbers.
+     * @private
+     */
+    this.deviceDefinition = options.deviceDefinition || null;
 
     // Keep track of last known hype/tension from energyManager so we can detect changes
     this._lastHype = null;
@@ -208,8 +225,40 @@ export class EvolvingLockedDrumPattern extends BasePattern {
 
       // unify duplicates
       const finalHits = mergeDuplicates(hitsForStep);
+
+      // Convert any string-based drum name to a numeric MIDI note if possible
+      finalHits.forEach((hit) => {
+        hit.note = this._lookupDrumNote(hit.note);
+      });
+
       this.cachedPattern[step] = finalHits;
     }
+  }
+
+  /**
+   * Converts a drum name like "kick", "snare" into a numeric MIDI note
+   * via `deviceDefinition.getDrumNote(...)`. If none found, defaults to 60 (C4).
+   *
+   * @private
+   * @param {string|number} drumNameOrNote - e.g. "kick", "snare", or numeric MIDI
+   * @returns {number} MIDI note number
+   */
+  _lookupDrumNote(drumNameOrNote) {
+    // If pattern logic already assigned numeric MIDI note, just return it
+    if (typeof drumNameOrNote === "number") {
+      return drumNameOrNote;
+    }
+    // If no deviceDefinition, fallback to 60
+    if (!this.deviceDefinition) {
+      return 60; // fallback
+    }
+    // Attempt to look up
+    const num = this.deviceDefinition.getDrumNote(drumNameOrNote);
+    if (num !== null) {
+      return num;
+    }
+    // fallback
+    return 60;
   }
 }
 
