@@ -31,6 +31,16 @@
       .param-row {
         margin-bottom: 0.3rem;
       }
+      ul {
+        list-style-type: none;
+        padding: 0;
+      }
+      ul li {
+        margin: 0.3rem 0;
+      }
+      ul li button {
+        margin-left: 0.5rem;
+      }
     </style>
   </head>
   <body>
@@ -43,6 +53,7 @@
       sequencer that sends clock, and the patterns will sync up automatically.
     </p>
 
+    <!-- 1) COLORFUL CHORD SWELL -->
     <fieldset>
       <legend>Colorful Chord Swell Pattern</legend>
       <p style="max-width: 600px">
@@ -82,6 +93,7 @@
       <button id="updateChordBtn">Update Chord Pattern</button>
     </fieldset>
 
+    <!-- 2) EVOLVING DRUM PATTERN -->
     <fieldset>
       <legend>Evolving Drum Pattern</legend>
       <p style="max-width: 600px">
@@ -112,6 +124,7 @@
       <button id="updateDrumsBtn">Update Drum Pattern</button>
     </fieldset>
 
+    <!-- 3) PHRASE CONTOUR MELODY -->
     <fieldset>
       <legend>PhraseContourMelody (Melody on channel 5)</legend>
       <p style="max-width: 600px">
@@ -170,6 +183,7 @@
       <button id="updateMelodyBtn">Update Melody Pattern</button>
     </fieldset>
 
+    <!-- 4) ENERGY CONTROLS -->
     <fieldset>
       <legend>Energy Manager Controls</legend>
       <p style="max-width: 600px">
@@ -190,6 +204,107 @@
       </div>
     </fieldset>
 
+    <!-- 5) REAL-TIME LFO MANAGER -->
+    <fieldset>
+      <legend>Real-Time LFOs</legend>
+      <p style="max-width: 600px">
+        Add continuous LFO modulation to any MIDI channel, layered on top of
+        your existing patterns. Multiple LFOs can affect the same channel.
+      </p>
+      <div class="param-row">
+        <label for="lfoChannelSelect">MIDI Channel:</label>
+        <select id="lfoChannelSelect">
+          <option value="1">Channel 1</option>
+          <option value="2">Channel 2</option>
+          <option value="3">Channel 3</option>
+          <option value="4">Channel 4</option>
+          <option value="5">Channel 5</option>
+          <option value="6">Channel 6</option>
+          <option value="7">Channel 7</option>
+          <option value="8">Channel 8</option>
+          <option value="9">Channel 9</option>
+          <option value="10">Channel 10</option>
+          <option value="11">Channel 11</option>
+          <option value="12">Channel 12</option>
+          <option value="13">Channel 13</option>
+          <option value="14">Channel 14</option>
+          <option value="15">Channel 15</option>
+          <option value="16">Channel 16</option>
+        </select>
+      </div>
+      <div class="param-row">
+        <label for="lfoPresetSelect">LFO Preset:</label>
+        <select id="lfoPresetSelect">
+          <!-- Sample "fast" LFO presets -->
+          <option value="lightVibrato">Light Vibrato</option>
+          <option value="rapidFilterFlutter">Rapid Filter Flutter</option>
+          <option value="squareTremolo">Square-Wave Tremolo</option>
+          <option value="pingPongPan">Ping-Pong Pan</option>
+          <option value="wobblyResonance">Wobbly Resonance</option>
+          <option value="subtleChorus">Subtle Chorus</option>
+          <option value="stutterGate">Stutter Gate</option>
+          <option value="fmClang">FM Clang</option>
+        </select>
+      </div>
+      <button id="addLfoBtn">Add LFO</button>
+
+      <h4>Active LFOs:</h4>
+      <ul id="activeLfoList"></ul>
+    </fieldset>
+
+    <!-- 6) ARRANGEMENT ONE-SHOTS -->
+    <fieldset>
+      <legend>Arrangement Sweeps / One-Shots</legend>
+      <p style="max-width: 600px">
+        Schedule a single, multi-step sweep (e.g., slowly opening a filter) that
+        starts at the next bar boundary, runs once, and then finishes. Choose a
+        channel, a duration in steps, and a preset.
+      </p>
+      <div class="param-row">
+        <label for="oneShotChannelSelect">MIDI Channel:</label>
+        <select id="oneShotChannelSelect">
+          <option value="1">Channel 1</option>
+          <option value="2">Channel 2</option>
+          <option value="3">Channel 3</option>
+          <option value="4">Channel 4</option>
+          <option value="5">Channel 5</option>
+          <option value="6">Channel 6</option>
+          <option value="7">Channel 7</option>
+          <option value="8">Channel 8</option>
+          <option value="9">Channel 9</option>
+          <option value="10">Channel 10</option>
+          <option value="11">Channel 11</option>
+          <option value="12">Channel 12</option>
+          <option value="13">Channel 13</option>
+          <option value="14">Channel 14</option>
+          <option value="15">Channel 15</option>
+          <option value="16">Channel 16</option>
+        </select>
+      </div>
+      <div class="param-row">
+        <label for="oneShotLengthSelect">Duration (steps):</label>
+        <select id="oneShotLengthSelect">
+          <option value="16">16 Steps</option>
+          <option value="32">32 Steps</option>
+          <option value="64">64 Steps</option>
+        </select>
+      </div>
+      <div class="param-row">
+        <label for="oneShotSweepSelect">Sweep Preset:</label>
+        <select id="oneShotSweepSelect">
+          <!-- Sample "slow" LFO presets -->
+          <option value="slowFilterRise">Slow Filter Rise</option>
+          <option value="deepBreathingPad">Deep Breathing Pad</option>
+          <option value="swellingResonance">Swelling Resonance</option>
+          <option value="verySlowRandomDrift">Very Slow Random Drift</option>
+        </select>
+      </div>
+      <button id="enqueueSweepBtn">Enqueue Sweep</button>
+
+      <h4>Queued Sweeps:</h4>
+      <ul id="queuedSweepList"></ul>
+    </fieldset>
+
     <p style="margin-top: 2rem; max-width: 700px">
       Try changing flavors, note durations, chord complexities, or hype/tension
       levels at any time. I'm continuing to build out new pattern ideas and ways
@@ -205,7 +320,94 @@
         ColorfulChordSwellPattern,
         EvolvingLockedDrumPattern,
         PhraseContourMelody,
+        LFO,
       } from "../src/index.js";
+
+      // Example Fast LFO Presets
+      const LFO_PRESETS_FAST = {
+        lightVibrato: {
+          shape: "sine",
+          frequency: 6.0,
+          amplitude: 5,
+          targetParam: "pitch_bend",
+        },
+        rapidFilterFlutter: {
+          shape: "triangle",
+          frequency: 9.0,
+          amplitude: 20,
+          targetParam: "filterCutoff",
+        },
+        squareTremolo: {
+          shape: "square",
+          frequency: 5.0,
+          amplitude: 80,
+          targetParam: "trackVolume",
+        },
+        pingPongPan: {
+          shape: "triangle",
+          frequency: 4.0,
+          amplitude: 127,
+          targetParam: "trackPan",
+        },
+        wobblyResonance: {
+          shape: "sine",
+          frequency: 4.0,
+          amplitude: 25,
+          targetParam: "resonance",
+        },
+        subtleChorus: {
+          shape: "sine",
+          frequency: 2.5,
+          amplitude: 5,
+          targetParam: "pitch_bend",
+        },
+        stutterGate: {
+          shape: "sawDown",
+          frequency: 8.0,
+          amplitude: 30,
+          targetParam: "trackVolume",
+        },
+        fmClang: {
+          shape: "random",
+          frequency: 10.0,
+          amplitude: 15,
+          targetParam: "pitch_bend",
+        },
+      };
+
+      // Example Slow LFO Presets (One-Shot Sweeps)
+      const LFO_PRESETS_SLOW = {
+        slowFilterRise: {
+          shape: "sine",
+          frequency: 0.05,
+          amplitude: 80,
+          targetParam: "filterCutoff",
+        },
+        deepBreathingPad: {
+          shape: "triangle",
+          frequency: 0.03,
+          amplitude: 40,
+          targetParam: "trackVolume",
+        },
+        swellingResonance: {
+          shape: "sine",
+          frequency: 0.02,
+          amplitude: 60,
+          targetParam: "resonance",
+        },
+        verySlowRandomDrift: {
+          shape: "random",
+          frequency: 0.01,
+          amplitude: 20,
+          targetParam: "filterCutoff",
+        },
+      };
+
+      // Real-time LFO store
+      const activeLFOs = [];
+
+      // One-shot sweeps store
+      const queuedOneShots = [];
 
       (async function main() {
         const system = await createDefaultSystem();
@@ -221,6 +423,7 @@
         globalContext.chordManager = chordManager;
         chordManager.authorizeProvider("ColorfulChordSwellPattern");
 
+        // Patterns & Loops
         let chordPattern = new ColorfulChordSwellPattern({
           color: "warm",
           swellDuration: 16,
@@ -278,9 +481,23 @@
         transport.addLiveLoop(drumLoop);
         transport.addLiveLoop(melodyLoop);
 
+        // Hook into the transport's clock pulses to update LFOs & sweeps:
+        // We'll monkey-patch or add a small hook to the TransportManager
+        const originalClockFn = transport._onClockPulse.bind(transport);
+        transport._onClockPulse = function (message) {
+          // call original
+          originalClockFn(message);
+          // do our LFO updates
+          const deltaTime = 1.0 / 24.0; // approximate for each pulse in beats
+          updateAllLFOs(deltaTime, this.timeInBeats);
+          checkOneShots(this.stepIndex, deltaTime);
+        };
+
         console.log("System ready! Press play on external clock...");
 
-        // Chord pattern controls
+        //-------------------------
+        //  Chord pattern controls
+        //-------------------------
         const colorSelect = document.getElementById("colorSelect");
         const swellDurationInput = document.getElementById("swellDuration");
         const overlapInput = document.getElementById("overlap");
@@ -309,7 +526,9 @@
             );
           });
 
+        //-------------------------
         // Drum pattern controls
+        //-------------------------
         const drumIntensityRange = document.getElementById("drumIntensity");
         const flavorSelect = document.getElementById("flavorSelect");
         document
@@ -331,7 +550,9 @@
             console.log("DrumPattern updated =>", newIntensity, newFlavor);
           });
 
+        //-------------------------
         // Melody pattern controls
+        //-------------------------
         const phraseBarsEl = document.getElementById("phraseBars");
         const subSectionsEl = document.getElementById("subSections");
         const stepsPerBarEl = document.getElementById("stepsPerBar");
@@ -388,7 +609,9 @@
             );
           });
 
+        //-------------------------
         // Energy controls
+        //-------------------------
         document.querySelectorAll("button[data-hype]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newHype = btn.getAttribute("data-hype");
@@ -403,6 +626,162 @@
             console.log("EnergyManager setTensionLevel:", newTension);
           });
         });
+
+        //-------------------------
+        // Real-time LFO manager
+        //-------------------------
+        document.getElementById("addLfoBtn").addEventListener("click", () => {
+          const channel = parseInt(
+            document.getElementById("lfoChannelSelect").value,
+            10
+          );
+          const presetKey = document.getElementById("lfoPresetSelect").value;
+          const preset = LFO_PRESETS_FAST[presetKey];
+
+          if (!preset) return;
+
+          const myLfo = new LFO({
+            shape: preset.shape,
+            frequency: preset.frequency,
+            amplitude: preset.amplitude,
+            targetParam: preset.targetParam,
+          });
+
+          const lfoObj = { channel, presetKey, lfo: myLfo };
+          activeLFOs.push(lfoObj);
+          renderActiveLFOList();
+        });
+
+        function renderActiveLFOList() {
+          const listEl = document.getElementById("activeLfoList");
+          listEl.innerHTML = "";
+          activeLFOs.forEach((obj, idx) => {
+            const li = document.createElement("li");
+            li.textContent = `CH${obj.channel} - ${obj.presetKey}`;
+            const removeBtn = document.createElement("button");
+            removeBtn.textContent = "X";
+            removeBtn.onclick = () => {
+              activeLFOs.splice(idx, 1);
+              renderActiveLFOList();
+            };
+            li.appendChild(removeBtn);
+            listEl.appendChild(li);
+          });
+        }
+
+        function updateAllLFOs(deltaTime, absoluteTime) {
+          // For each active LFO, update & send CC
+          activeLFOs.forEach(({ channel, lfo }) => {
+            const value = lfo.update(deltaTime);
+            const deviceDef = system.deviceManager.getDeviceForOutput(
+              system.midiOutputs[0]?.id
+            );
+            if (!deviceDef) return;
+            const ccNum = deviceDef.getCC(lfo.targetParam);
+            if (ccNum == null) return;
+
+            system.midiBus.controlChange({
+              channel,
+              cc: ccNum,
+              value: Math.floor(value),
+            });
+          });
+        }
+
+        //-------------------------
+        // Arrangement One-Shots
+        //-------------------------
+        document
+          .getElementById("enqueueSweepBtn")
+          .addEventListener("click", () => {
+            const channel = parseInt(
+              document.getElementById("oneShotChannelSelect").value,
+              10
+            );
+            const steps = parseInt(
+              document.getElementById("oneShotLengthSelect").value,
+              10
+            );
+            const presetKey =
+              document.getElementById("oneShotSweepSelect").value;
+            const preset = LFO_PRESETS_SLOW[presetKey];
+            if (!preset) return;
+
+            // We'll do 1 cycle over 'steps' steps if you want a simple approach
+            // if each step ~1 beat, freq might be 1 / (steps/4) to do 1 cycle in "steps"
+            const freq = 1 / (steps / 4);
+
+            const job = {
+              channel,
+              steps,
+              presetKey,
+              lfo: new LFO({
+                shape: preset.shape,
+                frequency: freq,
+                amplitude: preset.amplitude,
+                targetParam: preset.targetParam,
+              }),
+              startStep: null,
+              done: false,
+            };
+
+            // schedule at next multiple of 16 steps
+            const currentStep = transport.stepIndex;
+            const nextMultiple16 = Math.ceil(currentStep / 16) * 16;
+            job.startStep = nextMultiple16;
+
+            queuedOneShots.push(job);
+            renderSweepList();
+          });
+
+        function renderSweepList() {
+          const listEl = document.getElementById("queuedSweepList");
+          listEl.innerHTML = "";
+          queuedOneShots.forEach((obj, idx) => {
+            if (obj.done) return;
+            const li = document.createElement("li");
+            li.textContent = `CH${obj.channel} - ${obj.presetKey}, ${obj.steps} steps (start@${obj.startStep})`;
+            const removeBtn = document.createElement("button");
+            removeBtn.textContent = "X";
+            removeBtn.onclick = () => {
+              obj.done = true;
+              renderSweepList();
+            };
+            li.appendChild(removeBtn);
+            listEl.appendChild(li);
+          });
+        }
+
+        function checkOneShots(stepIndex, deltaTime) {
+          queuedOneShots.forEach((job) => {
+            if (job.done) return;
+            if (stepIndex < job.startStep) {
+              // not started yet
+              return;
+            }
+            const endStep = job.startStep + job.steps;
+            if (stepIndex >= endStep) {
+              // finished
+              job.done = true;
+              return;
+            }
+            // in the active range
+            const val = job.lfo.update(deltaTime);
+            const deviceDef = system.deviceManager.getDeviceForOutput(
+              system.midiOutputs[0]?.id
+            );
+            if (!deviceDef) return;
+            const ccNum = deviceDef.getCC(job.lfo.targetParam);
+            if (ccNum == null) return;
+
+            system.midiBus.controlChange({
+              channel: job.channel,
+              cc: ccNum,
+              value: Math.floor(val),
+            });
+          });
+          renderSweepList();
+        }
       })();
     </script>
   </body>
