@@ -2,7 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Colorful Chord Swell + Evolving Drum Demo</title>
+    <title>
+      Colorful Chord Swell + Evolving Drum + PhraseContourMelody Demo
+    </title>
     <style>
       body {
         font-family: sans-serif;
@@ -13,11 +15,16 @@
         margin-bottom: 1rem;
         border: 1px solid #ccc;
         padding: 1rem;
+        background: #fff;
       }
       label {
         display: inline-block;
-        width: 150px;
+        width: 180px;
         font-weight: 600;
+        margin-top: 0.2rem;
+      }
+      button {
+        margin-top: 0.5rem;
       }
       #output {
         width: 100%;
@@ -30,74 +37,136 @@
         font-size: 0.9rem;
         margin-top: 1rem;
       }
+      .param-row {
+        margin-bottom: 0.3rem;
+      }
     </style>
   </head>
   <body>
-    <h1>ColorfulChordSwell & EvolvingLockedDrum Demo</h1>
+    <h1>
+      Multi-Pattern Demo (Chord Swell + Evolving Drums + PhraseContourMelody)
+    </h1>
     <p>
-      <strong>Note:</strong> This demo uses an <em>external MIDI clock</em>.
-      Press <strong>Play</strong> on your DAW or hardware to start. Make sure
-      you have a MIDI input device providing clock to your browser.
+      <strong>Note:</strong> This demo relies on an
+      <em>external MIDI clock</em>. Press <strong>Play</strong> on your DAW or
+      hardware to start. Ensure you have a MIDI input device sending clock to
+      your browser.
     </p>
 
+    <!-- 1) ColorfulChordSwell Pattern -->
     <fieldset>
-      <legend>Chord Swell Pattern</legend>
-      <label for="colorSelect">Color:</label>
-      <select id="colorSelect">
-        <option value="warm" selected>Warm</option>
-        <option value="bright">Bright</option>
-        <option value="dark">Dark</option>
-        <option value="mysterious">Mysterious</option>
-      </select>
-      <br />
-
-      <label for="swellDuration">swellDuration:</label>
-      <input type="number" id="swellDuration" min="1" max="64" value="16" />
-      <br />
-
-      <label for="overlap">overlap:</label>
-      <input type="number" id="overlap" min="-8" max="8" value="2" />
-      <br />
-
-      <label for="chordComplexity">chordComplexity (0..1):</label>
-      <input
-        type="range"
-        id="chordComplexity"
-        min="0"
-        max="1"
-        step="0.1"
-        value="0.5"
-      />
-      <br />
-
+      <legend>Colorful Chord Swell Pattern</legend>
+      <div class="param-row">
+        <label for="colorSelect">color:</label>
+        <select id="colorSelect">
+          <option value="warm" selected>Warm</option>
+          <option value="bright">Bright</option>
+          <option value="dark">Dark</option>
+          <option value="mysterious">Mysterious</option>
+        </select>
+      </div>
+      <div class="param-row">
+        <label for="swellDuration">swellDuration (steps):</label>
+        <input type="number" id="swellDuration" min="1" max="64" value="16" />
+      </div>
+      <div class="param-row">
+        <label for="overlap">overlap (steps):</label>
+        <input type="number" id="overlap" min="-8" max="8" value="2" />
+      </div>
+      <div class="param-row">
+        <label for="chordComplexity">chordComplexity (0..1):</label>
+        <input
+          type="range"
+          id="chordComplexity"
+          min="0"
+          max="1"
+          step="0.1"
+          value="0.5"
+        />
+      </div>
       <button id="updateChordBtn">Update Chord Pattern</button>
     </fieldset>
 
+    <!-- 2) EvolvingLockedDrum Pattern -->
     <fieldset>
       <legend>Evolving Drum Pattern</legend>
-      <label for="drumIntensity">drumIntensity (0..1):</label>
-      <input
-        type="range"
-        id="drumIntensity"
-        min="0"
-        max="1"
-        step="0.1"
-        value="0.5"
-      />
-      <br />
-
-      <label for="flavorSelect">flavor:</label>
-      <select id="flavorSelect">
-        <option value="ambient" selected>ambient</option>
-        <option value="tribal">tribal</option>
-        <option value="electronic">electronic</option>
-        <option value="lofi">lofi</option>
-      </select>
-      <br />
-
+      <div class="param-row">
+        <label for="drumIntensity">drumIntensity (0..1):</label>
+        <input
+          type="range"
+          id="drumIntensity"
+          min="0"
+          max="1"
+          step="0.1"
+          value="0.5"
+        />
+      </div>
+      <div class="param-row">
+        <label for="flavorSelect">flavor:</label>
+        <select id="flavorSelect">
+          <option value="ambient" selected>ambient</option>
+          <option value="tribal">tribal</option>
+          <option value="electronic">electronic</option>
+          <option value="lofi">lofi</option>
+        </select>
+      </div>
       <button id="updateDrumsBtn">Update Drum Pattern</button>
     </fieldset>
 
+    <!-- 3) PhraseContourMelody Pattern -->
+    <fieldset>
+      <legend>PhraseContourMelody (Melody on channel 5)</legend>
+      <div class="param-row">
+        <label for="phraseBars">phraseBars:</label>
+        <input type="number" id="phraseBars" min="1" max="16" value="4" />
+      </div>
+      <div class="param-row">
+        <label for="subSections">subSections (comma-sep):</label>
+        <input
+          type="text"
+          id="subSections"
+          value="intro,build,peak,resolve,cadence"
+          size="30"
+        />
+      </div>
+      <div class="param-row">
+        <label for="stepsPerBar">stepsPerBar:</label>
+        <input type="number" id="stepsPerBar" min="4" max="64" value="16" />
+      </div>
+      <div class="param-row">
+        <label for="cadenceBeats">cadenceBeats:</label>
+        <input type="number" id="cadenceBeats" min="0" max="8" value="2" />
+      </div>
+      <div class="param-row">
+        <label for="melodicDensity">melodicDensity (0..1):</label>
+        <input
+          type="range"
+          id="melodicDensity"
+          min="0"
+          max="1"
+          step="0.1"
+          value="0.7"
+        />
+      </div>
+      <div class="param-row">
+        <label for="baseVelocity">baseVelocity (1..127):</label>
+        <input type="number" id="baseVelocity" min="1" max="127" value="90" />
+      </div>
+      <div class="param-row">
+        <label for="tensionEmbellishProb">tensionEmbellishProb (0..1):</label>
+        <input
+          type="range"
+          id="tensionEmbellishProb"
+          min="0"
+          max="1"
+          step="0.1"
+          value="0.2"
+        />
+      </div>
+      <button id="updateMelodyBtn">Update Melody Pattern</button>
+    </fieldset>
+
+    <!-- 4) Energy Manager Controls -->
     <fieldset>
       <legend>Energy Manager Controls</legend>
       <div>
@@ -117,17 +186,19 @@
     <div id="output"></div>
 
     <script type="module">
-      /*******************************************************
-       * 1) Import createDefaultSystem + patterns, etc.
-       *******************************************************/
+      /****************************************************
+       * 1) Import system + patterns (assuming you export
+       *    PhraseContourMelody in your main index.js).
+       ****************************************************/
       import { createDefaultSystem } from "../src/system/create-default-system.js";
       import {
         LiveLoop,
         ColorfulChordSwellPattern,
         EvolvingLockedDrumPattern,
-      } from "../src/index.js"; // or do more fine-grained imports
+        PhraseContourMelody,
+      } from "../src/index.js";
 
-      // Utility to mirror console logs to #output
+      // Mirror console logs to #output
       const outputEl = document.getElementById("output");
       const origLog = console.log;
       console.log = (...args) => {
@@ -136,14 +207,12 @@
         outputEl.scrollTop = outputEl.scrollHeight;
       };
 
-      /*******************************************************
-       * 2) Main async function to set up system, patterns, loops
-       *******************************************************/
+      /****************************************************
+       * 2) Main async function: set up system, patterns, loops
+       ****************************************************/
       (async function main() {
-        // 2A) Create the default system (MIDI bus, device manager, transport, etc.)
+        // 2A) Create system
         const system = await createDefaultSystem();
-
-        // Destructure the main items
         const {
           transport,
           energyManager,
@@ -152,37 +221,31 @@
           midiOutputs,
         } = system;
 
-        // 2B) Put energyManager & chordManager in globalContext
-        //     so that any pattern can read them via context.energyManager, context.chordManager.
+        // Insert managers into globalContext so patterns can read chord/tension/hype
         globalContext.energyManager = energyManager;
         globalContext.chordManager = chordManager;
 
-        // Authorize our chord provider ID for chord changes
+        // Authorize the chord provider ID for chord setting
         chordManager.authorizeProvider("ColorfulChordSwellPattern");
 
-        // A) Create an initial chord pattern
+        // (1) Build initial chord pattern + loop
         let chordPattern = new ColorfulChordSwellPattern({
           color: "warm",
           swellDuration: 16,
           overlap: 2,
           chordComplexity: 0.5,
         });
-
-        // B) Create the chord loop
-        //    **Note** We pass only `globalContext`; no need to pass chordManager or energyManager.
         const chordLoop = new LiveLoop(system.midiBus, {
           pattern: chordPattern,
           midiChannel: 8,
           name: "ColorfulChordLoop",
           role: "chordProvider",
           globalContext,
-
-          // If you want LFO -> device CC mapping, we still pass device info:
           deviceManager: system.deviceManager,
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // C) Create a drum pattern that includes a deviceDefinition
+        // (2) Build initial drum pattern + loop (kick provider)
         let drumPattern = new EvolvingLockedDrumPattern({
           patternLength: 16,
           drumIntensity: 0.5,
@@ -191,68 +254,85 @@
             midiOutputs[0]?.id
           ),
         });
-
-        // D) Create the drum loop (kick provider)
         const drumLoop = new LiveLoop(system.midiBus, {
           pattern: drumPattern,
           midiChannel: 1,
           name: "EvolvingDrums",
           role: "kickProvider",
           globalContext,
-
           deviceManager: system.deviceManager,
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // E) Add both loops to transport
+        // (3) Build initial PhraseContourMelody + loop (channel=5)
+        let melodyPattern = new PhraseContourMelody({
+          phraseBars: 4,
+          subSections: ["intro", "build", "peak", "resolve", "cadence"],
+          stepsPerBar: 16,
+          cadenceBeats: 2,
+          melodicDensity: 0.7,
+          baseVelocity: 90,
+          tensionEmbellishProb: 0.2,
+        });
+        const melodyLoop = new LiveLoop(system.midiBus, {
+          pattern: melodyPattern,
+          midiChannel: 5, // as requested, default channel=5
+          name: "PhraseMelody",
+          role: null, // or "melody" if you prefer
+          globalContext,
+          deviceManager: system.deviceManager,
+          midiOutputId: midiOutputs[0]?.id,
+        });
+
+        // Add loops to transport
         transport.addLiveLoop(chordLoop);
         transport.addLiveLoop(drumLoop);
+        transport.addLiveLoop(melodyLoop);
 
-        // Ready message
         console.log("System ready! Press Play on external clock...");
 
-        /*******************************************************
-         * 3) Hook up UI for chord + drum config
-         *******************************************************/
+        /****************************************************
+         * 3) Hook up UI for chord + drum + melody params
+         ****************************************************/
+
+        // (A) Chord Swell controls
         const colorSelect = document.getElementById("colorSelect");
         const swellDurationInput = document.getElementById("swellDuration");
         const overlapInput = document.getElementById("overlap");
         const chordComplexityInput = document.getElementById("chordComplexity");
-
         document
           .getElementById("updateChordBtn")
           .addEventListener("click", () => {
             const newColor = colorSelect.value;
-            const newSwellDuration =
-              parseInt(swellDurationInput.value, 10) || 16;
+            const newSwell = parseInt(swellDurationInput.value, 10) || 16;
             const newOverlap = parseInt(overlapInput.value, 10) || 0;
             const newComplex = parseFloat(chordComplexityInput.value) || 0.5;
 
             chordPattern = new ColorfulChordSwellPattern({
               color: newColor,
-              swellDuration: newSwellDuration,
+              swellDuration: newSwell,
               overlap: newOverlap,
               chordComplexity: newComplex,
             });
             chordLoop.setPattern(chordPattern, true);
             console.log(
-              "ChordSwell updated:",
+              "ChordPattern updated =>",
               newColor,
-              newSwellDuration,
+              newSwell,
               newOverlap,
               newComplex
             );
           });
 
+        // (B) Drum pattern controls
         const drumIntensityRange = document.getElementById("drumIntensity");
         const flavorSelect = document.getElementById("flavorSelect");
         document
           .getElementById("updateDrumsBtn")
           .addEventListener("click", () => {
-            const newIntensity = parseFloat(drumIntensityRange.value);
+            const newIntensity = parseFloat(drumIntensityRange.value) || 0.5;
             const newFlavor = flavorSelect.value;
 
-            // Recreate the pattern with updated parameters (and pass deviceDefinition again)
             drumPattern = new EvolvingLockedDrumPattern({
               patternLength: 16,
               drumIntensity: newIntensity,
@@ -263,10 +343,68 @@
             });
             drumLoop.setPattern(drumPattern, true);
 
-            console.log("Drum updated:", newIntensity, newFlavor);
+            console.log("DrumPattern updated =>", newIntensity, newFlavor);
           });
 
-        // F) Hook up hype/tension
+        // (C) PhraseContourMelody controls
+        const phraseBarsEl = document.getElementById("phraseBars");
+        const subSectionsEl = document.getElementById("subSections");
+        const stepsPerBarEl = document.getElementById("stepsPerBar");
+        const cadenceBeatsEl = document.getElementById("cadenceBeats");
+        const melodicDensityEl = document.getElementById("melodicDensity");
+        const baseVelocityEl = document.getElementById("baseVelocity");
+        const tensionEmbellishEl = document.getElementById(
+          "tensionEmbellishProb"
+        );
+
+        document
+          .getElementById("updateMelodyBtn")
+          .addEventListener("click", () => {
+            const pb = parseInt(phraseBarsEl.value, 10) || 4;
+            // subSections from comma-separated string
+            const subsArray = subSectionsEl.value
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
+            const spb = parseInt(stepsPerBarEl.value, 10) || 16;
+            const cadBeats = parseFloat(cadenceBeatsEl.value) || 2;
+            const density = parseFloat(melodicDensityEl.value) || 0.7;
+            const baseVel = parseInt(baseVelocityEl.value, 10) || 90;
+            const tProb = parseFloat(tensionEmbellishEl.value) || 0.2;
+
+            melodyPattern = new PhraseContourMelody({
+              phraseBars: pb,
+              subSections: subsArray.length
+                ? subsArray
+                : ["build", "peak", "resolve"],
+              stepsPerBar: spb,
+              cadenceBeats: cadBeats,
+              melodicDensity: density,
+              baseVelocity: baseVel,
+              tensionEmbellishProb: tProb,
+            });
+            melodyLoop.setPattern(melodyPattern, true);
+
+            console.log(
+              "MelodyPattern updated =>",
+              "phraseBars:",
+              pb,
+              "subSections:",
+              subsArray,
+              "stepsPerBar:",
+              spb,
+              "cadenceBeats:",
+              cadBeats,
+              "density:",
+              density,
+              "baseVelocity:",
+              baseVel,
+              "tensionEmbellishProb:",
+              tProb
+            );
+          });
+
+        // (D) Hype/Tension controls
         document.querySelectorAll("button[data-hype]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newHype = btn.getAttribute("data-hype");
