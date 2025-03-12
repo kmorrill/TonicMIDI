@@ -2,221 +2,74 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>OP-XY Live: Multi-Pattern Demo</title>
+    <title>Tonic Midi</title>
     <style>
-      /* Base styling to achieve a clean, professional look */
       body {
-        font-family: "Segoe UI", Tahoma, sans-serif;
-        margin: 1rem auto;
-        max-width: 980px;
-        background: #f7f7f7;
-        line-height: 1.5;
-        color: #333;
-      }
-      h1,
-      h2,
-      h3,
-      legend {
-        color: #222;
-      }
-      h1 {
-        margin-bottom: 0.2rem;
-      }
-      p {
-        margin-top: 0.2rem;
-        margin-bottom: 1rem;
+        font-family: sans-serif;
+        margin: 1rem;
+        background: #f0f0f0;
       }
       fieldset {
+        margin-bottom: 1rem;
         border: 1px solid #ccc;
-        border-radius: 5px;
         padding: 1rem;
-        margin-bottom: 1.5rem;
         background: #fff;
       }
-      fieldset legend {
-        font-weight: 600;
-        padding: 0 0.5rem;
+      fieldset > legend {
+        font-size: 1.2rem;
+        font-weight: bold;
       }
-      .description {
-        font-size: 0.9rem;
-        margin-bottom: 1rem;
-        color: #555;
-      }
-      .param-row {
-        display: flex;
-        align-items: center;
-        margin-bottom: 0.7rem;
-      }
-      .param-row label {
+      label {
         display: inline-block;
-        min-width: 200px;
+        width: 180px;
         font-weight: 600;
-      }
-      .param-row select,
-      .param-row input[type="number"],
-      .param-row input[type="range"],
-      .param-row input[type="text"] {
-        flex: 1;
-        padding: 0.3rem;
-        font-size: 0.9rem;
-        margin-left: 0.5rem;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-      }
-      .param-help {
-        display: block;
-        font-size: 0.8rem;
-        color: #666;
         margin-top: 0.2rem;
       }
       button {
-        display: inline-block;
-        cursor: pointer;
-        background: #0077cc;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        padding: 0.4rem 1rem;
-        font-size: 0.9rem;
         margin-top: 0.5rem;
-        transition: background 0.2s;
       }
-      button:hover {
-        background: #005fa3;
-      }
-      .energy-buttons {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-      }
-      .energy-buttons button {
-        margin: 0;
-      }
-      .small-note {
-        font-size: 0.85rem;
-        color: #666;
+      .param-row {
+        margin-bottom: 0.3rem;
       }
     </style>
   </head>
   <body>
-    <h1>OP-XY Live: Multi-Pattern Demo</h1>
+    <h1>Tonic Midi</h1>
     <p>
-      <strong>Updated Introduction / YouTube Demo Script</strong><br />
-      Welcome to this demonstration of our DAWless, mobile-friendly setup
-      powering an advanced sequencing system for the Teenage Engineering OP-XY.
-      In this video, we'll explore how you can harness multiple generative
-      patterns—<em>without needing deep music theory</em>—by simply adjusting
-      "Hype" and "Tension" controls.
-    </p>
-    <p>
-      These concepts draw inspiration from <em>The Addiction Formula</em>, a
-      book that emphasizes how effective music arrangements often hinge on
-      intentional rises and falls in energy. "Hype" increases the intensity,
-      bringing in faster subdivisions or more layers; "Tension" introduces
-      dissonance or borrowed chords that heighten the musical suspense. Even if
-      you're not familiar with those terms from the book, you'll see how easily
-      they let you shape your track’s arrangement from a single mobile page.
-    </p>
-    <p>
-      <strong>Script Outline for the YouTube Video:</strong><br /><br />
-      <strong>1. Introduction:</strong><br />
-      &bull; Greet viewers and explain that we have a web-based system
-      controlling a multi-timbral OP-XY synthesizer/drum machine. Emphasize no
-      DAW is required and everything runs on an Android phone for maximum
-      portability.<br />
-      &bull; Mention that the patterns (ColorfulChordSwell, EvolvingLockedDrum,
-      and PhraseContourMelody) adapt to chord changes and user input in real
-      time.
-      <br /><br />
-      <strong>2. Explanation of Patterns and Controls:</strong><br />
-      &bull; Show how <em>ColorfulChordSwell</em> handles chord progressions
-      with overlapping transitions—like in a film soundtrack—just by changing
-      color, swell duration, and complexity.<br />
-      &bull; Demonstrate <em>EvolvingLockedDrum</em> as it injects percussive
-      variety without losing the core rhythmic drive.<br />
-      &bull; Showcase <em>PhraseContourMelody</em>, how it automatically forms
-      melodic arcs over multiple bars, shaped by sub-sections (e.g. "intro",
-      "build", "peak", "resolve").<br />
-      &bull; Clarify that "Hype" adds more layers or faster patterns, while
-      "Tension" brings in dissonant notes, borrowed chords, or extra drum hits
-      to keep things interesting.<br /><br />
-      <strong>3. Hands-On Demonstration:</strong><br />
-      &bull; Connect your Android phone to the OP-XY via USB or MIDI adapter—no
-      computer needed. Press "Play" on the phone’s webpage to follow the
-      external clock from the OP-XY or another hardware clock.<br />
-      &bull; Turn up "Hype" to show instant changes, where drums get punchier
-      and chords become more active.<br />
-      &bull; Increase "Tension" during a breakdown to add dissonant chord
-      extensions or approach notes in the melody. Show how easy it is to revert
-      to less tension for a resolution.<br /><br />
-      <strong>4. Customizing Patterns on the Fly:</strong><br />
-      &bull; Demonstrate adjusting the chord color, overlap, or melodic density.
-      Note how each change is immediate, letting you improvise an entire track
-      live.<br />
-      &bull; Emphasize that you can do this all from your phone’s browser, with
-      no special hardware beyond the OP-XY and a USB MIDI cable.<br /><br />
-      <strong>5. Wrap-Up:</strong><br />
-      &bull; Summarize the freedom of jamming portably, referencing the
-      <em>Addiction Formula</em> principle that it’s easy to keep listeners
-      engaged by controlling hype and tension.<br />
-      &bull; Encourage viewers to experiment with these patterns and approach
-      their next arrangement with a more creative, dynamic lens.<br /><br />
-      That’s it! Now let’s dive into the parameters below to see how you can
-      adjust everything for your own unique performance.
+      This page is a personal project demonstrating how to build generative
+      music with chord swells, evolving drums, and melodic phrases. It reacts to
+      an
+      <em>external MIDI clock</em>, so press play on a hardware or software
+      sequencer that sends clock, and the patterns will sync up automatically.
     </p>
 
-    <p class="small-note">
-      <strong>Note:</strong> This demo relies on an
-      <em>external MIDI clock</em>. Press <strong>Play</strong> on your OP-XY or
-      external hardware to start. Ensure you have a MIDI input device sending
-      clock to the browser.
-    </p>
-
-    <!-- 1) Colorful Chord Swell Pattern -->
     <fieldset>
       <legend>Colorful Chord Swell Pattern</legend>
-      <p class="description">
-        Generates a rich harmonic progression with overlapping chords. Perfect
-        for ambient swells or transitions. Reacts to your hype/tension settings.
+      <p style="max-width: 600px">
+        This pattern selects a musical scale based on “color” and creates chords
+        that swell into each other. Adjust how long chords last
+        (<em>swellDuration</em>), how they overlap, and how many chord
+        extensions (<em>chordComplexity</em>) are added.
       </p>
-
       <div class="param-row">
-        <label for="colorSelect">
-          <span>Color (Scale Mode)</span>
-          <span class="param-help">
-            Chooses the modal flavor: <em>warm</em> (Ionian),
-            <em>bright</em> (Lydian), <em>dark</em> (Aeolian),
-            <em>mysterious</em> (Phrygian).
-          </span>
-        </label>
+        <label for="colorSelect">color:</label>
         <select id="colorSelect">
-          <option value="warm" selected>Warm (Ionian)</option>
-          <option value="bright">Bright (Lydian)</option>
-          <option value="dark">Dark (Aeolian)</option>
-          <option value="mysterious">Mysterious (Phrygian)</option>
+          <option value="warm" selected>Warm</option>
+          <option value="bright">Bright</option>
+          <option value="dark">Dark</option>
+          <option value="mysterious">Mysterious</option>
         </select>
       </div>
-
       <div class="param-row">
-        <label for="swellDuration">Swell Duration (steps):</label>
+        <label for="swellDuration">swellDuration (steps):</label>
         <input type="number" id="swellDuration" min="1" max="64" value="16" />
-        <span class="param-help">
-          How many steps each chord is held before moving to the next. Larger
-          values produce slower chord changes.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="overlap">Overlap (steps):</label>
+        <label for="overlap">overlap (steps):</label>
         <input type="number" id="overlap" min="-8" max="8" value="2" />
-        <span class="param-help">
-          Positive overlap means chords overlap by this many steps. Negative
-          values introduce a gap between chords.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="chordComplexity">Chord Complexity (0..1):</label>
+        <label for="chordComplexity">chordComplexity (0..1):</label>
         <input
           type="range"
           id="chordComplexity"
@@ -225,25 +78,19 @@
           step="0.1"
           value="0.5"
         />
-        <span class="param-help">
-          Controls how extended/dissonant chords can become. 0 = simple triads,
-          1 = richly extended chords (#11, 13, etc.).
-        </span>
       </div>
-
       <button id="updateChordBtn">Update Chord Pattern</button>
     </fieldset>
 
-    <!-- 2) EvolvingLockedDrum Pattern -->
     <fieldset>
       <legend>Evolving Drum Pattern</legend>
-      <p class="description">
-        A continually changing drum pattern that retains an overall identity.
-        It's the designated <strong>kick provider</strong>, syncing your groove
-        with hype/tension changes.
+      <p style="max-width: 600px">
+        This drum pattern morphs in real time while holding onto a core groove.
+        <em>drumIntensity</em> controls how dense the hits get, and
+        <em>flavor</em> picks the characteristic style.
       </p>
       <div class="param-row">
-        <label for="drumIntensity">Drum Intensity (0..1):</label>
+        <label for="drumIntensity">drumIntensity (0..1):</label>
         <input
           type="range"
           id="drumIntensity"
@@ -252,81 +99,50 @@
           step="0.1"
           value="0.5"
         />
-        <span class="param-help">
-          Higher intensity increases the frequency and volume of additional
-          hits.
-        </span>
       </div>
       <div class="param-row">
-        <label for="flavorSelect">Flavor:</label>
+        <label for="flavorSelect">flavor:</label>
         <select id="flavorSelect">
-          <option value="ambient" selected>Ambient</option>
-          <option value="tribal">Tribal</option>
-          <option value="electronic">Electronic</option>
-          <option value="lofi">Lo-Fi</option>
+          <option value="ambient" selected>ambient</option>
+          <option value="tribal">tribal</option>
+          <option value="electronic">electronic</option>
+          <option value="lofi">lofi</option>
         </select>
-        <span class="param-help">
-          Selects a fundamental style. E.g., <em>ambient</em> uses fewer hits,
-          <em>tribal</em> focuses on toms/percussion, <em>electronic</em> might
-          add extra syncopation, etc.
-        </span>
       </div>
       <button id="updateDrumsBtn">Update Drum Pattern</button>
     </fieldset>
 
-    <!-- 3) PhraseContourMelody Pattern -->
     <fieldset>
       <legend>PhraseContourMelody (Melody on channel 5)</legend>
-      <p class="description">
-        Builds multi-bar melodic phrases subdivided into sections (e.g. "intro",
-        "build", "peak", "resolve"). Each sub-section shapes pitch direction,
-        duration, and velocity. Also responds to tension/hype.
+      <p style="max-width: 600px">
+        A multi-bar melodic line divided into subSections like “build” or
+        “peak.” You can define how many bars the phrase lasts, steps per bar,
+        and how often “spice” (approach notes) appears. The pattern re-shapes
+        each time it completes a phrase.
       </p>
-
       <div class="param-row">
-        <label for="phraseBars">Phrase Bars:</label>
+        <label for="phraseBars">phraseBars:</label>
         <input type="number" id="phraseBars" min="1" max="16" value="4" />
-        <span class="param-help">
-          Number of bars in a single phrase cycle. Each phrase is subdivided by
-          <em>subSections</em>.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="subSections">SubSections (comma-separated):</label>
+        <label for="subSections">subSections (comma-sep):</label>
         <input
           type="text"
           id="subSections"
           value="intro,build,peak,resolve,cadence"
           size="30"
         />
-        <span class="param-help">
-          Possible values (examples): intro, build, peak, resolve, cadence,
-          fall, bridge, etc. The pattern changes logic based on each section’s
-          name.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="stepsPerBar">Steps Per Bar:</label>
+        <label for="stepsPerBar">stepsPerBar:</label>
         <input type="number" id="stepsPerBar" min="4" max="64" value="16" />
-        <span class="param-help">
-          The total sequencer steps that define one bar. 16 is typical in 4/4
-          when each step = 16th note.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="cadenceBeats">Cadence Beats:</label>
+        <label for="cadenceBeats">cadenceBeats:</label>
         <input type="number" id="cadenceBeats" min="0" max="8" value="2" />
-        <span class="param-help">
-          How many beats at the end of the phrase are used for a "cadence" hold
-          or rest. E.g., 2 beats at the end can create a sense of resolution.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="melodicDensity">Melodic Density (0..1):</label>
+        <label for="melodicDensity">melodicDensity (0..1):</label>
         <input
           type="range"
           id="melodicDensity"
@@ -335,23 +151,13 @@
           step="0.1"
           value="0.7"
         />
-        <span class="param-help">
-          Probability of placing a note at each possible slot. Higher = busier
-          melody.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="baseVelocity">Base Velocity (1..127):</label>
+        <label for="baseVelocity">baseVelocity (1..127):</label>
         <input type="number" id="baseVelocity" min="1" max="127" value="90" />
-        <span class="param-help">
-          Central MIDI velocity for the melody. Sub-sections and hype can push
-          this up or down.
-        </span>
       </div>
-
       <div class="param-row">
-        <label for="tensionEmbellishProb">Tension Embellish (0..1):</label>
+        <label for="tensionEmbellishProb">tensionEmbellishProb (0..1):</label>
         <input
           type="range"
           id="tensionEmbellishProb"
@@ -360,29 +166,23 @@
           step="0.1"
           value="0.2"
         />
-        <span class="param-help">
-          Base probability of adding approach/dissonance notes. This scales with
-          the current tension level.
-        </span>
       </div>
-
       <button id="updateMelodyBtn">Update Melody Pattern</button>
     </fieldset>
 
-    <!-- 4) Energy Manager Controls -->
     <fieldset>
       <legend>Energy Manager Controls</legend>
-      <p class="description">
-        Dynamically control <strong>Hype</strong> (low, medium, high) and
-        <strong>Tension</strong> (none, low, mid, high). Patterns will adjust
-        their output accordingly.
+      <p style="max-width: 600px">
+        These quick switches alter “hype” (how busy/loud everything is) and
+        “tension” (how dissonant or stable chord/melody structures become). This
+        is a handy shortcut for performing live arrangement changes.
       </p>
-      <div class="energy-buttons">
+      <div>
         <button data-hype="low">Set Hype: LOW</button>
         <button data-hype="medium">Set Hype: MEDIUM</button>
         <button data-hype="high">Set Hype: HIGH</button>
       </div>
-      <div class="energy-buttons" style="margin-top: 0.5rem">
+      <div style="margin-top: 0.5rem">
         <button data-tension="none">Set Tension: NONE</button>
         <button data-tension="low">Set Tension: LOW</button>
         <button data-tension="mid">Set Tension: MID</button>
@@ -390,10 +190,15 @@
       </div>
     </fieldset>
 
+    <p style="margin-top: 2rem; max-width: 700px">
+      Try changing flavors, note durations, chord complexities, or hype/tension
+      levels at any time. I'm continuing to build out new pattern ideas and ways
+      of chaining them together. The goal is a simple browser-based setup that
+      hooks to your hardware via Web MIDI, letting you spontaneously jam
+      evolving tracks without a DAW.
+    </p>
+
     <script type="module">
-      /****************************************************
-       * 1) Import system + patterns
-       ****************************************************/
       import { createDefaultSystem } from "../src/system/create-default-system.js";
       import {
         LiveLoop,
@@ -402,11 +207,7 @@
         PhraseContourMelody,
       } from "../src/index.js";
 
-      /****************************************************
-       * 2) Main async function: set up system, patterns, loops
-       ****************************************************/
       (async function main() {
-        // 2A) Create the system (MIDI Bus, Transport, etc.)
         const system = await createDefaultSystem();
         const {
           transport,
@@ -416,14 +217,10 @@
           midiOutputs,
         } = system;
 
-        // Insert references so patterns can read chord/tension/hype
         globalContext.energyManager = energyManager;
         globalContext.chordManager = chordManager;
-
-        // Authorize a chord provider ID for chordManager
         chordManager.authorizeProvider("ColorfulChordSwellPattern");
 
-        // (1) Build initial chord pattern + loop
         let chordPattern = new ColorfulChordSwellPattern({
           color: "warm",
           swellDuration: 16,
@@ -440,7 +237,6 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // (2) Build initial drum pattern + loop (kick provider)
         let drumPattern = new EvolvingLockedDrumPattern({
           patternLength: 16,
           drumIntensity: 0.5,
@@ -459,7 +255,6 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // (3) Build initial PhraseContourMelody + loop (channel=5)
         let melodyPattern = new PhraseContourMelody({
           phraseBars: 4,
           subSections: ["intro", "build", "peak", "resolve", "cadence"],
@@ -479,17 +274,17 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // Add loops to transport
         transport.addLiveLoop(chordLoop);
         transport.addLiveLoop(drumLoop);
         transport.addLiveLoop(melodyLoop);
 
-        // (A) Chord Swell controls
+        console.log("System ready! Press play on external clock...");
+
+        // Chord pattern controls
         const colorSelect = document.getElementById("colorSelect");
         const swellDurationInput = document.getElementById("swellDuration");
         const overlapInput = document.getElementById("overlap");
         const chordComplexityInput = document.getElementById("chordComplexity");
-
         document
           .getElementById("updateChordBtn")
           .addEventListener("click", () => {
@@ -505,12 +300,18 @@
               chordComplexity: newComplex,
             });
             chordLoop.setPattern(chordPattern, true);
+            console.log(
+              "ChordPattern updated =>",
+              newColor,
+              newSwell,
+              newOverlap,
+              newComplex
+            );
           });
 
-        // (B) Drum pattern controls
+        // Drum pattern controls
         const drumIntensityRange = document.getElementById("drumIntensity");
         const flavorSelect = document.getElementById("flavorSelect");
-
         document
           .getElementById("updateDrumsBtn")
           .addEventListener("click", () => {
@@ -526,9 +327,11 @@
               ),
             });
             drumLoop.setPattern(drumPattern, true);
+
+            console.log("DrumPattern updated =>", newIntensity, newFlavor);
           });
 
-        // (C) PhraseContourMelody controls
+        // Melody pattern controls
         const phraseBarsEl = document.getElementById("phraseBars");
         const subSectionsEl = document.getElementById("subSections");
         const stepsPerBarEl = document.getElementById("stepsPerBar");
@@ -555,8 +358,9 @@
 
             melodyPattern = new PhraseContourMelody({
               phraseBars: pb,
-              subSections:
-                subsArray.length > 0 ? subsArray : ["build", "peak", "resolve"],
+              subSections: subsArray.length
+                ? subsArray
+                : ["build", "peak", "resolve"],
               stepsPerBar: spb,
               cadenceBeats: cadBeats,
               melodicDensity: density,
@@ -564,19 +368,39 @@
               tensionEmbellishProb: tProb,
             });
             melodyLoop.setPattern(melodyPattern, true);
+
+            console.log(
+              "MelodyPattern updated =>",
+              "phraseBars:",
+              pb,
+              "subSections:",
+              subsArray,
+              "stepsPerBar:",
+              spb,
+              "cadenceBeats:",
+              cadBeats,
+              "density:",
+              density,
+              "baseVelocity:",
+              baseVel,
+              "tensionEmbellishProb:",
+              tProb
+            );
           });
 
-        // (D) Hype/Tension controls
+        // Energy controls
         document.querySelectorAll("button[data-hype]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newHype = btn.getAttribute("data-hype");
             energyManager.setHypeLevel(newHype);
+            console.log("EnergyManager setHypeLevel:", newHype);
           });
         });
         document.querySelectorAll("button[data-tension]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newTension = btn.getAttribute("data-tension");
             energyManager.setTensionLevel(newTension);
+            console.log("EnergyManager setTensionLevel:", newTension);
           });
         });
       })();
