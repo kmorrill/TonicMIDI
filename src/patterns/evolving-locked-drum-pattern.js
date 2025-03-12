@@ -2,273 +2,247 @@
 
 import { BasePattern } from "./base-pattern.js";
 
-/**
- * EvolvingLockedDrumPattern
- *
- * - Acts as your single "kickProvider" if used that way (ensuring a main Kick).
- * - Reads hype & tension from context.energyManager, plus 2 local params:
- *     1) drumIntensity (0..1)
- *     2) flavor (a string like "ambient","tribal","electronic","lofi", etc.)
- * - Whenever (hype, tension, drumIntensity, or flavor) changes, it re-generates
- *   a new 16-step pattern (with random logic). Until they change again, the pattern
- *   is locked, so each bar repeats the same hits.
- *
- * **Device Definition Lookup**:
- * If you pass `deviceDefinition` in the constructor options, any drum name
- * like `"kick"`, `"snare"`, etc. will be converted to its MIDI note number
- * via `deviceDefinition.getDrumNote(...)`.
- *
- * Example usage:
- * ```js
- *   const pattern = new EvolvingLockedDrumPattern({
- *     patternLength: 16,
- *     drumIntensity: 0.3,
- *     flavor: "lofi",
- *     deviceDefinition: myOpXyDevice,  // so it can map drum names to MIDI notes
- *   });
- *
- *   const loop = new LiveLoop(midiBus, {
- *     pattern,
- *     deviceManager,
- *     midiOutputId: "op-xy-output",
- *     role: "kickProvider",
- *   });
- *
- *   // Then calls like:
- *   energyManager.setHypeLevel("medium");
- *   pattern.setDrumIntensity(0.8);  // triggers a fresh re-gen of the 16-step pattern
- * ```
- */
 export class EvolvingLockedDrumPattern extends BasePattern {
-  /**
-   * @param {Object} options
-   * @param {number} [options.patternLength=16]
-   *   The total steps in one cycle. Typically 16 for a 4/4 measure.
-   * @param {number} [options.drumIntensity=0.5]
-   *   A single parameter (0..1) controlling how dense & loud the pattern is.
-   *   - 0 => extremely sparse, lower velocities
-   *   - 1 => more hits, higher velocities
-   * @param {string} [options.flavor="ambient"]
-   *   A style label controlling which instruments are favored.
-   *   (e.g. "ambient","tribal","electronic","lofi")
-   * @param {import("../device-definition.js").DeviceDefinition} [options.deviceDefinition=null]
-   *   If provided, drum names like "kick" or "snare" will be mapped to numeric
-   *   MIDI note values via `deviceDefinition.getDrumNote(...)`.
-   */
   constructor(options = {}) {
     super(options);
 
     this.patternLength = options.patternLength ?? 16;
     this.drumIntensity = options.drumIntensity ?? 0.5;
-    this.flavor = options.flavor ?? "ambient";
+    this.flavor = options.flavor ?? "house"; // or "ambient","tribal","lofi", etc.
 
-    /**
-     * The DeviceDefinition (optional). If present, we convert drum names to MIDI numbers.
-     * @private
-     */
     this.deviceDefinition = options.deviceDefinition || null;
 
-    // Keep track of last known hype/tension from energyManager so we can detect changes
     this._lastHype = null;
     this._lastTension = null;
     this._lastDrumIntensity = this.drumIntensity;
     this._lastFlavor = this.flavor;
 
-    /**
-     * We'll store a cached array of hits for each step:
-     *   this.cachedPattern[stepIndex] => array of { note, velocity, durationSteps }
-     */
     this.cachedPattern = [];
-
-    // Initially, we don't know hype/tension. We'll generate the pattern
-    // as soon as we first call getNotes(), or you can call forceRegenerate().
   }
 
-  /**
-   * getNotes is called each step by the LiveLoop. We:
-   *   1) read current hype & tension from context
-   *   2) compare with last-known hype/tension/flavor/drumIntensity
-   *   3) if any have changed, re-generate a new 16-step pattern
-   *   4) return the pre-computed hits for the current step
-   */
   getNotes(stepIndex, context = {}) {
-    // 1) read hype & tension from energyManager
     const hype = context.energyManager?.getHypeLevel?.() || "low";
     const tension = context.energyManager?.getTensionLevel?.() || "none";
 
-    // 2) check if anything changed
+    // If we detect changes in hype/tension/intensity/flavor, rebuild the pattern
     if (
       hype !== this._lastHype ||
       tension !== this._lastTension ||
       this.drumIntensity !== this._lastDrumIntensity ||
       this.flavor !== this._lastFlavor ||
-      this.cachedPattern.length === 0 // or if we haven't generated yet
+      !this.cachedPattern.length
     ) {
-      // 3) re-generate
       this._generatePattern(hype, tension);
-      // record the new state
+
       this._lastHype = hype;
       this._lastTension = tension;
       this._lastDrumIntensity = this.drumIntensity;
       this._lastFlavor = this.flavor;
     }
 
-    // 4) Return the hits stored for this step
     const stepInBar = stepIndex % this.patternLength;
     return this.cachedPattern[stepInBar] || [];
   }
 
-  /**
-   * getLength must return the number of steps before repeating.
-   */
   getLength() {
     return this.patternLength;
   }
 
-  /**
-   * Let user set drumIntensity. We'll cause a re-gen next time getNotes is called.
-   */
   setDrumIntensity(value) {
     this.drumIntensity = Math.max(0, Math.min(1, value));
   }
 
-  /**
-   * Let user set flavor. We'll cause a re-gen next time getNotes is called.
-   */
   setFlavor(newFlavor) {
     this.flavor = newFlavor;
   }
 
-  /**
-   * If you want to forcibly re-generate in the middle of a bar,
-   * you can call pattern.forceRegenerate(context).
-   */
   forceRegenerate(context = {}) {
     const hype = context.energyManager?.getHypeLevel?.() || "low";
     const tension = context.energyManager?.getTensionLevel?.() || "none";
     this._generatePattern(hype, tension);
-
-    // update stored values so we don't re-generate again immediately
     this._lastHype = hype;
     this._lastTension = tension;
     this._lastDrumIntensity = this.drumIntensity;
     this._lastFlavor = this.flavor;
   }
 
-  /**
-   * The core random logic, but we do it ONCE to fill up
-   * this.cachedPattern[0..patternLength-1] with arrays of hits.
-   * Then it won't change until hype/tension/flavor/intensity changes again.
-   *
-   * @private
-   */
+  // ---------------------------------------------------
+  // Main pattern generation
+  // ---------------------------------------------------
   _generatePattern(hype, tension) {
-    // build empty array for each step
-    this.cachedPattern = new Array(this.patternLength).fill(null).map(() => []);
+    // Initialize empty step arrays
+    this.cachedPattern = Array.from({ length: this.patternLength }, () => []);
 
-    // We'll do the same random approach for each step:
-    // For step in 0..patternLength-1, we generate hits based on hype/tension + user params
-    const hypeFactor = getHypeFactor(hype);
+    // 1) Build the foundation pattern for this flavor & hype
+    const foundation = getFoundationPattern(this.flavor, hype, tension);
 
+    // 2) Merge that foundation into the cached array
     for (let step = 0; step < this.patternLength; step++) {
-      // how many attempts for this step?
-      const maxHits = Math.floor(this.drumIntensity * hypeFactor * 3 + 0.5);
-      const attempts = Math.floor(Math.random() * (maxHits + 1));
+      for (const fHit of foundation[step]) {
+        // fHit is { drumName, velocity }
+        this.cachedPattern[step].push({
+          note: this._lookupDrumNote(fHit.drumName),
+          velocity: fHit.velocity,
+          durationSteps: 1,
+        });
+      }
+    }
 
-      // pick instruments for each attempt
-      const pools = getInstrumentPoolsForFlavor(this.flavor);
-      const hitsForStep = [];
+    // 3) Add random hits on top, scaled by hype + intensity
+    const hypeFactor = getHypeFactor(hype);
+    for (let step = 0; step < this.patternLength; step++) {
+      // Fewer attempts if intensity is low. We do a max of 2–3 for medium or high.
+      // For example:
+      //    maxHits = 3 * drumIntensity * hypeFactor => ~ 0..4 attempts
+      // But we clamp it so that at low intensity it might be 0–1 attempts, not big.
+      const baseMax = 3 * this.drumIntensity * hypeFactor; // e.g. up to 3 if intensity=1 & hype=medium
+      const attempts = Math.floor(Math.random() * baseMax);
 
+      const flavorPools = getInstrumentPoolsForFlavor(this.flavor);
+
+      // Attempt random overlays
       for (let i = 0; i < attempts; i++) {
-        const chosenNote = pickWeightedInstrument(pools, hype);
-        if (chosenNote) {
-          hitsForStep.push({
-            note: chosenNote,
-            velocity: decideVelocity(hype, this.drumIntensity),
-            durationSteps: 1,
-          });
-        }
+        const chosen = pickWeightedInstrument(flavorPools, hype);
+        if (!chosen) continue;
+
+        // If the foundation or an existing random pick is already here, maybe skip
+        const alreadyHere = this.cachedPattern[step].some(
+          (hit) => hit._origName === chosen
+        );
+        if (alreadyHere) continue;
+
+        const randomVel = decideVelocity(hype, this.drumIntensity);
+        this.cachedPattern[step].push({
+          note: this._lookupDrumNote(chosen),
+          _origName: chosen,
+          velocity: randomVel,
+          durationSteps: 1,
+        });
       }
 
-      // Kick provider logic:
-      // ensure we have a real kick on step 0 if hype >= "medium"
-      // or if hype="low" but intensity > 0.7
-      if (
-        hype === "medium" ||
-        hype === "high" ||
-        (hype === "low" && this.drumIntensity > 0.7)
-      ) {
-        if (step === 0 && !hitsForStep.some((h) => isKick(h.note))) {
-          hitsForStep.push({
-            note: "kick",
-            velocity: 110,
-            durationSteps: 1,
-          });
-        }
-      }
-
-      // If tension >= "mid", add “spicy” hits (metal, chi, cowbell, guiro) on offbeats
+      // If tension is mid or high, possibly add a “spicy” accent
       if (tension === "mid" || tension === "high") {
-        const spiceSteps = [2, 6, 10, 14];
-        if (spiceSteps.includes(step)) {
-          const spiceChance = tension === "high" ? 0.25 : 0.15;
+        if ([2, 6, 10, 14].includes(step)) {
+          const spiceChance = tension === "high" ? 0.3 : 0.15;
           if (Math.random() < spiceChance) {
             const edgy = pickRandom(["metal", "chi", "cowbell", "guiro"]);
-            hitsForStep.push({
-              note: edgy,
-              velocity: tension === "high" ? 100 : 80,
-              durationSteps: 1,
-            });
+            // Don’t double-add if it’s already there
+            if (
+              !this.cachedPattern[step].some((hit) => hit._origName === edgy)
+            ) {
+              this.cachedPattern[step].push({
+                note: this._lookupDrumNote(edgy),
+                _origName: edgy,
+                velocity: tension === "high" ? 100 : 80,
+                durationSteps: 1,
+              });
+            }
           }
         }
       }
-
-      // unify duplicates
-      const finalHits = mergeDuplicates(hitsForStep);
-
-      // Convert any string-based drum name to a numeric MIDI note if possible
-      finalHits.forEach((hit) => {
-        hit.note = this._lookupDrumNote(hit.note);
-      });
-
-      this.cachedPattern[step] = finalHits;
     }
   }
 
-  /**
-   * Converts a drum name like "kick", "snare" into a numeric MIDI note
-   * via `deviceDefinition.getDrumNote(...)`. If none found, defaults to 60 (C4).
-   *
-   * @private
-   * @param {string|number} drumNameOrNote - e.g. "kick", "snare", or numeric MIDI
-   * @returns {number} MIDI note number
-   */
   _lookupDrumNote(drumNameOrNote) {
-    // If pattern logic already assigned numeric MIDI note, just return it
     if (typeof drumNameOrNote === "number") {
       return drumNameOrNote;
     }
-    // If no deviceDefinition, fallback to 60
     if (!this.deviceDefinition) {
-      return 60; // fallback
+      return 60; // fallback if no definition
     }
-    // Attempt to look up
-    const num = this.deviceDefinition.getDrumNote(drumNameOrNote);
-    if (num !== null) {
-      return num;
-    }
-    // fallback
-    return 60;
+    const found = this.deviceDefinition.getDrumNote(drumNameOrNote);
+    return found == null ? 60 : found;
   }
 }
 
-/* ------------------------------------------------------------------
-   HELPER UTILS (same logic as before, but used once in _generatePattern)
-   ------------------------------------------------------------------ */
+// -------------------------------------------------------------------
+// "Minimal at Low Hype" Foundation Patterns
+// -------------------------------------------------------------------
+function getFoundationPattern(flavor, hype, tension) {
+  // We’ll store an array of length=16, each step is an array of objects:
+  // e.g. foundation[step] = [ { drumName:"kick", velocity:80 }, ... ]
+  const foundation = Array.from({ length: 16 }, () => []);
 
-/**
- * Convert hype => a factor for density
- */
+  // Decide a base velocity for the backbone hits
+  let backboneVel = 100;
+  if (hype === "low") backboneVel = 70;
+  if (hype === "medium") backboneVel = 100;
+  if (hype === "high") backboneVel = 115;
+
+  switch (flavor) {
+    case "house":
+      if (hype === "low") {
+        // Very minimal: just a single quiet(ish) kick on step 0
+        foundation[0].push({ drumName: "kick", velocity: backboneVel });
+      } else if (hype === "medium") {
+        // Standard 4-on-floor
+        [0, 4, 8, 12].forEach((s) =>
+          foundation[s].push({ drumName: "kick", velocity: backboneVel })
+        );
+        // Soft snare at 4,12
+        [4, 12].forEach((s) =>
+          foundation[s].push({ drumName: "snare", velocity: backboneVel - 10 })
+        );
+      } else {
+        // hype=high => same 4-on-floor + possibly add hats
+        [0, 4, 8, 12].forEach((s) =>
+          foundation[s].push({ drumName: "kick", velocity: backboneVel })
+        );
+        [4, 12].forEach((s) =>
+          foundation[s].push({ drumName: "snare", velocity: backboneVel })
+        );
+        // Add open hat on 2,6,10,14 (light accent)
+        [2, 6, 10, 14].forEach((s) =>
+          foundation[s].push({
+            drumName: "open_hat",
+            velocity: backboneVel - 20,
+          })
+        );
+      }
+      break;
+
+    case "tribal":
+      // Similar approach: for low hype => single random tom,
+      // medium => bigger pattern, high => more steps, etc.
+      // ...
+      break;
+
+    // ... your other flavors here
+
+    default:
+      // fallback or "ambient"
+      if (hype === "low") {
+        foundation[0].push({ drumName: "kick", velocity: backboneVel });
+      } else if (hype === "medium") {
+        [0, 8].forEach((s) =>
+          foundation[s].push({ drumName: "kick", velocity: backboneVel })
+        );
+        [4, 12].forEach((s) =>
+          foundation[s].push({ drumName: "snare", velocity: backboneVel })
+        );
+      } else {
+        [0, 4, 8, 12].forEach((s) =>
+          foundation[s].push({ drumName: "kick", velocity: backboneVel })
+        );
+        foundation[4].push({ drumName: "snare", velocity: backboneVel });
+        foundation[12].push({ drumName: "snare", velocity: backboneVel });
+      }
+      break;
+  }
+
+  // If tension is high, we could add a mild boost or something to certain steps
+  if (tension === "high") {
+    // E.g. add a clap or rim on step 2 just to underscore tension
+    foundation[2].push({ drumName: "clap", velocity: backboneVel });
+  }
+
+  // Return our 16-step foundation
+  return foundation;
+}
+
+// -------------------------------------------------------------------
+// Remaining random logic is mostly unchanged
+// -------------------------------------------------------------------
 function getHypeFactor(hype) {
   switch (hype) {
     case "low":
@@ -282,87 +256,33 @@ function getHypeFactor(hype) {
   }
 }
 
-/**
- * Returns instrument pools for each flavor,
- * which we pick from with pickWeightedInstrument().
- */
 function getInstrumentPoolsForFlavor(flavor) {
   switch (flavor) {
-    case "tribal":
+    case "house":
       return {
-        primary: ["kick", "low_tom", "conga_low"],
-        secondary: [
-          "snare",
-          "mid_tom",
-          "high_tom",
-          "conga_high",
-          "shaker",
-          "rim",
-        ],
-        tertiary: [
-          "cowbell",
-          "tambourine",
-          "metal",
-          "chi",
-          "ride",
-          "pedal_hat",
-        ],
+        primary: ["kick"],
+        secondary: ["snare", "clap", "closed_hat", "open_hat"],
+        tertiary: ["ride", "crash", "shaker", "tambourine", "cowbell"],
       };
-    case "electronic":
-      return {
-        primary: ["kick", "kick_alt", "snare", "snare_alt"],
-        secondary: [
-          "closed_hat",
-          "open_hat",
-          "pedal_hat",
-          "clap",
-          "rim",
-          "crash",
-        ],
-        tertiary: ["metal", "chi", "ride", "shaker", "tambourine", "cowbell"],
-      };
-    case "lofi":
-      return {
-        primary: ["kick", "snare_alt", "rim", "snap"],
-        secondary: [
-          "shaker",
-          "tambourine",
-          "guiro",
-          "clap",
-          "kick_alt",
-          "pedal_hat",
-        ],
-        tertiary: ["crash", "metal", "chi", "cowbell", "ride", "open_hat"],
-      };
-    case "ambient":
+    // ...
     default:
+      // fallback or "ambient"
       return {
-        primary: ["kick", "rim", "shaker", "snap"],
-        secondary: ["kick_alt", "snare", "tambourine", "clap", "guiro", "ride"],
-        tertiary: [
-          "open_hat",
-          "conga_low",
-          "conga_high",
-          "cowbell",
-          "crash",
-          "metal",
-        ],
+        primary: ["kick", "rim"],
+        secondary: ["snare", "shaker", "tambourine"],
+        tertiary: ["open_hat", "crash", "metal", "cowbell"],
       };
   }
 }
 
-/**
- * Weighted pick: "primary" always has weight 1.0,
- * "secondary" might be 0.5..1.2, "tertiary" might be 0.2..1.0 depending on hype.
- */
 function pickWeightedInstrument(pools, hype) {
+  // same weighting logic as before
   let wPrimary = 1.0;
   let wSecondary = 1.0;
   let wTertiary = 0.5;
-
   switch (hype) {
     case "low":
-      wSecondary = 0.5;
+      wSecondary = 0.4;
       wTertiary = 0.2;
       break;
     case "medium":
@@ -374,21 +294,24 @@ function pickWeightedInstrument(pools, hype) {
       wTertiary = 1.0;
       break;
   }
-
-  const totalWeight = wPrimary + wSecondary + wTertiary;
-  const r = Math.random() * totalWeight;
-
+  const total = wPrimary + wSecondary + wTertiary;
+  const r = Math.random() * total;
   if (r < wPrimary) {
-    return pickRandom(pools.primary ?? []);
+    return pickRandom(pools.primary);
   } else if (r < wPrimary + wSecondary) {
-    return pickRandom(pools.secondary ?? []);
+    return pickRandom(pools.secondary);
   } else {
-    return pickRandom(pools.tertiary ?? []);
+    return pickRandom(pools.tertiary);
   }
 }
 
+function pickRandom(arr) {
+  if (!arr || !arr.length) return null;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 /**
- * Decide velocity from hype + intensity, adding small random offset.
+ * Velocity shaping for random hits
  */
 function decideVelocity(hype, intensity) {
   let baseMin = 40;
@@ -409,30 +332,6 @@ function decideVelocity(hype, intensity) {
   }
   const range = baseMax - baseMin;
   const scaled = baseMin + range * intensity;
-  const final = scaled + (Math.random() * 10 - 5);
+  const final = scaled + (Math.random() * 10 - 5); // ±5 randomization
   return Math.max(1, Math.min(127, Math.round(final)));
-}
-
-/** Identify if noteName is "kick" or "kick_alt". */
-function isKick(noteName) {
-  return noteName === "kick" || noteName === "kick_alt";
-}
-
-/** Random pick from an array. Returns null if empty. */
-function pickRandom(arr) {
-  if (!arr || !arr.length) return null;
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-/** Merge duplicates in a single step so we only keep one instance of each note. */
-function mergeDuplicates(hits) {
-  const seen = new Set();
-  const result = [];
-  for (const h of hits) {
-    if (!seen.has(h.note)) {
-      seen.add(h.note);
-      result.push(h);
-    }
-  }
-  return result;
 }
