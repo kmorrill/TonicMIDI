@@ -27,6 +27,7 @@
       }
       button {
         margin-top: 0.5rem;
+        cursor: pointer;
       }
       .param-row {
         margin-bottom: 0.3rem;
@@ -48,8 +49,7 @@
     <p>
       This page is a personal project demonstrating how to build generative
       music with chord swells, evolving drums, and melodic phrases. It reacts to
-      an
-      <em>external MIDI clock</em>, so press play on a hardware or software
+      an <em>external MIDI clock</em>, so press play on a hardware or software
       sequencer that sends clock, and the patterns will sync up automatically.
     </p>
 
@@ -58,129 +58,50 @@
       <legend>Colorful Chord Swell Pattern</legend>
       <p style="max-width: 600px">
         This pattern selects a musical scale based on “color” and creates chords
-        that swell into each other. Adjust how long chords last
-        (<em>swellDuration</em>), how they overlap, and how many chord
-        extensions (<em>chordComplexity</em>) are added.
+        that swell into each other. Adjust how long chords last, how they
+        overlap, and how many chord extensions you add. Click below to open a
+        dialog that lets you tweak these options.
       </p>
-      <div class="param-row">
-        <label for="colorSelect">color:</label>
-        <select id="colorSelect">
-          <option value="warm" selected>Warm</option>
-          <option value="bright">Bright</option>
-          <option value="dark">Dark</option>
-          <option value="mysterious">Mysterious</option>
-        </select>
-      </div>
-      <div class="param-row">
-        <label for="swellDuration">swellDuration (steps):</label>
-        <input type="number" id="swellDuration" min="1" max="64" value="16" />
-      </div>
-      <div class="param-row">
-        <label for="overlap">overlap (steps):</label>
-        <input type="number" id="overlap" min="-8" max="8" value="2" />
-      </div>
-      <div class="param-row">
-        <label for="chordComplexity">chordComplexity (0..1):</label>
-        <input
-          type="range"
-          id="chordComplexity"
-          min="0"
-          max="1"
-          step="0.1"
-          value="0.5"
-        />
-      </div>
-      <button id="updateChordBtn">Update Chord Pattern</button>
+      <button id="openChordConfigBtn">Open Chord Config</button>
+      <!-- The new custom element for chord config -->
+      <colorful-chord-swell-config
+        id="chordConfig"
+        style="display: none"
+      ></colorful-chord-swell-config>
     </fieldset>
 
-    <!-- 2) EVOLVING DRUM PATTERN -->
+    <!-- 2) EVOLVING DRUM PATTERN (using the existing custom element) -->
     <fieldset>
       <legend>Evolving Drum Pattern</legend>
       <p style="max-width: 600px">
         This drum pattern morphs in real time while holding onto a core groove.
-        <em>drumIntensity</em> controls how dense the hits get, and
-        <em>flavor</em> picks the characteristic style.
+        Use the button below to open a dialog that adjusts
+        <em>drumIntensity</em> and <em>flavor</em>, then update or enqueue
+        changes to the pattern.
       </p>
-      <div class="param-row">
-        <label for="drumIntensity">drumIntensity (0..1):</label>
-        <input
-          type="range"
-          id="drumIntensity"
-          min="0"
-          max="1"
-          step="0.1"
-          value="0.5"
-        />
-      </div>
-      <div class="param-row">
-        <label for="flavorSelect">flavor:</label>
-        <select id="flavorSelect">
-          <option value="ambient" selected>ambient</option>
-          <option value="tribal">tribal</option>
-          <option value="electronic">electronic</option>
-          <option value="lofi">lofi</option>
-        </select>
-      </div>
-      <button id="updateDrumsBtn">Update Drum Pattern</button>
+      <button id="openDrumConfigBtn">Open Drum Config</button>
+      <!-- Our custom element from src/ui/evolving-locked-drum-config.js -->
+      <evolving-locked-drum-config
+        id="drumConfig"
+        style="display: none"
+      ></evolving-locked-drum-config>
     </fieldset>
 
     <!-- 3) PHRASE CONTOUR MELODY -->
     <fieldset>
-      <legend>PhraseContourMelody (Melody on channel 5)</legend>
+      <legend>PhraseContourMelody</legend>
       <p style="max-width: 600px">
         A multi-bar melodic line divided into subSections like “build” or
-        “peak.” You can define how many bars the phrase lasts, steps per bar,
-        and how often “spice” (approach notes) appears. The pattern re-shapes
-        each time it completes a phrase.
+        “peak.” Click below to open a dialog that controls how many bars the
+        phrase lasts, steps per bar, and the likelihood of “spice” or approach
+        notes.
       </p>
-      <div class="param-row">
-        <label for="phraseBars">phraseBars:</label>
-        <input type="number" id="phraseBars" min="1" max="16" value="4" />
-      </div>
-      <div class="param-row">
-        <label for="subSections">subSections (comma-sep):</label>
-        <input
-          type="text"
-          id="subSections"
-          value="intro,build,peak,resolve,cadence"
-          size="30"
-        />
-      </div>
-      <div class="param-row">
-        <label for="stepsPerBar">stepsPerBar:</label>
-        <input type="number" id="stepsPerBar" min="4" max="64" value="16" />
-      </div>
-      <div class="param-row">
-        <label for="cadenceBeats">cadenceBeats:</label>
-        <input type="number" id="cadenceBeats" min="0" max="8" value="2" />
-      </div>
-      <div class="param-row">
-        <label for="melodicDensity">melodicDensity (0..1):</label>
-        <input
-          type="range"
-          id="melodicDensity"
-          min="0"
-          max="1"
-          step="0.1"
-          value="0.7"
-        />
-      </div>
-      <div class="param-row">
-        <label for="baseVelocity">baseVelocity (1..127):</label>
-        <input type="number" id="baseVelocity" min="1" max="127" value="90" />
-      </div>
-      <div class="param-row">
-        <label for="tensionEmbellishProb">tensionEmbellishProb (0..1):</label>
-        <input
-          type="range"
-          id="tensionEmbellishProb"
-          min="0"
-          max="1"
-          step="0.1"
-          value="0.2"
-        />
-      </div>
-      <button id="updateMelodyBtn">Update Melody Pattern</button>
+      <button id="openMelodyConfigBtn">Open Melody Config</button>
+      <!-- The new custom element for melody config -->
+      <phrase-contour-melody-config
+        id="melodyConfig"
+        style="display: none"
+      ></phrase-contour-melody-config>
     </fieldset>
 
     <!-- 4) ENERGY CONTROLS -->
@@ -306,12 +227,19 @@
     </fieldset>
 
     <p style="margin-top: 2rem; max-width: 700px">
-      Try changing flavors, note durations, chord complexities, or hype/tension
-      levels at any time. I'm continuing to build out new pattern ideas and ways
-      of chaining them together. The goal is a simple browser-based setup that
-      hooks to your hardware via Web MIDI, letting you spontaneously jam
-      evolving tracks without a DAW.
+      Try changing flavors, chord complexities, or hype/tension levels at any
+      time. I'm continuing to build out new pattern ideas and ways of chaining
+      them together. The goal is a simple browser-based setup that hooks to your
+      hardware via Web MIDI, letting you spontaneously jam evolving tracks
+      without a DAW.
     </p>
+
+    <!-- Include all custom elements -->
+    <script type="module">
+      import "../src/ui/evolving-locked-drum-config.js";
+      import "../src/ui/colorful-chord-swell-config.js";
+      import "../src/ui/phrase-contour-melody-config.js";
+    </script>
 
     <script type="module">
       import { createDefaultSystem } from "../src/system/create-default-system.js";
@@ -421,9 +349,11 @@
 
         globalContext.energyManager = energyManager;
         globalContext.chordManager = chordManager;
+
+        // Authorize a chord provider
         chordManager.authorizeProvider("ColorfulChordSwellPattern");
 
-        // Patterns & Loops
+        // 1) Chord Swell
         let chordPattern = new ColorfulChordSwellPattern({
           color: "warm",
           swellDuration: 16,
@@ -440,6 +370,7 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
+        // 2) Evolving Drums
         let drumPattern = new EvolvingLockedDrumPattern({
           patternLength: 16,
           drumIntensity: 0.5,
@@ -458,6 +389,7 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
+        // 3) PhraseContourMelody
         let melodyPattern = new PhraseContourMelody({
           phraseBars: 4,
           subSections: ["intro", "build", "peak", "resolve", "cadence"],
@@ -477,141 +409,85 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
+        // Add loops to the transport
         transport.addLiveLoop(chordLoop);
         transport.addLiveLoop(drumLoop);
         transport.addLiveLoop(melodyLoop);
 
-        // Hook into the transport's clock pulses to update LFOs & sweeps:
-        // We'll monkey-patch or add a small hook to the TransportManager
+        // -----------
+        // Wire up our new custom elements for chord & melody configuration
+        // -----------
+        const chordConfigEl = document.getElementById("chordConfig");
+        chordConfigEl.liveLoop = chordLoop;
+        // chordConfigEl.deviceDefinition = optional if you want
+
+        document
+          .getElementById("openChordConfigBtn")
+          .addEventListener("click", () => {
+            if (chordConfigEl.hasAttribute("open")) {
+              chordConfigEl.removeAttribute("open");
+              chordConfigEl.style.display = "none";
+            } else {
+              chordConfigEl.setAttribute("open", "");
+              chordConfigEl.style.display = "block";
+            }
+          });
+
+        const melodyConfigEl = document.getElementById("melodyConfig");
+        melodyConfigEl.liveLoop = melodyLoop;
+        // melodyConfigEl.deviceDefinition = optional if you want
+
+        document
+          .getElementById("openMelodyConfigBtn")
+          .addEventListener("click", () => {
+            if (melodyConfigEl.hasAttribute("open")) {
+              melodyConfigEl.removeAttribute("open");
+              melodyConfigEl.style.display = "none";
+            } else {
+              melodyConfigEl.setAttribute("open", "");
+              melodyConfigEl.style.display = "block";
+            }
+          });
+
+        // -----------
+        // Drum config (existing approach)
+        // -----------
+        const drumConfigEl = document.getElementById("drumConfig");
+        drumConfigEl.liveLoop = drumLoop;
+        drumConfigEl.deviceDefinition = system.deviceManager.getDeviceForOutput(
+          midiOutputs[0]?.id
+        );
+
+        document
+          .getElementById("openDrumConfigBtn")
+          .addEventListener("click", () => {
+            if (drumConfigEl.hasAttribute("open")) {
+              drumConfigEl.removeAttribute("open");
+              drumConfigEl.style.display = "none";
+            } else {
+              drumConfigEl.setAttribute("open", "");
+              drumConfigEl.style.display = "block";
+            }
+          });
+
+        // -----------
+        // Tap into the transport clock to do LFO + sweeps
+        // -----------
         const originalClockFn = transport._onClockPulse.bind(transport);
-        transport._onClockPulse = function (message) {
-          // call original
-          originalClockFn(message);
-          // do our LFO updates
-          const deltaTime = 1.0 / 24.0; // approximate for each pulse in beats
+        transport._onClockPulse = function (msg) {
+          // call original logic
+          originalClockFn(msg);
+          // Then do custom updates
+          const deltaTime = 1.0 / 24.0; // each pulse ~1/24 beat
           updateAllLFOs(deltaTime, this.timeInBeats);
           checkOneShots(this.stepIndex, deltaTime);
         };
 
-        console.log("System ready! Press play on external clock...");
+        console.log("System ready! Press play on external MIDI clock...");
 
-        //-------------------------
-        //  Chord pattern controls
-        //-------------------------
-        const colorSelect = document.getElementById("colorSelect");
-        const swellDurationInput = document.getElementById("swellDuration");
-        const overlapInput = document.getElementById("overlap");
-        const chordComplexityInput = document.getElementById("chordComplexity");
-        document
-          .getElementById("updateChordBtn")
-          .addEventListener("click", () => {
-            const newColor = colorSelect.value;
-            const newSwell = parseInt(swellDurationInput.value, 10) || 16;
-            const newOverlap = parseInt(overlapInput.value, 10) || 0;
-            const newComplex = parseFloat(chordComplexityInput.value) || 0.5;
-
-            chordPattern = new ColorfulChordSwellPattern({
-              color: newColor,
-              swellDuration: newSwell,
-              overlap: newOverlap,
-              chordComplexity: newComplex,
-            });
-            chordLoop.setPattern(chordPattern, true);
-            console.log(
-              "ChordPattern updated =>",
-              newColor,
-              newSwell,
-              newOverlap,
-              newComplex
-            );
-          });
-
-        //-------------------------
-        // Drum pattern controls
-        //-------------------------
-        const drumIntensityRange = document.getElementById("drumIntensity");
-        const flavorSelect = document.getElementById("flavorSelect");
-        document
-          .getElementById("updateDrumsBtn")
-          .addEventListener("click", () => {
-            const newIntensity = parseFloat(drumIntensityRange.value) || 0.5;
-            const newFlavor = flavorSelect.value;
-
-            drumPattern = new EvolvingLockedDrumPattern({
-              patternLength: 16,
-              drumIntensity: newIntensity,
-              flavor: newFlavor,
-              deviceDefinition: system.deviceManager.getDeviceForOutput(
-                midiOutputs[0]?.id
-              ),
-            });
-            drumLoop.setPattern(drumPattern, true);
-
-            console.log("DrumPattern updated =>", newIntensity, newFlavor);
-          });
-
-        //-------------------------
-        // Melody pattern controls
-        //-------------------------
-        const phraseBarsEl = document.getElementById("phraseBars");
-        const subSectionsEl = document.getElementById("subSections");
-        const stepsPerBarEl = document.getElementById("stepsPerBar");
-        const cadenceBeatsEl = document.getElementById("cadenceBeats");
-        const melodicDensityEl = document.getElementById("melodicDensity");
-        const baseVelocityEl = document.getElementById("baseVelocity");
-        const tensionEmbellishEl = document.getElementById(
-          "tensionEmbellishProb"
-        );
-
-        document
-          .getElementById("updateMelodyBtn")
-          .addEventListener("click", () => {
-            const pb = parseInt(phraseBarsEl.value, 10) || 4;
-            const subsArray = subSectionsEl.value
-              .split(",")
-              .map((s) => s.trim())
-              .filter((s) => s.length > 0);
-            const spb = parseInt(stepsPerBarEl.value, 10) || 16;
-            const cadBeats = parseFloat(cadenceBeatsEl.value) || 2;
-            const density = parseFloat(melodicDensityEl.value) || 0.7;
-            const baseVel = parseInt(baseVelocityEl.value, 10) || 90;
-            const tProb = parseFloat(tensionEmbellishEl.value) || 0.2;
-
-            melodyPattern = new PhraseContourMelody({
-              phraseBars: pb,
-              subSections: subsArray.length
-                ? subsArray
-                : ["build", "peak", "resolve"],
-              stepsPerBar: spb,
-              cadenceBeats: cadBeats,
-              melodicDensity: density,
-              baseVelocity: baseVel,
-              tensionEmbellishProb: tProb,
-            });
-            melodyLoop.setPattern(melodyPattern, true);
-
-            console.log(
-              "MelodyPattern updated =>",
-              "phraseBars:",
-              pb,
-              "subSections:",
-              subsArray,
-              "stepsPerBar:",
-              spb,
-              "cadenceBeats:",
-              cadBeats,
-              "density:",
-              density,
-              "baseVelocity:",
-              baseVel,
-              "tensionEmbellishProb:",
-              tProb
-            );
-          });
-
-        //-------------------------
+        // -------------------------------------------------
         // Energy controls
-        //-------------------------
+        // -------------------------------------------------
         document.querySelectorAll("button[data-hype]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newHype = btn.getAttribute("data-hype");
@@ -627,9 +503,9 @@
           });
         });
 
-        //-------------------------
+        // -------------------------------------------------
         // Real-time LFO manager
-        //-------------------------
+        // -------------------------------------------------
         document.getElementById("addLfoBtn").addEventListener("click", () => {
           const channel = parseInt(
             document.getElementById("lfoChannelSelect").value,
@@ -637,7 +513,6 @@
           );
           const presetKey = document.getElementById("lfoPresetSelect").value;
           const preset = LFO_PRESETS_FAST[presetKey];
-
           if (!preset) return;
 
           const myLfo = new LFO({
@@ -688,9 +563,9 @@
           });
         }
 
-        //-------------------------
-        // Arrangement One-Shots
-        //-------------------------
+        // -------------------------------------------------
+        // Arrangement One-Shots (Sweeps)
+        // -------------------------------------------------
         document
           .getElementById("enqueueSweepBtn")
           .addEventListener("click", () => {
@@ -707,8 +582,7 @@
             const preset = LFO_PRESETS_SLOW[presetKey];
             if (!preset) return;
 
-            // We'll do 1 cycle over 'steps' steps if you want a simple approach
-            // if each step ~1 beat, freq might be 1 / (steps/4) to do 1 cycle in "steps"
+            // We'll do 1 full cycle over 'steps' steps
             const freq = 1 / (steps / 4);
 
             const job = {
@@ -725,7 +599,7 @@
               done: false,
             };
 
-            // schedule at next multiple of 16 steps
+            // schedule start at next multiple-of-16 step
             const currentStep = transport.stepIndex;
             const nextMultiple16 = Math.ceil(currentStep / 16) * 16;
             job.startStep = nextMultiple16;
@@ -737,7 +611,7 @@
         function renderSweepList() {
           const listEl = document.getElementById("queuedSweepList");
           listEl.innerHTML = "";
-          queuedOneShots.forEach((obj, idx) => {
+          queuedOneShots.forEach((obj) => {
             if (obj.done) return;
             const li = document.createElement("li");
             li.textContent = `CH${obj.channel} - ${obj.presetKey}, ${obj.steps} steps (start@${obj.startStep})`;
@@ -755,10 +629,8 @@
         function checkOneShots(stepIndex, deltaTime) {
           queuedOneShots.forEach((job) => {
             if (job.done) return;
-            if (stepIndex < job.startStep) {
-              // not started yet
-              return;
-            }
+            if (stepIndex < job.startStep) return;
+
             const endStep = job.startStep + job.steps;
             if (stepIndex >= endStep) {
               // finished
