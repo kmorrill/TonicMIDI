@@ -23,23 +23,27 @@ import { EvolvingLockedDrumPattern } from "../patterns/evolving-locked-drum-patt
  *   - flavor (select)
  *
  * And three buttons:
- *   - Close: hides the modal
- *   - Update Now: calls loop.setPattern(newPattern, true)
- *   - Enqueue Update: calls loop.setPattern(newPattern, false)
+ *   - Cancel: dismisses the modal without committing changes
+ *   - Update Pattern: calls liveLoop.setPattern(newPattern, true)
+ *   - Enqueue Update: calls liveLoop.setPattern(newPattern, false)
+ *
+ * Also, pressing ESC dismisses the modal without committing changes.
  */
-
 export class EvolvingLockedDrumConfig extends HTMLElement {
   constructor() {
     super();
     this._liveLoop = null;
     this._deviceDefinition = null;
 
-    // Attach a shadow root
-    this.attachShadow({ mode: "open" });
-
     // Basic internal state
     this._drumIntensity = 0.5;
     this._flavor = "ambient";
+
+    // Bind the keydown handler
+    this._boundHandleKeyDown = this._handleKeyDown.bind(this);
+
+    // Attach a shadow root
+    this.attachShadow({ mode: "open" });
   }
 
   // Expose a property to set the connected LiveLoop from outside
@@ -69,8 +73,18 @@ export class EvolvingLockedDrumConfig extends HTMLElement {
   }
 
   connectedCallback() {
-    // On first insert into DOM
+    document.addEventListener("keydown", this._boundHandleKeyDown);
     this.render();
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener("keydown", this._boundHandleKeyDown);
+  }
+
+  _handleKeyDown(e) {
+    if (e.key === "Escape" && this.hasAttribute("open")) {
+      this.close();
+    }
   }
 
   render() {
@@ -110,7 +124,7 @@ export class EvolvingLockedDrumConfig extends HTMLElement {
         overflow: hidden;
       }
 
-      /* On small screens (mobile), we can take over the full screen */
+      /* On small screens (mobile), take over full screen */
       @media (max-width: 600px) {
         .modal {
           width: 100vw;
@@ -183,14 +197,17 @@ export class EvolvingLockedDrumConfig extends HTMLElement {
         background: #11aa44;
         color: #fff;
       }
+      .modal-footer button.cancel {
+        background: #aaa;
+        color: #fff;
+      }
     `;
-
     root.appendChild(style);
 
     //--- BACKDROP + MODAL structure ---
     const backdrop = document.createElement("div");
     backdrop.classList.add("backdrop");
-    backdrop.addEventListener("click", (e) => this.close());
+    backdrop.addEventListener("click", () => this.close());
     root.appendChild(backdrop);
 
     const modal = document.createElement("div");
@@ -214,7 +231,7 @@ export class EvolvingLockedDrumConfig extends HTMLElement {
     body.classList.add("modal-body");
     modal.appendChild(body);
 
-    // Fields: drumIntensity + flavor
+    // Field: drumIntensity
     const intensityField = document.createElement("div");
     intensityField.classList.add("field");
     const intensityLabel = document.createElement("label");
@@ -230,15 +247,14 @@ export class EvolvingLockedDrumConfig extends HTMLElement {
     });
     intensityField.appendChild(intensityLabel);
     intensityField.appendChild(intensityRange);
-
     body.appendChild(intensityField);
 
+    // Field: flavor
     const flavorField = document.createElement("div");
     flavorField.classList.add("field");
     const flavorLabel = document.createElement("label");
     flavorLabel.textContent = "flavor:";
     const flavorSelect = document.createElement("select");
-    // Some example options:
     ["ambient", "tribal", "electronic", "lofi"].forEach((fl) => {
       const opt = document.createElement("option");
       opt.value = fl;
@@ -253,30 +269,37 @@ export class EvolvingLockedDrumConfig extends HTMLElement {
     });
     flavorField.appendChild(flavorLabel);
     flavorField.appendChild(flavorSelect);
-
     body.appendChild(flavorField);
 
     // Footer
     const footer = document.createElement("div");
     footer.classList.add("modal-footer");
 
+    // Cancel button (dismisses the modal without committing changes)
+    const cancelBtn = document.createElement("button");
+    cancelBtn.classList.add("cancel");
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => this.close());
+    footer.appendChild(cancelBtn);
+
+    // Enqueue Update button
     const enqueueBtn = document.createElement("button");
     enqueueBtn.classList.add("enqueue");
     enqueueBtn.textContent = "Enqueue Update";
     enqueueBtn.addEventListener("click", () => this._applyPattern(false));
+    footer.appendChild(enqueueBtn);
 
+    // Update Pattern button
     const updateBtn = document.createElement("button");
     updateBtn.classList.add("update");
     updateBtn.textContent = "Update Pattern";
     updateBtn.addEventListener("click", () => this._applyPattern(true));
-
-    footer.appendChild(enqueueBtn);
     footer.appendChild(updateBtn);
 
     modal.appendChild(footer);
   }
 
-  // Helper to close/hide
+  // Helper to close/hide the modal without committing changes
   close() {
     this.removeAttribute("open");
     this.style.display = "none";
@@ -306,5 +329,4 @@ export class EvolvingLockedDrumConfig extends HTMLElement {
   }
 }
 
-// Register the custom element
 customElements.define("evolving-locked-drum-config", EvolvingLockedDrumConfig);

@@ -135,7 +135,7 @@ export class LiveLoopMixer extends HTMLElement {
         <th>Pattern</th>
         <th>M</th>
         <th>S</th>
-        <th>Dev</th>
+        <th>Device</th>
         <th>Ch</th>
       </tr>
     `);

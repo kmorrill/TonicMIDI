@@ -21,9 +21,12 @@ import { PhraseContourMelody } from "../patterns/phrase-contour-melody.js";
  *   - baseVelocity (1..127)
  *   - tensionEmbellishProb (range 0..1)
  *
- * And two buttons:
+ * And three buttons:
+ *   - Cancel: dismisses the modal without committing changes
  *   - "Update Pattern" => immediate setPattern (true)
  *   - "Enqueue Pattern" => queued setPattern (false)
+ *
+ * Also, pressing ESC will dismiss the modal without applying any changes.
  */
 export class PhraseContourMelodyConfig extends HTMLElement {
   constructor() {
@@ -39,6 +42,9 @@ export class PhraseContourMelodyConfig extends HTMLElement {
     this._melodicDensity = 0.7;
     this._baseVelocity = 90;
     this._tensionEmbellishProb = 0.2;
+
+    // Bind keydown handler for ESC key
+    this._boundHandleKeyDown = this._handleKeyDown.bind(this);
 
     // Attach shadow root
     this.attachShadow({ mode: "open" });
@@ -68,7 +74,18 @@ export class PhraseContourMelodyConfig extends HTMLElement {
   }
 
   connectedCallback() {
+    document.addEventListener("keydown", this._boundHandleKeyDown);
     this.render();
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener("keydown", this._boundHandleKeyDown);
+  }
+
+  _handleKeyDown(e) {
+    if (e.key === "Escape" && this.hasAttribute("open")) {
+      this.close();
+    }
   }
 
   render() {
@@ -166,6 +183,10 @@ export class PhraseContourMelodyConfig extends HTMLElement {
       }
       .modal-footer button.enqueue {
         background: #11aa44;
+        color: #fff;
+      }
+      .modal-footer button.cancel {
+        background: #aaa;
         color: #fff;
       }
     `;
@@ -323,18 +344,25 @@ export class PhraseContourMelodyConfig extends HTMLElement {
     const footer = document.createElement("div");
     footer.classList.add("modal-footer");
 
+    // Cancel button (dismisses without committing changes)
+    const cancelBtn = document.createElement("button");
+    cancelBtn.classList.add("cancel");
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => this.close());
+    footer.appendChild(cancelBtn);
+
     const enqueueBtn = document.createElement("button");
     enqueueBtn.classList.add("enqueue");
     enqueueBtn.textContent = "Enqueue Pattern";
     enqueueBtn.addEventListener("click", () => this._applyPattern(false));
+    footer.appendChild(enqueueBtn);
 
     const updateBtn = document.createElement("button");
     updateBtn.classList.add("update");
     updateBtn.textContent = "Update Pattern";
     updateBtn.addEventListener("click", () => this._applyPattern(true));
-
-    footer.appendChild(enqueueBtn);
     footer.appendChild(updateBtn);
+
     modal.appendChild(footer);
   }
 

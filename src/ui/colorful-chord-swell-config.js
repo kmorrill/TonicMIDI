@@ -19,9 +19,10 @@ import { ColorfulChordSwellPattern } from "../patterns/colorful-chord-swell-patt
  *   - overlap (number, steps, can be negative)
  *   - chordComplexity (range 0..1)
  *
- * And two buttons:
+ * And three buttons:
  *   - "Update Pattern" => immediate setPattern (true)
  *   - "Enqueue Pattern" => queued setPattern (false)
+ *   - "Cancel" => dismisses the dialog without committing changes
  */
 export class ColorfulChordSwellConfig extends HTMLElement {
   constructor() {
@@ -34,6 +35,9 @@ export class ColorfulChordSwellConfig extends HTMLElement {
     this._swellDuration = 16;
     this._overlap = 2;
     this._chordComplexity = 0.5;
+
+    // Bind the ESC key handler
+    this._boundHandleKeyDown = this._handleKeyDown.bind(this);
 
     // Attach a shadow root
     this.attachShadow({ mode: "open" });
@@ -66,7 +70,18 @@ export class ColorfulChordSwellConfig extends HTMLElement {
   }
 
   connectedCallback() {
+    document.addEventListener("keydown", this._boundHandleKeyDown);
     this.render();
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener("keydown", this._boundHandleKeyDown);
+  }
+
+  _handleKeyDown(e) {
+    if (e.key === "Escape" && this.hasAttribute("open")) {
+      this.close();
+    }
   }
 
   render() {
@@ -165,6 +180,10 @@ export class ColorfulChordSwellConfig extends HTMLElement {
       }
       .modal-footer button.enqueue {
         background: #11aa44;
+        color: #fff;
+      }
+      .modal-footer button.cancel {
+        background: #aaa;
         color: #fff;
       }
     `;
@@ -275,6 +294,13 @@ export class ColorfulChordSwellConfig extends HTMLElement {
     // Footer
     const footer = document.createElement("div");
     footer.classList.add("modal-footer");
+
+    // Cancel button (dismisses the dialog without committing changes)
+    const cancelBtn = document.createElement("button");
+    cancelBtn.classList.add("cancel");
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => this.close());
+    footer.appendChild(cancelBtn);
 
     const enqueueBtn = document.createElement("button");
     enqueueBtn.classList.add("enqueue");
