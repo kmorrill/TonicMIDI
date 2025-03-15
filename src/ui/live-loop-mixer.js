@@ -1,7 +1,7 @@
 // File: live-loop-mixer.js
 
 import {
-  LiveLoop, // you need it for creating new loops on "Add"
+  LiveLoop, // needed if creating new loops on "Add"
   ColorfulChordSwellPattern,
   EvolvingLockedDrumPattern,
   PhraseContourMelody,
@@ -13,36 +13,37 @@ import {
  *   <live-loop-mixer></live-loop-mixer>
  *
  *   document.querySelector("live-loop-mixer").system = {
- *      transport, // must have a .liveLoops array
+ *      transport,     // must have a .liveLoops array
  *      deviceManager, // must have .listOutputs() => array of {outputId, deviceName}
- *      midiBus // optional if adding new loops
+ *      midiBus,       // optional if adding new loops
  *   };
  *
  * Behavior:
  *   - Shows a list (table) of existing loops:
- *     - [Name] [PatternType] [Mute] [Solo] [DeviceDropdown] [ChannelDropdown]
- *     - M = Mute toggle
- *     - S = Solo
- *   - "Add New Loop" row: user picks pattern type, name, device, channel => "Add" => creates & attaches new LiveLoop
- *
- * Keep it small & tight with short text.
+ *       [Name] [PatternType] [ Mute ] [ Solo ] [DeviceDropdown] [ChannelDropdown]
+ *     Clicking "Mute" toggles that loop’s `_userMuted`.
+ *     Clicking "Solo" toggles that loop’s `_userSolo`.
+ *   - If any loop is soloed, only those with `_userSolo = true` remain unmuted.
+ *   - Otherwise each loop’s `muted` follows its `_userMuted`.
+ *   - "Add New Loop" row: user picks pattern type, name, device, channel => "Add"
+ *     => creates & attaches a new LiveLoop to the transport.
  */
 export class LiveLoopMixer extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    /**
-     * We'll expect the user to assign `this.system` or `this.transport` + `this.deviceManager`.
-     */
-    this.system = null; // user sets { transport, deviceManager, midiBus } etc.
 
-    // Local state for "Add New" form
+    // We expect .system to be set from outside:
+    // { transport, deviceManager, midiBus, ... }
+    this._system = null;
+
+    // "Add New" form local state
     this.newLoopName = "NewLoop";
-    this.newPatternType = "Chord";
+    this.newPatternType = "ColorfulChordSwellPattern";
     this.newDeviceId = "";
     this.newChannel = 1;
 
-    // Known pattern types for "Add new"
+    // Recognized pattern types
     this.patternChoices = [
       { label: "Chord", value: "ColorfulChordSwellPattern" },
       { label: "Drums", value: "EvolvingLockedDrumPattern" },
@@ -50,9 +51,7 @@ export class LiveLoopMixer extends HTMLElement {
     ];
   }
 
-  /**
-   * Called after the element is placed in DOM or whenever user sets .system
-   */
+  // Exposed property: system = { transport, deviceManager, midiBus, ... }
   set system(sys) {
     this._system = sys;
     this.render();
@@ -62,18 +61,20 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Re-renders the entire UI. Called whenever something changes.
+   * Renders the mixer UI: a table of loops + an "Add new" row.
    */
   render() {
     if (!this.shadowRoot) return;
     const { transport, deviceManager } = this._system || {};
-    // If transport or deviceManager is missing, show a placeholder
     if (!transport || !deviceManager) {
-      this.shadowRoot.innerHTML = `<p style="color:red;">LiveLoopMixer: No system/transport/deviceManager found.</p>`;
+      this.shadowRoot.innerHTML = `
+        <p style="color:red;">
+          LiveLoopMixer: No system/transport/deviceManager set.
+        </p>`;
       return;
     }
 
-    // Minimal styling
+    // Minimal CSS
     const style = `
       <style>
         :host {
@@ -116,7 +117,7 @@ export class LiveLoopMixer extends HTMLElement {
       </style>
     `;
 
-    // Render existing loops
+    // Build the table rows for existing loops
     const rows = [];
     rows.push(`
       <tr>
@@ -130,15 +131,24 @@ export class LiveLoopMixer extends HTMLElement {
     `);
 
     transport.liveLoops.forEach((loop, idx) => {
+      // Initialize _userMuted / _userSolo if not set
+      if (typeof loop._userMuted === "undefined") {
+        loop._userMuted = loop.muted; // start from its current
+      }
+      if (typeof loop._userSolo === "undefined") {
+        loop._userSolo = false;
+      }
+
+      // Device dropdown
       const deviceOptions = deviceManager.listOutputs().map((o) => {
         const sel = loop.midiOutputId === o.outputId ? "selected" : "";
         return `<option value="${o.outputId}" ${sel}>${o.deviceName}</option>`;
       });
-      // If no device set, we add a blank option
+      // add a blank "None" if we want no device
       const blankSel = loop.midiOutputId ? "" : "selected";
       deviceOptions.unshift(`<option value="" ${blankSel}>-None-</option>`);
 
-      // Channels 1..16
+      // Channel dropdown
       let channelOptions = "";
       for (let c = 1; c <= 16; c++) {
         channelOptions += `<option value="${c}" ${
@@ -146,17 +156,19 @@ export class LiveLoopMixer extends HTMLElement {
         }>${c}</option>`;
       }
 
+      const patternType = loop.pattern ? loop.pattern.constructor.name : "?";
+      const muteLabel = loop._userMuted ? "UnMute" : "Mute";
+      const soloLabel = loop._userSolo ? "UnSolo" : "Solo";
+
       rows.push(`
         <tr data-idx="${idx}">
           <td>${loop.name || "Loop"}</td>
-          <td>${loop.pattern ? loop.pattern.constructor.name : "?"}</td>
+          <td>${patternType}</td>
           <td>
-            <button data-action="mute">${
-              loop.muted ? "UnMute" : "Mute"
-            }</button>
+            <button data-action="mute">${muteLabel}</button>
           </td>
           <td>
-            <button data-action="solo">Solo</button>
+            <button data-action="solo">${soloLabel}</button>
           </td>
           <td>
             <select data-action="setDevice">${deviceOptions.join("")}</select>
@@ -168,8 +180,7 @@ export class LiveLoopMixer extends HTMLElement {
       `);
     });
 
-    // "Add new" form
-    // Gather device options again
+    // Build the "Add new" row
     const devs = deviceManager.listOutputs();
     const devOptions = devs.map((o) => {
       const sel = o.outputId === this.newDeviceId ? "selected" : "";
@@ -191,6 +202,7 @@ export class LiveLoopMixer extends HTMLElement {
       })
       .join("");
 
+    // Combine everything into HTML
     this.shadowRoot.innerHTML = `
       ${style}
       <table class="loop-list">
@@ -201,62 +213,60 @@ export class LiveLoopMixer extends HTMLElement {
 
       <div class="add-form">
         <span style="font-weight:bold;">Add:</span>
-        <input style="width:60px;" type="text" value="${
-          this.newLoopName
-        }" data-addfield="name" placeholder="Name"/>
-        <select data-addfield="pattern" title="PatternType">
+        <input
+          style="width:60px;"
+          type="text"
+          value="${this.newLoopName}"
+          data-addfield="name"
+          placeholder="Name"
+        />
+        <select data-addfield="pattern">
           ${patternOpts}
         </select>
-        <select data-addfield="device" title="Device">
+        <select data-addfield="device">
           ${devOptions.join("")}
         </select>
-        <select data-addfield="channel" title="MIDI Channel">
+        <select data-addfield="channel">
           ${channelOpts}
         </select>
         <button data-action="add">+</button>
       </div>
     `;
 
-    // Add event listeners
+    // Wire up all row-level handlers
     this.shadowRoot
       .querySelectorAll(".loop-list tr[data-idx]")
       .forEach((rowEl) => {
         const idx = parseInt(rowEl.getAttribute("data-idx"), 10);
         const loop = transport.liveLoops[idx];
 
-        // Mute
+        // Mute button
         rowEl
           .querySelector('button[data-action="mute"]')
           .addEventListener("click", () => {
-            const newMuted = !loop.muted;
-            loop.setMuted(newMuted);
-            this.render(); // re-render to update label
-          });
-
-        // Solo
-        rowEl
-          .querySelector('button[data-action="solo"]')
-          .addEventListener("click", () => {
-            // Mute all except this one
-            transport.liveLoops.forEach((l) => {
-              l.setMuted(l !== loop);
-            });
+            loop._userMuted = !loop._userMuted;
+            this._applySoloMuteLogic();
             this.render();
           });
 
-        // Device
+        // Solo button
+        rowEl
+          .querySelector('button[data-action="solo"]')
+          .addEventListener("click", () => {
+            loop._userSolo = !loop._userSolo;
+            this._applySoloMuteLogic();
+            this.render();
+          });
+
+        // Device select
         rowEl
           .querySelector('select[data-action="setDevice"]')
           .addEventListener("change", (evt) => {
-            const val = evt.target.value; // outputId
-            if (val) {
-              loop.midiOutputId = val;
-            } else {
-              loop.midiOutputId = null;
-            }
+            const val = evt.target.value;
+            loop.midiOutputId = val || null; // allow unsetting
           });
 
-        // Channel
+        // Channel select
         rowEl
           .querySelector('select[data-action="setChannel"]')
           .addEventListener("change", (evt) => {
@@ -264,35 +274,29 @@ export class LiveLoopMixer extends HTMLElement {
           });
       });
 
-    // Add new form
+    // "Add new" form handlers
     const addForm = this.shadowRoot.querySelector(".add-form");
     if (addForm) {
-      // text input for name
       addForm
         .querySelector('input[data-addfield="name"]')
         .addEventListener("input", (evt) => {
           this.newLoopName = evt.target.value;
         });
-      // pattern
       addForm
         .querySelector('select[data-addfield="pattern"]')
         .addEventListener("change", (evt) => {
           this.newPatternType = evt.target.value;
         });
-      // device
       addForm
         .querySelector('select[data-addfield="device"]')
         .addEventListener("change", (evt) => {
           this.newDeviceId = evt.target.value;
         });
-      // channel
       addForm
         .querySelector('select[data-addfield="channel"]')
         .addEventListener("change", (evt) => {
           this.newChannel = parseInt(evt.target.value, 10) || 1;
         });
-
-      // Add button
       addForm
         .querySelector('button[data-action="add"]')
         .addEventListener("click", () => this._handleAddNewLoop());
@@ -300,15 +304,17 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Called when user clicks the "+" button to add a new loop.
+   * Called when user clicks “Add” on the "Add new" form
    */
   _handleAddNewLoop() {
-    if (!this._system || !this._system.transport || !this._system.midiBus) {
+    const { transport, midiBus } = this._system || {};
+    if (!transport || !midiBus) {
       alert("Missing system.transport or system.midiBus. Cannot create loop.");
       return;
     }
-    let pattern = null;
-    // create a pattern instance
+
+    // Create the chosen pattern
+    let pattern;
     switch (this.newPatternType) {
       case "ColorfulChordSwellPattern":
         pattern = new ColorfulChordSwellPattern();
@@ -324,22 +330,48 @@ export class LiveLoopMixer extends HTMLElement {
         return;
     }
 
-    // Create a new LiveLoop
-    const newLoop = new LiveLoop(this._system.midiBus, {
+    // Build a new LiveLoop
+    const newLoop = new LiveLoop(midiBus, {
       pattern,
       name: this.newLoopName,
       midiChannel: this.newChannel,
       muted: false,
-      // If user selected a device
       midiOutputId: this.newDeviceId || null,
     });
 
-    // Add to the transport
-    this._system.transport.addLiveLoop(newLoop);
+    // Initialize user flags
+    newLoop._userMuted = false;
+    newLoop._userSolo = false;
 
-    // reset name
+    // Add to transport
+    transport.addLiveLoop(newLoop);
+
+    // Reset the "name" field
     this.newLoopName = "NewLoop";
     this.render();
+  }
+
+  /**
+   * Applies final muted states based on user’s Solo and Mute settings:
+   * - If ANY loop is solo, only those with `_userSolo = true` are unmuted.
+   * - Otherwise, each loop’s `muted = _userMuted`.
+   */
+  _applySoloMuteLogic() {
+    const { transport } = this._system;
+    if (!transport) return;
+
+    const loops = transport.liveLoops;
+    const anySolo = loops.some((l) => l._userSolo);
+
+    loops.forEach((l) => {
+      if (anySolo) {
+        // If there's at least one solo, everything else is muted
+        l.muted = !l._userSolo;
+      } else {
+        // No solos => follow each loop’s personal `_userMuted` flag
+        l.muted = l._userMuted;
+      }
+    });
   }
 }
 
