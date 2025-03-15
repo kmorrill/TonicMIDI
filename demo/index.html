@@ -70,7 +70,7 @@
       ></colorful-chord-swell-config>
     </fieldset>
 
-    <!-- 2) EVOLVING DRUM PATTERN (using the existing custom element) -->
+    <!-- 2) EVOLVING DRUM PATTERN -->
     <fieldset>
       <legend>Evolving Drum Pattern</legend>
       <p style="max-width: 600px">
@@ -80,7 +80,6 @@
         changes to the pattern.
       </p>
       <button id="openDrumConfigBtn">Open Drum Config</button>
-      <!-- Our custom element from src/ui/evolving-locked-drum-config.js -->
       <evolving-locked-drum-config
         id="drumConfig"
         style="display: none"
@@ -97,7 +96,6 @@
         notes.
       </p>
       <button id="openMelodyConfigBtn">Open Melody Config</button>
-      <!-- The new custom element for melody config -->
       <phrase-contour-melody-config
         id="melodyConfig"
         style="display: none"
@@ -156,7 +154,6 @@
       <div class="param-row">
         <label for="lfoPresetSelect">LFO Preset:</label>
         <select id="lfoPresetSelect">
-          <!-- Sample "fast" LFO presets -->
           <option value="lightVibrato">Light Vibrato</option>
           <option value="rapidFilterFlutter">Rapid Filter Flutter</option>
           <option value="squareTremolo">Square-Wave Tremolo</option>
@@ -213,7 +210,6 @@
       <div class="param-row">
         <label for="oneShotSweepSelect">Sweep Preset:</label>
         <select id="oneShotSweepSelect">
-          <!-- Sample "slow" LFO presets -->
           <option value="slowFilterRise">Slow Filter Rise</option>
           <option value="deepBreathingPad">Deep Breathing Pad</option>
           <option value="swellingResonance">Swelling Resonance</option>
@@ -224,6 +220,16 @@
 
       <h4>Queued Sweeps:</h4>
       <ul id="queuedSweepList"></ul>
+    </fieldset>
+
+    <!-- 7) LIVE-LOOP MIXER (the new compact mixer) -->
+    <fieldset>
+      <legend>LiveLoop Mixer</legend>
+      <p style="max-width: 600px">
+        A compact view of all current LiveLoops. You can mute, solo, remap them
+        to a device & channel, or even add a new loop on the fly.
+      </p>
+      <live-loop-mixer id="mixer"></live-loop-mixer>
     </fieldset>
 
     <p style="margin-top: 2rem; max-width: 700px">
@@ -239,6 +245,7 @@
       import "../src/ui/evolving-locked-drum-config.js";
       import "../src/ui/colorful-chord-swell-config.js";
       import "../src/ui/phrase-contour-melody-config.js";
+      import "../src/ui/live-loop-mixer.js";
     </script>
 
     <script type="module">
@@ -419,7 +426,6 @@
         // -----------
         const chordConfigEl = document.getElementById("chordConfig");
         chordConfigEl.liveLoop = chordLoop;
-        // chordConfigEl.deviceDefinition = optional if you want
 
         document
           .getElementById("openChordConfigBtn")
@@ -435,7 +441,6 @@
 
         const melodyConfigEl = document.getElementById("melodyConfig");
         melodyConfigEl.liveLoop = melodyLoop;
-        // melodyConfigEl.deviceDefinition = optional if you want
 
         document
           .getElementById("openMelodyConfigBtn")
@@ -654,6 +659,10 @@
           });
           renderSweepList();
         }
+
+        // Finally, wire up the new <live-loop-mixer>
+        const mixerEl = document.getElementById("mixer");
+        mixerEl.system = system; // so it can show/modify loops
       })();
     </script>
   </body>

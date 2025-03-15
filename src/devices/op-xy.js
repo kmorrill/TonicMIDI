@@ -95,4 +95,16 @@ export class OpXyDevice extends DeviceDefinition {
       16: { name: "OP-XY Track 16", type: "Fx2" },
     };
   }
+
+  listChannels() {
+    // for instance:
+    return Object.keys(this.enginesByChannel).map((chStr) => {
+      const ch = parseInt(chStr, 10);
+      const eng = this.enginesByChannel[ch];
+      return {
+        channel: ch,
+        engineName: eng ? eng.name : "Unknown",
+      };
+    });
+  }
 }
