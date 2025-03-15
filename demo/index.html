@@ -53,56 +53,15 @@
       sequencer that sends clock, and the patterns will sync up automatically.
     </p>
 
-    <!-- 1) COLORFUL CHORD SWELL -->
     <fieldset>
-      <legend>Colorful Chord Swell Pattern</legend>
+      <legend>LiveLoop Mixer</legend>
       <p style="max-width: 600px">
-        This pattern selects a musical scale based on “color” and creates chords
-        that swell into each other. Adjust how long chords last, how they
-        overlap, and how many chord extensions you add. Click below to open a
-        dialog that lets you tweak these options.
+        A compact view of all current LiveLoops. You can mute, solo, remap them
+        to a device & channel, or even add a new loop on the fly.
       </p>
-      <button id="openChordConfigBtn">Open Chord Config</button>
-      <!-- The new custom element for chord config -->
-      <colorful-chord-swell-config
-        id="chordConfig"
-        style="display: none"
-      ></colorful-chord-swell-config>
+      <live-loop-mixer id="mixer"></live-loop-mixer>
     </fieldset>
 
-    <!-- 2) EVOLVING DRUM PATTERN -->
-    <fieldset>
-      <legend>Evolving Drum Pattern</legend>
-      <p style="max-width: 600px">
-        This drum pattern morphs in real time while holding onto a core groove.
-        Use the button below to open a dialog that adjusts
-        <em>drumIntensity</em> and <em>flavor</em>, then update or enqueue
-        changes to the pattern.
-      </p>
-      <button id="openDrumConfigBtn">Open Drum Config</button>
-      <evolving-locked-drum-config
-        id="drumConfig"
-        style="display: none"
-      ></evolving-locked-drum-config>
-    </fieldset>
-
-    <!-- 3) PHRASE CONTOUR MELODY -->
-    <fieldset>
-      <legend>PhraseContourMelody</legend>
-      <p style="max-width: 600px">
-        A multi-bar melodic line divided into subSections like “build” or
-        “peak.” Click below to open a dialog that controls how many bars the
-        phrase lasts, steps per bar, and the likelihood of “spice” or approach
-        notes.
-      </p>
-      <button id="openMelodyConfigBtn">Open Melody Config</button>
-      <phrase-contour-melody-config
-        id="melodyConfig"
-        style="display: none"
-      ></phrase-contour-melody-config>
-    </fieldset>
-
-    <!-- 4) ENERGY CONTROLS -->
     <fieldset>
       <legend>Energy Manager Controls</legend>
       <p style="max-width: 600px">
@@ -123,7 +82,6 @@
       </div>
     </fieldset>
 
-    <!-- 5) REAL-TIME LFO MANAGER -->
     <fieldset>
       <legend>Real-Time LFOs</legend>
       <p style="max-width: 600px">
@@ -220,16 +178,6 @@
 
       <h4>Queued Sweeps:</h4>
       <ul id="queuedSweepList"></ul>
-    </fieldset>
-
-    <!-- 7) LIVE-LOOP MIXER (the new compact mixer) -->
-    <fieldset>
-      <legend>LiveLoop Mixer</legend>
-      <p style="max-width: 600px">
-        A compact view of all current LiveLoops. You can mute, solo, remap them
-        to a device & channel, or even add a new loop on the fly.
-      </p>
-      <live-loop-mixer id="mixer"></live-loop-mixer>
     </fieldset>
 
     <p style="margin-top: 2rem; max-width: 700px">
@@ -420,60 +368,6 @@
         transport.addLiveLoop(chordLoop);
         transport.addLiveLoop(drumLoop);
         transport.addLiveLoop(melodyLoop);
-
-        // -----------
-        // Wire up our new custom elements for chord & melody configuration
-        // -----------
-        const chordConfigEl = document.getElementById("chordConfig");
-        chordConfigEl.liveLoop = chordLoop;
-
-        document
-          .getElementById("openChordConfigBtn")
-          .addEventListener("click", () => {
-            if (chordConfigEl.hasAttribute("open")) {
-              chordConfigEl.removeAttribute("open");
-              chordConfigEl.style.display = "none";
-            } else {
-              chordConfigEl.setAttribute("open", "");
-              chordConfigEl.style.display = "block";
-            }
-          });
-
-        const melodyConfigEl = document.getElementById("melodyConfig");
-        melodyConfigEl.liveLoop = melodyLoop;
-
-        document
-          .getElementById("openMelodyConfigBtn")
-          .addEventListener("click", () => {
-            if (melodyConfigEl.hasAttribute("open")) {
-              melodyConfigEl.removeAttribute("open");
-              melodyConfigEl.style.display = "none";
-            } else {
-              melodyConfigEl.setAttribute("open", "");
-              melodyConfigEl.style.display = "block";
-            }
-          });
-
-        // -----------
-        // Drum config (existing approach)
-        // -----------
-        const drumConfigEl = document.getElementById("drumConfig");
-        drumConfigEl.liveLoop = drumLoop;
-        drumConfigEl.deviceDefinition = system.deviceManager.getDeviceForOutput(
-          midiOutputs[0]?.id
-        );
-
-        document
-          .getElementById("openDrumConfigBtn")
-          .addEventListener("click", () => {
-            if (drumConfigEl.hasAttribute("open")) {
-              drumConfigEl.removeAttribute("open");
-              drumConfigEl.style.display = "none";
-            } else {
-              drumConfigEl.setAttribute("open", "");
-              drumConfigEl.style.display = "block";
-            }
-          });
 
         // -----------
         // Tap into the transport clock to do LFO + sweeps
