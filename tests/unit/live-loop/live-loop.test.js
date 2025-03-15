@@ -80,12 +80,14 @@ describe("LiveLoop", () => {
       channel: 1,
       note: 60,
       velocity: 80,
+      outputId: null,
     });
     // E4 is MIDI note 64
     expect(midiBusMock.noteOn).toHaveBeenNthCalledWith(2, {
       channel: 1,
       note: 64,
       velocity: 100, // default if not specified
+      outputId: null,
     });
 
     // Verify we never call noteOff
@@ -105,6 +107,7 @@ describe("LiveLoop", () => {
       channel: 1,
       cc: 74,
       value: 63, // CC value returned directly from LFO
+      outputId: null,
     });
   });
 
@@ -131,6 +134,7 @@ describe("LiveLoop", () => {
       channel: 1,
       cc: 74,
       value: 127,
+      outputId: null,
     });
   });
 
@@ -156,6 +160,7 @@ describe("LiveLoop", () => {
       channel: 1,
       note: 67,
       velocity: 90,
+      outputId: null,
     });
   });
 
@@ -189,6 +194,7 @@ describe("LiveLoop", () => {
       channel: 1,
       note: 65,
       velocity: 70,
+      outputId: null,
     });
   });
 
@@ -226,6 +232,7 @@ describe("LiveLoop", () => {
     expect(midiBusMock.noteOff).toHaveBeenCalledWith({
       channel: 1,
       note: 60, // C4
+      outputId: null,
     });
   });
 
@@ -273,6 +280,7 @@ describe("LiveLoop", () => {
         channel: 1,
         note: 62,
         velocity: 100,
+        outputId: null,
       });
     });
 
@@ -289,6 +297,7 @@ describe("LiveLoop", () => {
         channel: 1,
         note: 127,
         velocity: 80,
+        outputId: null,
       });
     });
   });
@@ -405,11 +414,13 @@ describe("LiveLoop", () => {
         channel: 1,
         note: 60,
         velocity: 80,
+        outputId: null,
       });
       // immediate noteOff
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
@@ -446,6 +457,7 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(3);
 
@@ -465,6 +477,7 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 67,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
@@ -493,12 +506,14 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
+        outputId: null,
       });
       // Then noteOn for the new C4
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
         velocity: 90,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0]).toEqual({
@@ -529,6 +544,7 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
@@ -547,6 +563,7 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 64,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(0);
     });
@@ -581,6 +598,7 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(2);
 
@@ -590,6 +608,7 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenLastCalledWith({
         channel: 1,
         note: 64,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(1);
       expect(liveLoop.activeNotes[0].note).toBe(67);
@@ -614,12 +633,14 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
+        outputId: null,
       });
       // noteOn for new note
       expect(midiBusMock.noteOn).toHaveBeenCalledWith({
         channel: 1,
         note: 64,
         velocity: 90,
+        outputId: null,
       });
 
       // only the new note remains
@@ -644,6 +665,7 @@ describe("LiveLoop", () => {
         channel: 1,
         note: 60,
         velocity: 80,
+        outputId: null,
       });
       expect(liveLoop.activeNotes[0].endStep).toBe(6);
 
@@ -656,6 +678,7 @@ describe("LiveLoop", () => {
       expect(midiBusMock.noteOff).toHaveBeenCalledWith({
         channel: 1,
         note: 60,
+        outputId: null,
       });
       expect(liveLoop.activeNotes).toHaveLength(0);
     });

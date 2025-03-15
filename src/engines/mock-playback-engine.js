@@ -34,18 +34,28 @@ export class MockPlaybackEngine {
    * @param {number} data.channel
    * @param {number} data.note
    * @param {number} data.velocity
+   * @param {string|null} [data.outputId=null] // <-- added
    */
-  handleNoteOn(data) {
-    this.events.push({ type: "noteOn", data });
+  handleNoteOn({ channel, note, velocity, outputId = null, step }) {
+    // <-- added outputId and step
+    this.events.push({
+      type: "noteOn",
+      data: { channel, note, velocity, outputId, step }, // <-- store outputId and step
+    });
   }
 
   /**
    * @param {Object} data
    * @param {number} data.channel
    * @param {number} data.note
+   * @param {string|null} [data.outputId=null] // <-- added
    */
-  handleNoteOff(data) {
-    this.events.push({ type: "noteOff", data });
+  handleNoteOff({ channel, note, outputId = null, step }) {
+    // <-- added outputId and step
+    this.events.push({
+      type: "noteOff",
+      data: { channel, note, outputId, step }, // <-- store outputId and step
+    });
   }
 
   /**
@@ -53,36 +63,56 @@ export class MockPlaybackEngine {
    * @param {number} data.channel
    * @param {number} data.cc
    * @param {number} data.value
+   * @param {string|null} [data.outputId=null] // <-- added
    */
-  handleControlChange(data) {
-    this.events.push({ type: "controlChange", data });
+  handleControlChange({ channel, cc, value, outputId = null, step }) {
+    // <-- added outputId and step
+    this.events.push({
+      type: "controlChange",
+      data: { channel, cc, value, outputId, step }, // <-- store outputId and step
+    });
   }
 
   /**
    * @param {Object} data
    * @param {number} data.channel
    * @param {number} data.value
+   * @param {string|null} [data.outputId=null] // <-- added
    */
-  handlePitchBend(data) {
-    this.events.push({ type: "pitchBend", data });
+  handlePitchBend({ channel, value, outputId = null, step }) {
+    // <-- added outputId and step
+    this.events.push({
+      type: "pitchBend",
+      data: { channel, value, outputId, step }, // <-- store outputId and step
+    });
   }
 
   /**
    * @param {Object} data
    * @param {number} data.channel
    * @param {number} data.program
+   * @param {string|null} [data.outputId=null] // <-- added
    */
-  handleProgramChange(data) {
-    this.events.push({ type: "programChange", data });
+  handleProgramChange({ channel, program, outputId = null, step }) {
+    // <-- added outputId and step
+    this.events.push({
+      type: "programChange",
+      data: { channel, program, outputId, step }, // <-- store outputId and step
+    });
   }
 
   /**
    * @param {Object} data
    * @param {number} data.channel
    * @param {number} data.pressure
+   * @param {string|null} [data.outputId=null] // <-- added
    */
-  handleAftertouch(data) {
-    this.events.push({ type: "aftertouch", data });
+  handleAftertouch({ channel, pressure, outputId = null, step }) {
+    // <-- added outputId and step
+    this.events.push({
+      type: "aftertouch",
+      data: { channel, pressure, outputId, step }, // <-- store outputId and step
+    });
   }
 
   /**

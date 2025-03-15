@@ -17,47 +17,49 @@ import {
  * A helper that does the standard “bootstrap” tasks:
  *   1. Request Web MIDI Access
  *   2. Create a MidiBus, DeviceManager, PlaybackEngine
- *   3. Hook the first input for external clock, the first output for note sending
- *   4. For each MIDI output, auto-match a device profile
- *   5. Build a TransportManager (with pulsesPerStep=6 or whatever you like)
- *   6. Create optional global context (chordManager, energyManager, etc.)
+ *   3. Hook the first input for external clock
+ *   4. Provide all MIDI outputs to the playback engine
+ *   5. For each MIDI output, auto-match a device profile
+ *   6. Build a TransportManager (pulsesPerStep=6 or as passed)
+ *   7. Create optional global context (chordManager, energyManager, etc.)
  *
- * Returns an object containing all these references so you can quickly build your LiveLoops.
+ * Returns an object containing references to all these so you can build LiveLoops.
  */
 export async function createDefaultSystem({ pulsesPerStep = 6 } = {}) {
-  // 1) MIDI Bus + DeviceManager + RealPlaybackEngine
+  // 1) Create the core objects:
   const midiBus = new MidiBus();
   const deviceManager = new DeviceManager();
   const playbackEngine = new RealPlaybackEngine(midiBus);
 
-  // 2) Initialize the playback engine (requests MIDI access)
+  // 2) Initialize the playback engine (requests MIDI access in the browser)
   await playbackEngine.init();
 
-  // 3) Now get the raw MIDIAccess again for hooking inputs/outputs
+  // 3) Now get the raw MIDIAccess so we can hook up inputs/outputs manually
   const midiAccess = await navigator.requestMIDIAccess({ sysex: false });
   const inputs = Array.from(midiAccess.inputs.values());
   const outputs = Array.from(midiAccess.outputs.values());
 
-  // 4) Use first MIDI input for external clock
+  // 4) Use the first MIDI input (if any) for external clock
   if (inputs.length > 0) {
     console.log("Using external MIDI clock from:", inputs[0].name);
     inputs[0].onmidimessage = (evt) => {
-      // Re-emit to our bus as "midiMessage"
+      // Relay the MIDI message to our midiBus as "midiMessage"
       midiBus.emit("midiMessage", { data: evt.data });
     };
   } else {
     console.warn("No MIDI inputs found -> no external clock available.");
   }
 
-  // 5) Use first MIDI output for actual note sending
+  // 5) Provide ALL outputs to the playback engine
+  //    so we can send events to whichever outputId we choose later.
   if (outputs.length > 0) {
-    console.log("Sending MIDI to:", outputs[0].name);
-    playbackEngine.midiOutputs = [outputs[0]];
+    console.log("Found", outputs.length, "MIDI output(s).");
+    playbackEngine.midiOutputs = outputs;
   } else {
     console.warn("No MIDI outputs found -> cannot send notes!");
   }
 
-  // 6) Auto-map each output to a known device profile
+  // 6) Auto-map each output to a known device profile (if recognized by substring)
   for (const output of outputs) {
     const deviceName = output.name || "Unknown Device";
     const ProfileClass = findProfileClassForMidiName(deviceName);
@@ -74,24 +76,20 @@ export async function createDefaultSystem({ pulsesPerStep = 6 } = {}) {
     }
   }
 
-  // 7) Create the TransportManager
+  // 7) Create the TransportManager that listens for clock pulses and manages steps
   const transport = new TransportManager(midiBus, { pulsesPerStep });
 
-  // 8) Create optional managers: e.g. energyManager, chordManager, globalContext
+  // 8) Create some optional managers: energyManager, chordManager, globalContext
   const energyManager = new EnergyManager();
   const chordManager = new ChordManager();
-  // Optionally, authorize a chord provider ID ahead of time, or wait until a pattern does it
-  // chordManager.authorizeProvider("ColorfulChordSwellPattern");
+  // chordManager.authorizeProvider("ColorfulChordSwellPattern"); // optionally do now
 
-  const globalContext = new GlobalContext({
-    chordManager,
-    // If you have a RhythmManager, you can pass it here too
-  });
+  const globalContext = new GlobalContext({ chordManager });
 
-  // Let energyManager see the globalContext if needed
+  // Let the energyManager see the globalContext, if it needs to
   energyManager.globalContext = globalContext;
 
-  // 9) Return an object with everything
+  // 9) Return an object with references to all components
   return {
     midiBus,
     deviceManager,
@@ -100,7 +98,8 @@ export async function createDefaultSystem({ pulsesPerStep = 6 } = {}) {
     energyManager,
     chordManager,
     globalContext,
-    // Expose the outputs so user can pick e.g. outputs[0].id
+
+    // Also expose the raw outputs array so your UI can list them, etc.
     midiOutputs: outputs,
   };
 }

@@ -69,6 +69,7 @@ describe("High-Resolution LFO Updates", () => {
       channel: 1,
       cc: 74,
       value: 95, // CC value returned directly from LFO
+      outputId: null,
     });
   });
 

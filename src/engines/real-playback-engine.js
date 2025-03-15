@@ -54,40 +54,60 @@ export class RealPlaybackEngine {
   }
 
   /**
-   * Send a Note On message to all outputs.
+   * Send a Note On message.
    * @param {Object} data
    * @param {number} data.channel - 1-based MIDI channel
    * @param {number} data.note - 0-127
    * @param {number} data.velocity - 0-127
+   * @param {string|null} [data.outputId=null] - which output device to use
    */
-  handleNoteOn({ channel, note, velocity = 100 }) {
+  handleNoteOn({ channel, note, velocity = 100, outputId = null }) {
+    // <-- added outputId
     if (!this.midiOutputs.length) return; // no outputs available
 
     const statusByte = 0x90 + (channel - 1); // 0x90 = Note On, channel offset
     const message = [statusByte, note, velocity];
 
-    this.midiOutputs.forEach((output) => {
-      // send immediately (timestamp=0 => send now)
-      output.send(message, 0);
-    });
+    if (outputId) {
+      // <-- added
+      // Send only to matching device
+      const out = this.midiOutputs.find((o) => o.id === outputId);
+      if (out) {
+        out.send(message, 0);
+      }
+    } else {
+      // If no outputId, send to all
+      this.midiOutputs.forEach((output) => {
+        output.send(message, 0);
+      });
+    }
   }
 
   /**
-   * Send a Note Off message to all outputs.
+   * Send a Note Off message.
    * @param {Object} data
    * @param {number} data.channel - 1-based MIDI channel
    * @param {number} data.note - 0-127
+   * @param {string|null} [data.outputId=null]
    */
-  handleNoteOff({ channel, note }) {
+  handleNoteOff({ channel, note, outputId = null }) {
+    // <-- added outputId
     if (!this.midiOutputs.length) return;
 
     const statusByte = 0x80 + (channel - 1); // 0x80 = Note Off, channel offset
-    // velocity typically 0 for note off
     const message = [statusByte, note, 0];
 
-    this.midiOutputs.forEach((output) => {
-      output.send(message, 0);
-    });
+    if (outputId) {
+      // <-- added
+      const out = this.midiOutputs.find((o) => o.id === outputId);
+      if (out) {
+        out.send(message, 0);
+      }
+    } else {
+      this.midiOutputs.forEach((output) => {
+        output.send(message, 0);
+      });
+    }
   }
 
   /**
@@ -96,17 +116,27 @@ export class RealPlaybackEngine {
    * @param {number} data.channel
    * @param {number} data.cc - 0-127
    * @param {number} data.value - 0-127
+   * @param {string|null} [data.outputId=null]
    */
-  handleControlChange({ channel, cc, value }) {
+  handleControlChange({ channel, cc, value, outputId = null }) {
+    // <-- added outputId
     if (!this.midiOutputs.length) return;
 
-    // 0xB0 = CC message on channel 1 (so add channel offset)
+    // 0xB0 = CC message on channel 1
     const statusByte = 0xb0 + (channel - 1);
     const message = [statusByte, cc, value];
 
-    this.midiOutputs.forEach((output) => {
-      output.send(message, 0);
-    });
+    if (outputId) {
+      // <-- added
+      const out = this.midiOutputs.find((o) => o.id === outputId);
+      if (out) {
+        out.send(message, 0);
+      }
+    } else {
+      this.midiOutputs.forEach((output) => {
+        output.send(message, 0);
+      });
+    }
   }
 
   /**
@@ -117,16 +147,16 @@ export class RealPlaybackEngine {
    * @param {Object} data
    * @param {number} data.channel
    * @param {number} data.value  - typical range: -8192..8191
+   * @param {string|null} [data.outputId=null]
    */
-  handlePitchBend({ channel, value }) {
+  handlePitchBend({ channel, value, outputId = null }) {
+    // <-- added outputId
     if (!this.midiOutputs.length) return;
 
     // 0xE0 = Pitch Bend on channel 1
     const statusByte = 0xe0 + (channel - 1);
 
     // Convert value to 14-bit: center = 8192 => [LSB, MSB]
-    // If value is negative, we add 8192, etc.
-    const bendRange = 16384; // 14-bit
     let adjusted = value + 8192;
     if (adjusted < 0) adjusted = 0;
     if (adjusted > 16383) adjusted = 16383;
@@ -135,26 +165,45 @@ export class RealPlaybackEngine {
     const msb = (adjusted >> 7) & 0x7f; // upper 7 bits
 
     const message = [statusByte, lsb, msb];
-    this.midiOutputs.forEach((output) => {
-      output.send(message, 0);
-    });
+
+    if (outputId) {
+      // <-- added
+      const out = this.midiOutputs.find((o) => o.id === outputId);
+      if (out) {
+        out.send(message, 0);
+      }
+    } else {
+      this.midiOutputs.forEach((output) => {
+        output.send(message, 0);
+      });
+    }
   }
 
   /**
    * Program Change message.
    * @param {Object} data
    * @param {number} data.channel
-   * @param {number} data.program - 0-127 (some hardware might treat 0 as "Program 1")
+   * @param {number} data.program - 0-127
+   * @param {string|null} [data.outputId=null]
    */
-  handleProgramChange({ channel, program }) {
+  handleProgramChange({ channel, program, outputId = null }) {
+    // <-- added outputId
     if (!this.midiOutputs.length) return;
 
     const statusByte = 0xc0 + (channel - 1);
     const message = [statusByte, program];
 
-    this.midiOutputs.forEach((output) => {
-      output.send(message, 0);
-    });
+    if (outputId) {
+      // <-- added
+      const out = this.midiOutputs.find((o) => o.id === outputId);
+      if (out) {
+        out.send(message, 0);
+      }
+    } else {
+      this.midiOutputs.forEach((output) => {
+        output.send(message, 0);
+      });
+    }
   }
 
   /**
@@ -162,16 +211,26 @@ export class RealPlaybackEngine {
    * @param {Object} data
    * @param {number} data.channel
    * @param {number} data.pressure - 0-127
+   * @param {string|null} [data.outputId=null]
    */
-  handleAftertouch({ channel, pressure }) {
+  handleAftertouch({ channel, pressure, outputId = null }) {
+    // <-- added outputId
     if (!this.midiOutputs.length) return;
 
     // 0xD0 = Channel Pressure (Aftertouch)
     const statusByte = 0xd0 + (channel - 1);
     const message = [statusByte, pressure];
 
-    this.midiOutputs.forEach((output) => {
-      output.send(message, 0);
-    });
+    if (outputId) {
+      // <-- added
+      const out = this.midiOutputs.find((o) => o.id === outputId);
+      if (out) {
+        out.send(message, 0);
+      }
+    } else {
+      this.midiOutputs.forEach((output) => {
+        output.send(message, 0);
+      });
+    }
   }
 }

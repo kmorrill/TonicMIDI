@@ -1,4 +1,15 @@
 // File: src/live-loop.js
+// -------------------------------------------------------------
+// A LiveLoop class manages the playback logic for a single part.
+//
+// CHANGES ADDED:
+//   1) Store `_midiOutputId` in constructor instead of `midiOutputId`.
+//   2) Provide a set/get for `midiOutputId` to let us change it post-construction.
+//   3) Pass `outputId: this._midiOutputId` whenever we do noteOn/noteOff/CC.
+//
+// Everything else is the same as your original code.
+// -------------------------------------------------------------
+
 /**
  * src/live-loop.js
  *
@@ -49,8 +60,6 @@
  * //    Provide 'cycles' to the constructor, then chain more sub-loops.
  * const chainLoop = new LiveLoop(midiBus, {
  *   pattern: patternA,
- *   midiChannel: 1,
- *   name: "ChainedMelody",
  *   cycles: 2   // how many times patternA should repeat
  * })
  * .chainLiveLoop({ pattern: patternB, cycles: 4 })
@@ -101,8 +110,7 @@ export class LiveLoop {
   /**
    * Constructs a new LiveLoop. Once created, it listens for "tick" calls from
    * a TransportManager. Each tick, it retrieves notes from its pattern,
-   * sends `noteOn` events, schedules `noteOff` (based on note durations),
-   * and updates LFOs to send `controlChange` events as needed.
+   * sends `noteOn` (unless muted), schedules `noteOff`, and updates LFOs.
    *
    * **Chaining Mode**:
    * If you specify the `cycles` option, this LiveLoop enters "chain mode."
@@ -146,8 +154,7 @@ export class LiveLoop {
       transpose = 0,
       deviceDefinition = null,
       deviceManager = null,
-      midiOutputId = null,
-
+      midiOutputId = null, // <-- note we store it in _midiOutputId
       // Chain mode
       cycles = null,
       role = null,
@@ -193,13 +200,17 @@ export class LiveLoop {
     /** @private */
     this.deviceManager = deviceManager;
 
-    /** @private */
-    this.midiOutputId = midiOutputId;
+    /**
+     * We'll store the output ID in an internal field,
+     * and add a setter below so we can change it later.
+     * @private
+     */
+    this._midiOutputId = midiOutputId || null; // <-- added
 
     // If deviceManager + midiOutputId are provided, fetch the deviceDefinition
-    if (this.deviceManager && this.midiOutputId) {
+    if (this.deviceManager && this._midiOutputId) {
       this.deviceDefinition =
-        this.deviceManager.getDeviceForOutput(this.midiOutputId) || null;
+        this.deviceManager.getDeviceForOutput(this._midiOutputId) || null;
     } else {
       this.deviceDefinition = deviceDefinition;
     }
@@ -233,7 +244,7 @@ export class LiveLoop {
     }
 
     // ----------------------------------------------------------------------
-    // Approximate pitch tracking
+    // Approximate Pitch Tracking
     // We'll accumulate MIDI note values and count how many notes we've triggered
     /** @private */
     this._pitchAccumulator = 0;
@@ -242,17 +253,38 @@ export class LiveLoop {
   }
 
   // ----------------------------------------------------------------------
+  // NEW: Getter/Setter for midiOutputId
+  // ----------------------------------------------------------------------
+  /**
+   * Return the currently assigned MIDI output ID (if any).
+   */
+  get midiOutputId() {
+    return this._midiOutputId;
+  }
+
+  /**
+   * Assign a new MIDI output ID, and optionally re-fetch deviceDefinition if available.
+   */
+  set midiOutputId(newId) {
+    this._midiOutputId = newId || null; // store it
+    if (this.deviceManager && this._midiOutputId) {
+      this.deviceDefinition =
+        this.deviceManager.getDeviceForOutput(this._midiOutputId) || null;
+    }
+  }
+
+  // ----------------------------------------------------------------------
   // New Feature #1: device getter
   // ----------------------------------------------------------------------
   /**
-   * Returns the device instance (from deviceManager) if we have a valid midiOutputId.
+   * Returns the device instance (from deviceManager) if we have a valid _midiOutputId.
    * @returns {import('./device-definition.js').DeviceDefinition|null}
    */
   get device() {
-    if (!this.deviceManager || !this.midiOutputId) {
+    if (!this.deviceManager || !this._midiOutputId) {
       return null;
     }
-    return this.deviceManager.getDeviceForOutput(this.midiOutputId);
+    return this.deviceManager.getDeviceForOutput(this._midiOutputId);
   }
 
   // ----------------------------------------------------------------------
@@ -270,6 +302,7 @@ export class LiveLoop {
     const ccNum = dev.getCC(paramName);
     if (ccNum !== null) {
       this.midiBus.controlChange({
+        outputId: this._midiOutputId, // <-- added
         channel: this.midiChannel,
         cc: ccNum,
         value,
@@ -422,6 +455,7 @@ export class LiveLoop {
         if (existingIdx >= 0) {
           const existing = this.activeNotes[existingIdx];
           this.midiBus.noteOff({
+            outputId: this._midiOutputId, // <-- added
             channel: existing.channel,
             note: existing.note,
           });
@@ -431,6 +465,7 @@ export class LiveLoop {
         // Send noteOn unless muted
         if (!this.muted) {
           this.midiBus.noteOn({
+            outputId: this._midiOutputId, // <-- added
             channel: this.midiChannel,
             note: midiNote,
             velocity,
@@ -455,7 +490,11 @@ export class LiveLoop {
     const stillActive = [];
     for (const noteObj of this.activeNotes) {
       if (stepIndex >= noteObj.endStep) {
-        this.midiBus.noteOff({ channel: noteObj.channel, note: noteObj.note });
+        this.midiBus.noteOff({
+          outputId: this._midiOutputId, // <-- added
+          channel: noteObj.channel,
+          note: noteObj.note,
+        });
       } else {
         stillActive.push(noteObj);
       }
@@ -650,27 +689,18 @@ export class LiveLoop {
 
     // Merge in global managers, if any
     if (this.globalContext) {
-      // e.g. chordManager, energyManager, rhythmManager...
       if (this.globalContext.chordManager) {
         effectiveContext.chordManager = this.globalContext.chordManager;
       }
       if (this.globalContext.rhythmManager) {
         effectiveContext.rhythmManager = this.globalContext.rhythmManager;
       }
-
-      // <-- NEW: If globalContext has energyManager, attach it
       if (this.globalContext.energyManager) {
         effectiveContext.energyManager = this.globalContext.energyManager;
       }
-
-      // You might still support older patterns reading .energyState
-      // if (this.globalContext.getEnergyState) {
-      //   effectiveContext.energyState = this.globalContext.getEnergyState();
-      // }
     }
 
     // Also directly add deviceDefinition for convenience
-    // (provided we have deviceManager + midiOutputId or a direct deviceDefinition)
     if (this.deviceDefinition) {
       effectiveContext.deviceDefinition = this.deviceDefinition;
     }
@@ -705,6 +735,7 @@ export class LiveLoop {
       }
 
       this.midiBus.controlChange({
+        outputId: this._midiOutputId, // <-- added
         channel: this.midiChannel,
         cc: ccNum,
         value: ccValue,

@@ -45,7 +45,7 @@ describe("MidiBus (Unit Tests)", () => {
     const key = "1_60";
     expect(midiBus.activeNotes.has(key)).toBe(true);
     const activeNote = midiBus.activeNotes.get(key);
-    expect(activeNote).toEqual({ channel: 1, note: 60, velocity: 80 });
+    expect(activeNote).toEqual({ channel: 1, note: 60, velocity: 80, outputId: null });
   });
 
   it("should emit noteOff event and remove active note", () => {
@@ -170,14 +170,14 @@ describe("MidiBus (Unit Tests)", () => {
     // Check initial state
     const key = "1_60";
     expect(midiBus.activeNotes.has(key)).toBe(true);
-    expect(midiBus.activeNotes.get(key)).toEqual({ channel: 1, note: 60, velocity: 80 });
+    expect(midiBus.activeNotes.get(key)).toEqual({ channel: 1, note: 60, velocity: 80, outputId: null });
     
     // Retrigger the same note with different velocity
     midiBus.noteOn({ channel: 1, note: 60, velocity: 100 });
     
     // The active note should be updated with the new velocity
     expect(midiBus.activeNotes.has(key)).toBe(true);
-    expect(midiBus.activeNotes.get(key)).toEqual({ channel: 1, note: 60, velocity: 100 });
+    expect(midiBus.activeNotes.get(key)).toEqual({ channel: 1, note: 60, velocity: 100, outputId: null });
     
     // Verify two noteOn events were emitted
     const noteOnEvents = events.filter(e => e.type === "noteOn");
