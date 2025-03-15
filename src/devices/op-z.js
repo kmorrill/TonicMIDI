@@ -6,6 +6,8 @@ import { DeviceDefinition } from "../device-definition.js";
  * In an actual system, you'd fill out real CC values, note mappings, etc.
  */
 export class OpZDevice extends DeviceDefinition {
+  static profileName = "OP-Z";
+
   constructor() {
     super();
 

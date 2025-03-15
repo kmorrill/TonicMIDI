@@ -8,7 +8,7 @@ import { DeviceDefinition } from "../device-definition.js";
  *   - Then each engine merges in its own specialized params.
  */
 export class PolyendSynthDevice extends DeviceDefinition {
-  static profileName = "Polyend Synth";
+  static profileName = "Synth";
 
   constructor() {
     super();
@@ -194,5 +194,17 @@ export class PolyendSynthDevice extends DeviceDefinition {
     };
     // 5) Normalize all maps:
     this.normalizeCCMap();
+  }
+
+  listChannels() {
+    // for instance:
+    return Object.keys(this.enginesByChannel).map((chStr) => {
+      const ch = parseInt(chStr, 10);
+      const eng = this.enginesByChannel[ch];
+      return {
+        channel: ch,
+        engineName: eng ? eng.name : "Unknown",
+      };
+    });
   }
 }

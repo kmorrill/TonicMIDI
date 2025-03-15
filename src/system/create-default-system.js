@@ -59,7 +59,7 @@ export async function createDefaultSystem({ pulsesPerStep = 6 } = {}) {
 
   // 6) Auto-map each output to a known device profile
   for (const output of outputs) {
-    const deviceName = output.name;
+    const deviceName = output.name || "Unknown Device";
     const ProfileClass = findProfileClassForMidiName(deviceName);
     if (ProfileClass) {
       const deviceDef = new ProfileClass();
