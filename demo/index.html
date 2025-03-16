@@ -48,16 +48,18 @@
     <h1>Tonic Midi</h1>
     <p>
       This page is a personal project demonstrating how to build generative
-      music with chord swells, evolving drums, and melodic phrases. It reacts to
-      an <em>external MIDI clock</em>, so press play on a hardware or software
-      sequencer that sends clock, and the patterns will sync up automatically.
+      music with chord swells, evolving drums, melodic phrases, and syncopated
+      bass. It reacts to an <em>external MIDI clock</em>, so press play on a
+      hardware or software sequencer that sends clock, and the patterns will
+      sync up automatically.
     </p>
 
     <fieldset>
       <legend>LiveLoop Mixer</legend>
       <p style="max-width: 600px">
         A compact view of all current LiveLoops. You can mute, solo, remap them
-        to a device & channel, or even add a new loop on the fly.
+        to a device & channel, or even add a new loop on the fly (including the
+        new SyncopatedBass).
       </p>
       <live-loop-mixer id="mixer"></live-loop-mixer>
     </fieldset>
@@ -128,13 +130,11 @@
       <ul id="activeLfoList"></ul>
     </fieldset>
 
-    <!-- 6) ARRANGEMENT ONE-SHOTS -->
     <fieldset>
       <legend>Arrangement Sweeps / One-Shots</legend>
       <p style="max-width: 600px">
         Schedule a single, multi-step sweep (e.g., slowly opening a filter) that
-        starts at the next bar boundary, runs once, and then finishes. Choose a
-        channel, a duration in steps, and a preset.
+        starts at the next bar boundary, runs once, and then finishes.
       </p>
       <div class="param-row">
         <label for="oneShotChannelSelect">MIDI Channel:</label>
@@ -188,11 +188,12 @@
       without a DAW.
     </p>
 
-    <!-- Include all custom elements -->
+    <!-- Include other custom elements used by the page -->
     <script type="module">
       import "../src/ui/evolving-locked-drum-config.js";
       import "../src/ui/colorful-chord-swell-config.js";
       import "../src/ui/phrase-contour-melody-config.js";
+      import "../src/ui/syncopated-bass-config.js";
       import "../src/ui/live-loop-mixer.js";
     </script>
 
@@ -203,6 +204,7 @@
         ColorfulChordSwellPattern,
         EvolvingLockedDrumPattern,
         PhraseContourMelody,
+        SyncopatedBass, // <-- Import your new pattern
         LFO,
       } from "../src/index.js";
 
@@ -364,10 +366,28 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
+        // 4) SyncopatedBass
+        let bassPattern = new SyncopatedBass({
+          patternLength: 16,
+          genre: "funk",
+          octave: 2,
+          density: 0.6,
+        });
+        const bassLoop = new LiveLoop(system.midiBus, {
+          pattern: bassPattern,
+          midiChannel: 3,
+          name: "FunkBassLine",
+          role: null, // no chord or kick role
+          globalContext,
+          deviceManager: system.deviceManager,
+          midiOutputId: midiOutputs[0]?.id,
+        });
+
         // Add loops to the transport
         transport.addLiveLoop(chordLoop);
         transport.addLiveLoop(drumLoop);
         transport.addLiveLoop(melodyLoop);
+        transport.addLiveLoop(bassLoop);
 
         // -----------
         // Tap into the transport clock to do LFO + sweeps
@@ -556,7 +576,18 @@
 
         // Finally, wire up the new <live-loop-mixer>
         const mixerEl = document.getElementById("mixer");
-        mixerEl.system = system; // so it can show/modify loops
+        mixerEl.system = system;
+
+        // NOTE: If you want the mixer "Add new" form to list "SyncopatedBass",
+        // ensure your 'live-loop-mixer.js' includes something like:
+        //   this.patternChoices = [
+        //     { label: "Chord", value: "ColorfulChordSwellPattern" },
+        //     { label: "Drums", value: "EvolvingLockedDrumPattern" },
+        //     { label: "Melody", value: "PhraseContourMelody" },
+        //     { label: "Bass", value: "SyncopatedBass" }
+        //   ];
+        //
+        // ... so the user can pick "Bass" from the dropdown.
       })();
     </script>
   </body>

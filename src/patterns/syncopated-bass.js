@@ -1,240 +1,337 @@
+// File: src/patterns/syncopated-bass.js
+
 import { BasePattern } from "./base-pattern.js";
-import { RhythmManager } from "../rhythm-manager.js";
 
 /**
- * A Pattern class that generates a syncopated bass line based on:
- * 1) A preset "rhythm feel" (`funk`, `latin`, or `reggae`)
- * 2) Chord information from a `chordManager`
- * 3) Optional velocity shaping via a `rhythmManager`
+ * SyncopatedBass
  *
- * The result is a "bassy" sequence that responds to chord changes and varies
- * its velocity on downbeats, offbeats, etc., for a more musical feel.
+ * Creates a stable (non-changing) rhythmic pattern with the following user controls:
+ *   - patternLength: total steps in the loop (16 or 32 typically)
+ *   - genre: which base groove to seed (e.g. "funk","latin","house", etc.)
+ *   - octave: the single octave in which to place notes (e.g. 2 => "C2")
+ *   - density: 0..1 controlling how many “events” are kept
+ *   - randomFn: optional seeded random if you want deterministic results
  *
- * ### Example Usage
- * ```js
- * import { SyncopatedBass } from "op-xy-live/patterns/syncopated-bass.js";
- *
- * // Suppose you have a chordManager that provides chords at each step.
- * const chordManager = new ChordManager({ ... });
- *
- * // Create a syncopated bass pattern with "funk" style
- * const bassPattern = new SyncopatedBass({
- *   length: 16,
- *   octave: 2,
- *   probabilities: { root: 60, fifth: 30, third: 10 },
- *   rhythmPreset: "funk"
- * });
- *
- * // In a LiveLoop:
- * const loop = new LiveLoop(midiBus, {
- *   pattern: bassPattern,
- *   context: { chordManager },
- *   midiChannel: 2,
- *   name: "Funky Bass",
- *   role: null,
- * });
- * ```
+ * On each step, we look up chord/hype/tension/beat managers to adapt pitch and velocity.
+ * Some notes may last multiple steps (2..3).
  */
 export class SyncopatedBass extends BasePattern {
   /**
-   * Constructs a SyncopatedBass pattern instance.
-   *
-   * @param {object} [options={}]
-   * @param {number} [options.length=16]
-   *   The total number of steps in one loop cycle.
-   * @param {number} [options.octave=2]
-   *   The octave to use as a base for the bass notes (e.g. 2 = "C2").
-   * @param {object} [options.probabilities]
-   *   Probability weights (in percentages) for choosing which chord tone
-   *   (root, fifth, or third) to play. Must sum up to 100 or less to make sense.
-   *   @property {number} [options.probabilities.root=60]   Weight for choosing the root.
-   *   @property {number} [options.probabilities.fifth=30] Weight for the fifth.
-   *   @property {number} [options.probabilities.third=10]  Weight for the third.
-   * @param {string} [options.rhythmPreset="funk"]
-   *   Which preset rhythmic pattern to use: "funk", "latin", or "reggae". This determines the
-   *   rhythmic feel of the bass line. For example, "funk" might emphasize offbeats, while "latin"
-   *   might have a more driving rhythm.
-   * @param {number} [options.probabilityToAdvance=50]
-   *   (Reserved for advanced usage) Probability of advancing note selection step.
-   *   Lower values might repeat notes more frequently.
-   * @param {number} [options.restProbability=30]
-   *   (Reserved for advanced usage) Probability of inserting a rest instead of playing a note.
-   *
-   * @throws {Error} If the sum of probabilities is not 100 or less.
-   * @throws {Error} If the rhythm preset is not one of "funk", "latin", or "reggae".
+   * @param {object} options
+   * @param {number} [options.patternLength=16] - steps in the loop
+   * @param {string} [options.genre="funk"] - e.g. "funk","latin","rock","house","afrobeat"
+   * @param {number} [options.octave=2] - e.g. 2 => "C2"
+   * @param {number} [options.density=0.5] - 0..1, how many total events remain
+   * @param {Function} [options.randomFn=Math.random] - custom RNG for deterministic results
    */
   constructor({
-    length = 16,
+    patternLength = 16,
+    genre = "funk",
     octave = 2,
-    probabilities = { root: 60, fifth: 30, third: 10 },
-    rhythmPreset = "funk",
-    probabilityToAdvance = 50,
-    restProbability = 30,
+    density = 0.5,
+    randomFn = Math.random,
   } = {}) {
-    super({
-      length,
-      octave,
-      probabilities,
-      rhythmPreset,
-      probabilityToAdvance,
-      restProbability,
-    });
-
-    /** @private */
-    this.length = length;
-
-    /** @private */
+    super({ patternLength, genre, octave, density });
+    this.patternLength = patternLength;
+    this.genre = genre;
     this.octave = octave;
+    this.density = density;
+    this.randomFn = randomFn;
 
-    /** @private */
-    this.probabilities = probabilities;
-
-    /** @private */
-    this.probabilityToAdvance = probabilityToAdvance;
-
-    /** @private */
-    this.restProbability = restProbability;
-
-    /** @private */
-    this.rhythmPatterns = {
-      funk: [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0],
-      latin: [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0],
-      reggae: [0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
-    };
-
-    if (rhythmPreset && !this.rhythmPatterns[rhythmPreset]) {
-      throw new Error(
-        `Invalid rhythm preset: ${rhythmPreset}. Must be one of "funk", "latin", or "reggae".`
-      );
-    }
-
-    if (probabilities) {
-      const totalWeight = Object.values(probabilities).reduce(
-        (a, b) => a + b,
-        0
-      );
-      if (totalWeight > 100) {
-        throw new Error(
-          `Invalid probabilities: The sum of probabilities must be 100 or less.`
-        );
-      }
-    }
-
-    /** @private */
-    this.rhythmPattern =
-      this.rhythmPatterns[rhythmPreset] || this.rhythmPatterns["funk"];
+    // We'll create an array where each element is either 0 or a positive integer = note duration in steps.
+    // E.g. 2 => start a note that lasts 2 steps, 3 => 3 steps, 1 => single short step, 0 => rest.
+    // We'll pick a base seed from the chosen genre and adapt it to patternLength, then randomize for density.
+    this._patternArray = this._generatePattern();
   }
 
   /**
-   * Retrieves the note (if any) to play on a given step. This method:
-   * 1. Checks a preset step pattern (funk/latin/reggae).
-   * 2. Uses `chordManager` (if provided in context) to find the chord tones.
-   * 3. Optionally applies velocity shaping via `rhythmManager`.
-   *
-   * If there's no chordManager in the context, no notes will be returned.
-   *
-   * @param {number} stepIndex
-   *   Which step we're on (0-based). Typically managed by a LiveLoop or sequencer.
-   * @param {object} [context={}]
-   *   May contain `chordManager` for chord info, `rhythmManager` for accent logic, etc.
-   * @returns {Array<{note: string, velocity: number, durationSteps: number}>}
-   *   An array containing zero or one note object for this step. Each note has:
-   *   - `note`: The note name, e.g. "C2"
-   *   - `velocity`: A MIDI velocity (0-127)
-   *   - `durationSteps`: How many steps it should sustain (usually 1)
-   *
-   * @private
+   * We define base seeds for multiple genres. Each is an array of length=16,
+   * where each element is either 0 (rest) or a positive integer meaning how many steps the note extends.
+   */
+  _generatePattern() {
+    // Example seeds. Each is length=16. They can contain 2 or 3 for occasional longer notes.
+    const baseSeeds = {
+      funk: [2, 0, 0, 1, 0, 1, 0, 0, 2, 0, 0, 1, 0, 1, 0, 0],
+      latin: [1, 0, 2, 0, 0, 1, 0, 0, 1, 0, 2, 0, 0, 1, 0, 0],
+      reggae: [0, 2, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0],
+      hiphop: [1, 0, 1, 0, 2, 0, 0, 1, 0, 1, 0, 0, 2, 0, 0, 1],
+      rock: [2, 0, 0, 1, 0, 0, 1, 0, 2, 0, 0, 1, 0, 0, 2, 0],
+      house: [2, 0, 2, 0, 1, 0, 0, 1, 2, 0, 2, 0, 1, 0, 0, 1],
+      afrobeat: [1, 0, 0, 2, 0, 1, 0, 0, 1, 0, 0, 2, 0, 1, 0, 0],
+    };
+    const seed = baseSeeds[this.genre] || baseSeeds["funk"];
+
+    // 1) Adapt to patternLength
+    let pattern = this._adaptSeedToLength(seed, this.patternLength);
+
+    // 2) Adjust events according to density
+    pattern = this._applyDensity(pattern);
+
+    return pattern;
+  }
+
+  /**
+   * If user's patternLength != 16, replicate or slice the seed to match the length.
+   */
+  _adaptSeedToLength(seed, length) {
+    if (length === seed.length) {
+      return [...seed];
+    } else if (length < seed.length) {
+      return seed.slice(0, length);
+    } else {
+      // replicate
+      const result = [];
+      let idx = 0;
+      while (result.length < length) {
+        result.push(seed[idx % seed.length]);
+        idx++;
+      }
+      return result;
+    }
+  }
+
+  /**
+   * We measure how many total “events” (non-zero entries) are in the pattern,
+   * compare to targetHits = density * patternLength, remove or add events at random
+   * to match that approximate number. We avoid infinite loops by:
+   *   1) If targetEvents >= patternLength, fill all steps with single-step events.
+   *   2) For partial densities, we impose a max iteration limit when adding events.
+   */
+  _applyDensity(arr) {
+    // If density is 1 (or effectively 1), fill every step with a 1-step note
+    const targetEvents = Math.floor(this.patternLength * this.density);
+    if (targetEvents >= this.patternLength) {
+      return arr.map(() => 1); // fill everything, no rests
+    }
+
+    // Build a list of “event indices” => step indexes where arr[i] > 0
+    const eventIndexes = [];
+    let totalEvents = 0;
+    let i = 0;
+    while (i < arr.length) {
+      const dur = arr[i];
+      if (dur > 0) {
+        eventIndexes.push(i);
+        // skip the next dur-1 steps
+        i += dur;
+        totalEvents++;
+      } else {
+        i++;
+      }
+    }
+
+    // 1) Remove random events if we have too many
+    while (totalEvents > targetEvents && eventIndexes.length > 0) {
+      const idxToRemove = Math.floor(this.randomFn() * eventIndexes.length);
+      const step = eventIndexes[idxToRemove];
+      const dur = arr[step];
+      // remove the entire event
+      arr[step] = 0;
+      // remove it from eventIndexes
+      eventIndexes.splice(idxToRemove, 1);
+      totalEvents--;
+    }
+
+    // 2) If we have too few, attempt to add random events
+    let attemptCount = 0;
+    const maxAttempts = arr.length * 10; // escape hatch
+    while (totalEvents < targetEvents) {
+      attemptCount++;
+      if (attemptCount > maxAttempts) {
+        console.warn(
+          "[SyncopatedBass] Reached attempt limit while applying density. Stopping early."
+        );
+        break;
+      }
+
+      const candidate = Math.floor(this.randomFn() * arr.length);
+      if (arr[candidate] === 0) {
+        // ensure we are not inside a multi-step note
+        if (!this._occupiedByExistingEvent(arr, candidate)) {
+          // place a new note
+          const newDur = this.randomFn() < 0.3 ? 2 : 1; // 30% chance 2-step
+          // check boundary
+          if (candidate + newDur <= arr.length) {
+            arr[candidate] = newDur;
+            eventIndexes.push(candidate);
+            totalEvents++;
+          }
+        }
+      }
+    }
+
+    return arr;
+  }
+
+  /**
+   * Check if 'candidateIndex' is inside an event with a longer duration
+   * that started earlier. If so, we can't place a new event here.
+   */
+  _occupiedByExistingEvent(arr, candidateIndex) {
+    // scan backwards to see if a previous step started a multi-step note that extends over candidateIndex
+    for (let i = candidateIndex - 1; i >= 0; i--) {
+      if (arr[i] > 0) {
+        const end = i + arr[i] - 1;
+        if (candidateIndex <= end) {
+          return true; // candidate is within that note
+        } else {
+          return false; // we passed its region
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Pattern length in steps
+   */
+  getLength() {
+    return this.patternLength;
+  }
+
+  /**
+   * Called each step by LiveLoop. We look up whether this step is the start of a note,
+   * adapt pitch/velocity from chordManager + energyManager, then return the note if any.
    */
   getNotes(stepIndex, context = {}) {
-    const { chordManager, rhythmManager } = context;
-    if (!chordManager) {
+    const chordManager = context.chordManager;
+    const energyManager = context.energyManager;
+    const rhythmManager = context.rhythmManager;
+
+    // If no chord, do nothing
+    if (!chordManager) return [];
+    const chordNotes = chordManager.getCurrentChordNotes() || [];
+    if (!chordNotes.length) return [];
+
+    // Check if this step starts a note
+    const stepPos = stepIndex % this.patternLength;
+    const dur = this._patternArray[stepPos];
+    if (dur <= 0) {
       return [];
     }
 
-    // Get the current chord
-    const chord = chordManager.getChord(stepIndex);
-    if (!chord) {
-      return [];
-    }
+    // 1) Choose a chord note
+    const tension = energyManager?.getTensionLevel?.() || "none";
+    let midiVal = this._chooseChordNote(chordNotes, tension);
 
-    // Special case for always playing a note with max velocity and no rests
-    if (this.probabilityToAdvance === 100 && this.restProbability === 0) {
-      const selectedNote = this._selectNoteByProbability(chord);
-      return [
-        {
-          note: selectedNote,
-          velocity: 100,
-          durationSteps: 1,
-        },
-      ];
-    }
+    // 2) Velocity from hype + downbeat/offbeat
+    const hype = energyManager?.getHypeLevel?.() || "low";
+    let velocity = this._computeVelocity(hype, stepIndex, rhythmManager);
 
-    // Check the internal "rhythmPattern" for a hit on this step
-    const patternValue = this.rhythmPattern[stepIndex % this.length];
-    if (!patternValue) {
-      return [];
-    }
-
-    // Choose which chord tone (root, fifth, third) to play
-    const selectedNote = this._selectNoteByProbability(chord);
-
-    // Base velocity from pattern
-    let velocity = patternValue === 1 ? 100 : 80;
-
-    // (Optional) Adjust velocity using a rhythmManager
-    if (rhythmManager instanceof RhythmManager) {
-      if (rhythmManager.isDownbeat(stepIndex)) {
-        velocity += 20; // stronger accent
-      } else if (rhythmManager.isOffbeat(stepIndex)) {
-        velocity -= 10; // quieter on offbeat
-      }
-      velocity = Math.max(0, Math.min(127, velocity));
-    }
-
+    // Return a single note that lasts `dur` steps
     return [
       {
-        note: selectedNote,
+        note: this._toNoteName(midiVal),
         velocity,
-        durationSteps: 1,
+        durationSteps: dur,
       },
     ];
   }
 
   /**
-   * @private
-   * Selects the root, fifth, or third from a chord object based on weighted probabilities.
-   * The chord object is expected to have `root`, `fifth`, and `third` properties.
-   *
-   * @param {object} chord
-   *   The chord from chordManager (e.g. { root: "C", third: "E", fifth: "G" }).
-   * @returns {string}
-   *   A note string like "C2", "E2", or "G2".
+   * Weighted approach to pick root/third/fifth or 7th if tension≥mid.
+   * Possibly approach ±1 semitone if tension=high. Then enforce `this.octave`.
    */
-  _selectNoteByProbability(chord) {
-    const totalWeight = Object.values(this.probabilities).reduce(
-      (a, b) => a + b,
-      0
-    );
-    const rand = Math.random() * totalWeight;
-
-    if (rand < this.probabilities.root) {
-      return chord.root + this.octave;
-    } else if (rand < this.probabilities.root + this.probabilities.fifth) {
-      return chord.fifth + this.octave;
-    } else {
-      return chord.third + this.octave;
+  _chooseChordNote(chordNotes, tension) {
+    // Weighted approach: root=50%, third=30%, fifth=20%
+    let picked = chordNotes[0];
+    const r = this.randomFn() * 100;
+    if (r < 50 && chordNotes[0]) {
+      picked = chordNotes[0]; // root
+    } else if (r < 80 && chordNotes[1]) {
+      picked = chordNotes[1]; // third
+    } else if (r < 95 && chordNotes[2]) {
+      picked = chordNotes[2]; // fifth
+    } else if (chordNotes[3] && (tension === "mid" || tension === "high")) {
+      picked = chordNotes[3]; // 7th or extension
     }
+
+    let midiVal = this._noteNameToMidi(picked);
+
+    // If tension=high => 30% approach ±1 semitone
+    if (tension === "high" && this.randomFn() < 0.3) {
+      midiVal += this.randomFn() < 0.5 ? -1 : +1;
+    }
+
+    // Force to user-chosen octave
+    const pitchClass = midiVal % 12;
+    midiVal = pitchClass + 12 * (this.octave + 1);
+
+    return midiVal;
   }
 
   /**
-   * Returns the total number of steps in this pattern's loop cycle. Typically
-   * a LiveLoop uses this to determine when the pattern repeats.
-   *
-   * @returns {number} The pattern length in steps.
-   *
-   * @private
+   * Example velocity shaping: hype=medium => +10, hype=high => +20.
+   * Downbeat => +10, offbeat => -10.
    */
-  getLength() {
-    return this.length;
+  _computeVelocity(hype, stepIndex, rhythmManager) {
+    let vel = 90;
+    switch (hype) {
+      case "medium":
+        vel += 10;
+        break;
+      case "high":
+        vel += 20;
+        break;
+    }
+    if (rhythmManager) {
+      if (rhythmManager.isDownbeat(stepIndex)) vel += 10;
+      else if (rhythmManager.isOffbeat(stepIndex)) vel -= 10;
+    }
+    return Math.max(1, Math.min(127, vel));
+  }
+
+  /**
+   * Minimal note name -> MIDI parse. E.g. "C4" => 60
+   */
+  _noteNameToMidi(noteName) {
+    const map = {
+      C: 0,
+      "C#": 1,
+      Db: 1,
+      D: 2,
+      "D#": 3,
+      Eb: 3,
+      E: 4,
+      F: 5,
+      "F#": 6,
+      Gb: 6,
+      G: 7,
+      "G#": 8,
+      Ab: 8,
+      A: 9,
+      "A#": 10,
+      Bb: 10,
+      B: 11,
+    };
+    const m = noteName.match(/^([A-G][b#]?)(\d+)$/);
+    if (!m) return 60; // fallback
+    const pitch = map[m[1]] ?? 0;
+    const octave = parseInt(m[2], 10);
+    return (octave + 1) * 12 + pitch;
+  }
+
+  /**
+   * Minimal MIDI -> note name. E.g. 60 => "C4".
+   */
+  _toNoteName(midiVal) {
+    const names = [
+      "C",
+      "C#",
+      "D",
+      "D#",
+      "E",
+      "F",
+      "F#",
+      "G",
+      "G#",
+      "A",
+      "A#",
+      "B",
+    ];
+    const val = Math.max(0, Math.min(127, midiVal));
+    const pitchClass = val % 12;
+    const octave = Math.floor(val / 12) - 1;
+    return names[pitchClass] + octave;
   }
 }

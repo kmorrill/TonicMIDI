@@ -5,6 +5,7 @@ import {
   ColorfulChordSwellPattern,
   EvolvingLockedDrumPattern,
   PhraseContourMelody,
+  SyncopatedBass,
 } from "../index.js";
 
 // Helper to convert a MIDI note (float or int) to e.g. "C#4"
@@ -50,6 +51,7 @@ export class LiveLoopMixer extends HTMLElement {
       { label: "Chord", value: "ColorfulChordSwellPattern" },
       { label: "Drums", value: "EvolvingLockedDrumPattern" },
       { label: "Melody", value: "PhraseContourMelody" },
+      { label: "Bass", value: "SyncopatedBass" },
     ];
 
     // Current active sort column: "name", "avgPitch", or "channel"
@@ -600,6 +602,9 @@ export class LiveLoopMixer extends HTMLElement {
       case "PhraseContourMelody":
         pattern = new PhraseContourMelody();
         break;
+      case "SyncopatedBass":
+        pattern = new SyncopatedBass();
+        break;
       default:
         alert("Unrecognized pattern type: " + this.newPatternType);
         return;
@@ -674,6 +679,10 @@ export class LiveLoopMixer extends HTMLElement {
       }
       case "PhraseContourMelody": {
         configEl = document.createElement("phrase-contour-melody-config");
+        break;
+      }
+      case "SyncopatedBass": {
+        configEl = document.createElement("syncopated-bass-config");
         break;
       }
       default:
