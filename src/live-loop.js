@@ -330,12 +330,15 @@ export class LiveLoop {
   // ----------------------------------------------------------------------
   /**
    * Returns the average MIDI note of all noteOn events triggered so far.
+   * This includes adjustments for the loop's current transpose setting.
    * If none have been triggered, returns null.
    * @returns {number|null}
    */
   getApproximatePitch() {
     if (this._pitchCount === 0) return null;
-    return this._pitchAccumulator / this._pitchCount;
+    const rawAverage = this._pitchAccumulator / this._pitchCount;
+    // Now add the current loop transpose
+    return rawAverage + this.transpose;
   }
 
   // ----------------------------------------------------------------------

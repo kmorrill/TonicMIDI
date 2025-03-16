@@ -20,9 +20,11 @@ import {
  *
  * Behavior:
  *   - Shows a list (table) of existing loops:
- *       [Name] [PatternType + Config Btn] [ Mute ] [ Solo ] [DeviceDropdown] [ChannelDropdown]
+ *       [Name] [PatternType + Config Btn] [Avg Pitch] [Oct +/-] [Mute] [Solo] [DeviceDropdown] [ChannelDropdown]
  *     Clicking "Mute" toggles that loop’s `_userMuted`.
  *     Clicking "Solo" toggles that loop’s `_userSolo`.
+ *     The "Avg Pitch" column displays the approximate pitch from loop.getApproximatePitch().
+ *     The "Oct +/-" column has two buttons to raise/lower the loop by one octave each click.
  *   - If any loop is soloed, only those with `_userSolo = true` remain unmuted.
  *   - Otherwise each loop’s `muted` follows its `_userMuted`.
  *   - "Add New Loop" row: user picks pattern type, name, device, channel => "Add"
@@ -32,6 +34,32 @@ import {
  *       - <evolving-locked-drum-config> if EvolvingLockedDrumPattern
  *       - <phrase-contour-melody-config> if PhraseContourMelody
  */
+
+// Helper to convert a MIDI note number (float or int) to something like "C#4"
+function midiToNoteName(midiVal) {
+  if (midiVal == null) return "(none)";
+
+  const clamped = Math.round(midiVal);
+  if (clamped < 0 || clamped > 127) return `(out of range)`;
+
+  const notes = [
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B",
+  ];
+  const name = notes[clamped % 12];
+  const octave = Math.floor(clamped / 12) - 1;
+  return `${name}${octave}`;
+}
 
 export class LiveLoopMixer extends HTMLElement {
   constructor() {
@@ -133,6 +161,8 @@ export class LiveLoopMixer extends HTMLElement {
       <tr>
         <th>Name</th>
         <th>Pattern</th>
+        <th>Avg Pitch</th>
+        <th>Oct +/-</th>
         <th>M</th>
         <th>S</th>
         <th>Device</th>
@@ -147,6 +177,12 @@ export class LiveLoopMixer extends HTMLElement {
       }
       if (typeof loop._userSolo === "undefined") {
         loop._userSolo = false;
+      }
+
+      // We'll also track a custom property for how many octaves we've shifted
+      // (0 => no shift, 1 => +12 semitones, etc.).
+      if (typeof loop._octaveOffset === "undefined") {
+        loop._octaveOffset = 0;
       }
 
       // Build device dropdown
@@ -172,13 +208,28 @@ export class LiveLoopMixer extends HTMLElement {
       const muteLabel = loop._userMuted ? "UnMute" : "Mute";
       const soloLabel = loop._userSolo ? "UnSolo" : "Solo";
 
-      // Add a "Config" button next to pattern name
+      // Display the approximate pitch
+      let avgPitchDisplay = "(none)";
+      if (typeof loop.getApproximatePitch === "function") {
+        const avgPitch = loop.getApproximatePitch();
+        if (avgPitch !== null) {
+          avgPitchDisplay = `${avgPitch.toFixed(1)} (${midiToNoteName(
+            avgPitch
+          )})`;
+        }
+      }
+
       rows.push(`
         <tr data-idx="${idx}">
           <td>${loop.name || "Loop"}</td>
           <td>
             ${patternType}
             <button data-action="config" data-ptype="${patternType}">Config</button>
+          </td>
+          <td>${avgPitchDisplay}</td>
+          <td>
+            <button data-action="octDown">Oct -</button>
+            <button data-action="octUp">Oct +</button>
           </td>
           <td><button data-action="mute">${muteLabel}</button></td>
           <td><button data-action="solo">${soloLabel}</button></td>
@@ -284,10 +335,27 @@ export class LiveLoopMixer extends HTMLElement {
             loop.midiChannel = parseInt(evt.target.value, 10) || 1;
           });
 
-        // Config button
+        // "Config" button
         const configBtn = rowEl.querySelector('button[data-action="config"]');
         configBtn.addEventListener("click", () => {
           this._showPatternConfig(loop);
+        });
+
+        // Octave Down
+        const btnOctDown = rowEl.querySelector('button[data-action="octDown"]');
+        btnOctDown.addEventListener("click", () => {
+          // Decrement the stored offset, apply transpose
+          loop._octaveOffset -= 1;
+          loop.setTranspose(loop._octaveOffset * 12);
+          this.render();
+        });
+
+        // Octave Up
+        const btnOctUp = rowEl.querySelector('button[data-action="octUp"]');
+        btnOctUp.addEventListener("click", () => {
+          loop._octaveOffset += 1;
+          loop.setTranspose(loop._octaveOffset * 12);
+          this.render();
         });
       });
 
@@ -365,6 +433,9 @@ export class LiveLoopMixer extends HTMLElement {
     // Initialize user flags
     newLoop._userMuted = false;
     newLoop._userSolo = false;
+    // Also set the custom octave offset to 0 initially
+    newLoop._octaveOffset = 0;
+    newLoop.setTranspose(0);
 
     // Add to transport
     transport.addLiveLoop(newLoop);
