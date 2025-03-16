@@ -19,8 +19,8 @@ import {
  *   };
  *
  * New in this version:
- *   - Sort buttons for [Name], [Avg Pitch], [Ch]. Only one sort active at a time.
- *   - Name & Ch are ascending sorts; Avg Pitch is descending.
+ *   - Sorting indicators now use ▲/△ and ▼/▽ to show active vs inactive sort columns.
+ *   - Mute and Solo columns use emoji icons instead of text.
  */
 
 // Helper to convert a MIDI note (float or int) to e.g. "C#4"
@@ -165,35 +165,47 @@ export class LiveLoopMixer extends HTMLElement {
           flex-shrink: 0;
         }
         .sort-btn {
+          border: none;
+          background: transparent;
+          cursor: pointer;
+          font-size: 1rem;
           margin-left: 0.3rem;
+        }
+        .icon-btn {
+          cursor: pointer;
+          user-select: none;
         }
       </style>
     `;
 
-    // 3) Build the table header, including sort buttons for Name, Avg Pitch, Ch
-    // We'll put an asterisk (*) if that column is currently selected for sorting
-    const nameIndicator = this._sortColumn === "name" ? "*" : "";
-    const pitchIndicator = this._sortColumn === "avgPitch" ? "*" : "";
-    const chIndicator = this._sortColumn === "channel" ? "*" : "";
+    // 3) Build the table header, including sort "buttons" for Name, Avg Pitch, Ch
+    // Arrows based on whether it's active or not.
+    const isSortedByName = this._sortColumn === "name";
+    const isSortedByPitch = this._sortColumn === "avgPitch";
+    const isSortedByCh = this._sortColumn === "channel";
+
+    const nameArrow = isSortedByName ? "&#9650;" : "&#9651;"; // ▲ / △
+    const pitchArrow = isSortedByPitch ? "&#9660;" : "&#9661;"; // ▼ / ▽
+    const chArrow = isSortedByCh ? "&#9650;" : "&#9651;"; // ▲ / △
 
     const headerRow = `
       <tr>
         <th>
           Name
-          <button class="sort-btn" data-sort="name">Asc${nameIndicator}</button>
+          <button class="sort-btn" data-sort="name">${nameArrow}</button>
         </th>
         <th>Pattern</th>
         <th>
           Avg Pitch
-          <button class="sort-btn" data-sort="avgPitch">Desc${pitchIndicator}</button>
+          <button class="sort-btn" data-sort="avgPitch">${pitchArrow}</button>
         </th>
         <th>Oct +/-</th>
-        <th>M</th>
-        <th>S</th>
+        <th>Mute</th>
+        <th>Solo</th>
         <th>Device</th>
         <th>
           Ch
-          <button class="sort-btn" data-sort="channel">Asc${chIndicator}</button>
+          <button class="sort-btn" data-sort="channel">${chArrow}</button>
         </th>
       </tr>
     `;
@@ -233,9 +245,9 @@ export class LiveLoopMixer extends HTMLElement {
         // Pattern name (constructor)
         const patternType = loop.pattern ? loop.pattern.constructor.name : "?";
 
-        // Mute / Solo labels
-        const muteLabel = loop._userMuted ? "UnMute" : "Mute";
-        const soloLabel = loop._userSolo ? "UnSolo" : "Solo";
+        // Mute / Solo icons
+        const muteIcon = loop._userMuted ? "&#128263;" : "&#128266;"; // 🔇 / 🔊
+        const soloIcon = loop._userSolo ? "&#127911;" : "&#9898;"; // 🎧 / ⚪️
 
         // Average pitch display
         let avgPitchDisplay = "(none)";
@@ -261,8 +273,12 @@ export class LiveLoopMixer extends HTMLElement {
             <button data-action="octDown">-</button>
             <button data-action="octUp">+</button>
           </td>
-          <td><button data-action="mute">${muteLabel}</button></td>
-          <td><button data-action="solo">${soloLabel}</button></td>
+          <td>
+            <span data-action="mute" class="icon-btn">${muteIcon}</span>
+          </td>
+          <td>
+            <span data-action="solo" class="icon-btn">${soloIcon}</span>
+          </td>
           <td>
             <select data-action="setDevice">${deviceOptions.join("")}</select>
           </td>
@@ -362,15 +378,14 @@ export class LiveLoopMixer extends HTMLElement {
   _bindRowEvents(transport) {
     this.shadowRoot.querySelectorAll(".loop-list tbody tr").forEach((rowEl) => {
       const rowId = rowEl.getAttribute("data-uuid");
-      // Find the actual loop by matching ID or some reference
-      // We'll do a quick approach: match by loop name + channel? Or store a real ID somewhere
+      // Find the actual loop by matching ID
       const loop = this._findLoopByUuid(transport.liveLoops, rowId);
 
       if (!loop) return;
 
       // Mute
       rowEl
-        .querySelector('button[data-action="mute"]')
+        .querySelector('[data-action="mute"]')
         .addEventListener("click", () => {
           loop._userMuted = !loop._userMuted;
           this._applySoloMuteLogic();
@@ -379,7 +394,7 @@ export class LiveLoopMixer extends HTMLElement {
 
       // Solo
       rowEl
-        .querySelector('button[data-action="solo"]')
+        .querySelector('[data-action="solo"]')
         .addEventListener("click", () => {
           loop._userSolo = !loop._userSolo;
           this._applySoloMuteLogic();
