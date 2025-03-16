@@ -685,8 +685,8 @@ export class LiveLoopMixer extends HTMLElement {
     configEl.style.position = "fixed";
     configEl.style.inset = "0";
     configEl.style.zIndex = "9999";
-    configEl.setAttribute("open", "");
     configEl.liveLoop = loop;
+    configEl.setAttribute("open", "");
     document.body.appendChild(configEl);
   }
 
