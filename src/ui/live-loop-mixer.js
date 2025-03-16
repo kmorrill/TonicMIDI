@@ -7,22 +7,6 @@ import {
   PhraseContourMelody,
 } from "../index.js";
 
-/**
- * <live-loop-mixer> usage:
- *
- *   <live-loop-mixer></live-loop-mixer>
- *
- *   document.querySelector("live-loop-mixer").system = {
- *      transport,     // must have a .liveLoops array
- *      deviceManager, // must have .listOutputs() => array of {outputId, deviceName}
- *      midiBus,       // optional if adding new loops
- *   };
- *
- * New in this version:
- *   - Sorting indicators now use ▲/△ and ▼/▽ to show active vs inactive sort columns.
- *   - Mute and Solo columns use emoji icons instead of text.
- */
-
 // Helper to convert a MIDI note (float or int) to e.g. "C#4"
 function midiToNoteName(midiVal) {
   if (midiVal == null) return "(none)";
@@ -52,7 +36,7 @@ export class LiveLoopMixer extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
 
-    // We expect .system = { transport, deviceManager, midiBus, ... } from outside
+    // We expect .system = { transport, deviceManager, midiBus, ... }
     this._system = null;
 
     // "Add New" form local state
@@ -69,7 +53,6 @@ export class LiveLoopMixer extends HTMLElement {
     ];
 
     // Current active sort column: "name", "avgPitch", or "channel"
-    // If null, no sorting is applied
     this._sortColumn = null;
   }
 
@@ -104,10 +87,8 @@ export class LiveLoopMixer extends HTMLElement {
 
     // 2) Apply sorting if _sortColumn is set
     if (this._sortColumn === "name") {
-      // Ascending by name
       loops.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     } else if (this._sortColumn === "channel") {
-      // Ascending by midiChannel
       loops.sort((a, b) => a.midiChannel - b.midiChannel);
     } else if (this._sortColumn === "avgPitch") {
       // Descending by average pitch
@@ -175,11 +156,13 @@ export class LiveLoopMixer extends HTMLElement {
           cursor: pointer;
           user-select: none;
         }
+        input[type="range"] {
+          width: 80px;
+        }
       </style>
     `;
 
     // 3) Build the table header, including sort "buttons" for Name, Avg Pitch, Ch
-    // Arrows based on whether it's active or not.
     const isSortedByName = this._sortColumn === "name";
     const isSortedByPitch = this._sortColumn === "avgPitch";
     const isSortedByCh = this._sortColumn === "channel";
@@ -202,6 +185,8 @@ export class LiveLoopMixer extends HTMLElement {
         <th>Oct +/-</th>
         <th>Mute</th>
         <th>Solo</th>
+        <th>Volume</th>
+        <th>Pan</th>
         <th>Device</th>
         <th>
           Ch
@@ -212,32 +197,27 @@ export class LiveLoopMixer extends HTMLElement {
 
     // 4) Build the table rows from the sorted array
     const bodyRows = loops
-      .map((loop, idx) => {
-        // If no _userMuted / _userSolo, set them
-        if (typeof loop._userMuted === "undefined") {
+      .map((loop) => {
+        // Initialize user flags if not present
+        if (typeof loop._userMuted === "undefined")
           loop._userMuted = loop.muted;
-        }
-        if (typeof loop._userSolo === "undefined") {
-          loop._userSolo = false;
-        }
-
-        // If no _octaveOffset, define it
-        if (typeof loop._octaveOffset === "undefined") {
-          loop._octaveOffset = 0;
-        }
+        if (typeof loop._userSolo === "undefined") loop._userSolo = false;
+        if (typeof loop._octaveOffset === "undefined") loop._octaveOffset = 0;
+        if (typeof loop._volume === "undefined") loop._volume = 100;
+        if (typeof loop._pan === "undefined") loop._pan = 64;
 
         // Build device dropdown
-        const deviceOptions = deviceManager.listOutputs().map((o) => {
+        const devOptions = deviceManager.listOutputs().map((o) => {
           const sel = loop.midiOutputId === o.outputId ? "selected" : "";
           return `<option value="${o.outputId}" ${sel}>${o.deviceName}</option>`;
         });
         const noneSel = loop.midiOutputId ? "" : "selected";
-        deviceOptions.unshift(`<option value="" ${noneSel}>-None-</option>`);
+        devOptions.unshift(`<option value="" ${noneSel}>-None-</option>`);
 
-        // Build channel dropdown
-        let channelOptions = "";
+        // Channel dropdown
+        let chOptions = "";
         for (let c = 1; c <= 16; c++) {
-          channelOptions += `<option value="${c}" ${
+          chOptions += `<option value="${c}" ${
             c === loop.midiChannel ? "selected" : ""
           }>${c}</option>`;
         }
@@ -264,7 +244,8 @@ export class LiveLoopMixer extends HTMLElement {
         <tr data-uuid="${this._makeLoopId(loop)}">
           <td>${loop.name || "Loop"}</td>
           <td>
-            <a href="#" style="color: blue; text-decoration: underline;" data-action="config" data-ptype="${patternType}">
+            <a href="#" style="color: blue; text-decoration: underline;" data-action="config"
+               data-ptype="${patternType}">
               ${patternType}
             </a>
           </td>
@@ -280,10 +261,18 @@ export class LiveLoopMixer extends HTMLElement {
             <span data-action="solo" class="icon-btn">${soloIcon}</span>
           </td>
           <td>
-            <select data-action="setDevice">${deviceOptions.join("")}</select>
+            <input type="range" min="0" max="127" data-action="volume"
+                   value="${loop._volume}" />
           </td>
           <td>
-            <select data-action="setChannel">${channelOptions}</select>
+            <input type="range" min="0" max="127" data-action="pan"
+                   value="${loop._pan}" />
+          </td>
+          <td>
+            <select data-action="setDevice">${devOptions.join("")}</select>
+          </td>
+          <td>
+            <select data-action="setChannel">${chOptions}</select>
           </td>
         </tr>
       `;
@@ -305,19 +294,19 @@ export class LiveLoopMixer extends HTMLElement {
       ${this._buildAddNewRowHTML(deviceManager)}
     `;
 
-    // 5) Bind sort-button events in the header
+    // Bind header sort-button events
     this.shadowRoot.querySelectorAll(".sort-btn").forEach((btn) => {
       btn.addEventListener("click", (evt) => {
         const col = evt.target.dataset.sort;
-        // set the active column, re-render
         this._sortColumn = col;
         this.render();
       });
     });
 
-    // 6) Bind row-level events
+    // Bind row-level events
     this._bindRowEvents(transport);
-    // 7) Bind add-form events
+
+    // Bind add-form events
     this._bindAddFormEvents();
   }
 
@@ -373,14 +362,14 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Binds row-level events (mute, solo, config, setDevice, setChannel, octave +/-).
+   * Binds row-level events (mute, solo, config, device, channel, oct +/-, volume, pan).
    */
   _bindRowEvents(transport) {
+    const { midiBus } = this._system || {};
+
     this.shadowRoot.querySelectorAll(".loop-list tbody tr").forEach((rowEl) => {
       const rowId = rowEl.getAttribute("data-uuid");
-      // Find the actual loop by matching ID
       const loop = this._findLoopByUuid(transport.liveLoops, rowId);
-
       if (!loop) return;
 
       // Mute
@@ -401,43 +390,84 @@ export class LiveLoopMixer extends HTMLElement {
           this.render();
         });
 
-      // Device selection
+      // Device
       rowEl
         .querySelector('select[data-action="setDevice"]')
         .addEventListener("change", (evt) => {
-          const val = evt.target.value;
-          loop.midiOutputId = val || null;
+          loop.midiOutputId = evt.target.value || null;
         });
 
-      // Channel selection
+      // Channel
       rowEl
         .querySelector('select[data-action="setChannel"]')
         .addEventListener("change", (evt) => {
           loop.midiChannel = parseInt(evt.target.value, 10) || 1;
         });
 
-      // Config (pattern link)
+      // Pattern config link
       const configLink = rowEl.querySelector('[data-action="config"]');
       configLink.addEventListener("click", (evt) => {
         evt.preventDefault();
         this._showPatternConfig(loop);
       });
 
-      // Octave Down
-      const btnOctDown = rowEl.querySelector('button[data-action="octDown"]');
-      btnOctDown.addEventListener("click", () => {
-        loop._octaveOffset -= 1;
-        loop.setTranspose(loop._octaveOffset * 12);
-        this.render();
-      });
+      // Octave +/- buttons
+      rowEl
+        .querySelector('button[data-action="octDown"]')
+        .addEventListener("click", () => {
+          loop._octaveOffset -= 1;
+          loop.setTranspose(loop._octaveOffset * 12);
+          this.render();
+        });
+      rowEl
+        .querySelector('button[data-action="octUp"]')
+        .addEventListener("click", () => {
+          loop._octaveOffset += 1;
+          loop.setTranspose(loop._octaveOffset * 12);
+          this.render();
+        });
 
-      // Octave Up
-      const btnOctUp = rowEl.querySelector('button[data-action="octUp"]');
-      btnOctUp.addEventListener("click", () => {
-        loop._octaveOffset += 1;
-        loop.setTranspose(loop._octaveOffset * 12);
-        this.render();
-      });
+      // Volume fader
+      rowEl
+        .querySelector('input[data-action="volume"]')
+        .addEventListener("input", (evt) => {
+          const val = parseInt(evt.target.value, 10);
+          loop._volume = val; // store for display
+          // If there's a device, get the trackVolume CC
+          const dev = this._getDeviceForLoop(loop);
+          if (dev && this._system?.midiBus) {
+            const ccNum = dev.getCC("trackVolume", loop.midiChannel);
+            if (ccNum !== null) {
+              midiBus.controlChange({
+                outputId: loop.midiOutputId,
+                channel: loop.midiChannel,
+                cc: ccNum,
+                value: val,
+              });
+            }
+          }
+        });
+
+      // Pan fader
+      rowEl
+        .querySelector('input[data-action="pan"]')
+        .addEventListener("input", (evt) => {
+          const val = parseInt(evt.target.value, 10);
+          loop._pan = val; // store for display
+          // If there's a device, get the trackPan CC
+          const dev = this._getDeviceForLoop(loop);
+          if (dev && this._system?.midiBus) {
+            const ccNum = dev.getCC("trackPan", loop.midiChannel);
+            if (ccNum !== null) {
+              midiBus.controlChange({
+                outputId: loop.midiOutputId,
+                channel: loop.midiChannel,
+                cc: ccNum,
+                value: val,
+              });
+            }
+          }
+        });
     });
   }
 
@@ -512,7 +542,9 @@ export class LiveLoopMixer extends HTMLElement {
     // Initialize user flags
     newLoop._userMuted = false;
     newLoop._userSolo = false;
-    newLoop._octaveOffset = 0; // no offset by default
+    newLoop._octaveOffset = 0;
+    newLoop._volume = 100; // default volume
+    newLoop._pan = 64; // default pan
     newLoop.setTranspose(0);
 
     // Add to transport
@@ -544,8 +576,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Opens the appropriate config modal for a loop’s pattern type,
-   * appending it to document.body so it can display as an overlay.
+   * Opens the appropriate config modal for a loop’s pattern type.
    */
   _showPatternConfig(loop) {
     const ptype = loop.pattern?.constructor?.name;
@@ -559,9 +590,7 @@ export class LiveLoopMixer extends HTMLElement {
       case "EvolvingLockedDrumPattern": {
         configEl = document.createElement("evolving-locked-drum-config");
         // If you want to set deviceDefinition for the drum config:
-        const devDef = this._system?.deviceManager?.getDeviceForOutput(
-          loop.midiOutputId
-        );
+        const devDef = this._getDeviceForLoop(loop);
         if (devDef) {
           configEl.deviceDefinition = devDef;
         }
@@ -576,27 +605,28 @@ export class LiveLoopMixer extends HTMLElement {
         return;
     }
 
-    // Position it to fill the screen (similar to how modals do)
+    // Position it to fill the screen
     configEl.style.position = "fixed";
     configEl.style.inset = "0";
     configEl.style.zIndex = "9999";
-
-    // Mark it open
     configEl.setAttribute("open", "");
-
-    // Assign the target loop so the modal knows which pattern to update
     configEl.liveLoop = loop;
-
-    // Insert into the main document (outside our shadow DOM)
     document.body.appendChild(configEl);
+  }
+
+  /**
+   * Utility: retrieve deviceDefinition if loop.midiOutputId is set.
+   */
+  _getDeviceForLoop(loop) {
+    const { deviceManager } = this._system || {};
+    if (!deviceManager || !loop.midiOutputId) return null;
+    return deviceManager.getDeviceForOutput(loop.midiOutputId);
   }
 
   /**
    * Creates a unique ID to identify the loop's row, so we can find it after sorting.
    */
   _makeLoopId(loop) {
-    // simplest is to combine loop.name + channel + a random ID or something
-    // you could do a real unique ID if your loops have one
     return `${loop.name}__ch${loop.midiChannel}__${(loop._uuid ||= Math.random()
       .toString(36)
       .slice(2))}`;
@@ -606,10 +636,7 @@ export class LiveLoopMixer extends HTMLElement {
    * Looks up the loop in the liveLoops array by the "uuid" we assigned.
    */
   _findLoopByUuid(liveLoops, rowId) {
-    return liveLoops.find((lp) => {
-      const cand = this._makeLoopId(lp);
-      return cand === rowId;
-    });
+    return liveLoops.find((lp) => this._makeLoopId(lp) === rowId);
   }
 }
 
