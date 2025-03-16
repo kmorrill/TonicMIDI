@@ -6,6 +6,7 @@ import {
   EvolvingLockedDrumPattern,
   PhraseContourMelody,
   SyncopatedBass,
+  ChanceStepArp,
 } from "../index.js";
 
 // Helper to convert a MIDI note (float or int) to e.g. "C#4"
@@ -52,6 +53,7 @@ export class LiveLoopMixer extends HTMLElement {
       { label: "Drums", value: "EvolvingLockedDrumPattern" },
       { label: "Melody", value: "PhraseContourMelody" },
       { label: "Bass", value: "SyncopatedBass" },
+      { label: "Arp", value: "ChanceStepArp" },
     ];
 
     // Current active sort column: "name", "avgPitch", or "channel"
@@ -605,6 +607,9 @@ export class LiveLoopMixer extends HTMLElement {
       case "SyncopatedBass":
         pattern = new SyncopatedBass();
         break;
+      case "ChanceStepArp":
+        pattern = new ChanceStepArp();
+        break;
       default:
         alert("Unrecognized pattern type: " + this.newPatternType);
         return;
@@ -683,6 +688,10 @@ export class LiveLoopMixer extends HTMLElement {
       }
       case "SyncopatedBass": {
         configEl = document.createElement("syncopated-bass-config");
+        break;
+      }
+      case "ChanceStepArp": {
+        configEl = document.createElement("chance-step-arp-config");
         break;
       }
       default:

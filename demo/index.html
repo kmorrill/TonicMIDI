@@ -48,18 +48,17 @@
     <h1>Tonic Midi</h1>
     <p>
       This page is a personal project demonstrating how to build generative
-      music with chord swells, evolving drums, melodic phrases, and syncopated
-      bass. It reacts to an <em>external MIDI clock</em>, so press play on a
-      hardware or software sequencer that sends clock, and the patterns will
-      sync up automatically.
+      music with chord swells, evolving drums, melodic phrases, syncopated bass,
+      and step-based “chance” arpeggiation. It reacts to an
+      <em>external MIDI clock</em>, so press play on a hardware or software
+      sequencer that sends clock, and the patterns will sync up automatically.
     </p>
 
     <fieldset>
       <legend>LiveLoop Mixer</legend>
       <p style="max-width: 600px">
         A compact view of all current LiveLoops. You can mute, solo, remap them
-        to a device & channel, or even add a new loop on the fly (including the
-        new SyncopatedBass).
+        to a device & channel, or even add a new loop on the fly.
       </p>
       <live-loop-mixer id="mixer"></live-loop-mixer>
     </fieldset>
@@ -68,8 +67,7 @@
       <legend>Energy Manager Controls</legend>
       <p style="max-width: 600px">
         These quick switches alter “hype” (how busy/loud everything is) and
-        “tension” (how dissonant or stable chord/melody structures become). This
-        is a handy shortcut for performing live arrangement changes.
+        “tension” (how dissonant or stable chord/melody structures become).
       </p>
       <div>
         <button data-hype="low">Set Hype: LOW</button>
@@ -88,7 +86,7 @@
       <legend>Real-Time LFOs</legend>
       <p style="max-width: 600px">
         Add continuous LFO modulation to any MIDI channel, layered on top of
-        your existing patterns. Multiple LFOs can affect the same channel.
+        your existing patterns.
       </p>
       <div class="param-row">
         <label for="lfoChannelSelect">MIDI Channel:</label>
@@ -134,7 +132,7 @@
       <legend>Arrangement Sweeps / One-Shots</legend>
       <p style="max-width: 600px">
         Schedule a single, multi-step sweep (e.g., slowly opening a filter) that
-        starts at the next bar boundary, runs once, and then finishes.
+        starts at the next bar boundary, runs once, then finishes.
       </p>
       <div class="param-row">
         <label for="oneShotChannelSelect">MIDI Channel:</label>
@@ -190,6 +188,7 @@
 
     <!-- Include other custom elements used by the page -->
     <script type="module">
+      import "../src/ui/chance-step-arp-config.js";
       import "../src/ui/evolving-locked-drum-config.js";
       import "../src/ui/colorful-chord-swell-config.js";
       import "../src/ui/phrase-contour-melody-config.js";
@@ -204,7 +203,8 @@
         ColorfulChordSwellPattern,
         EvolvingLockedDrumPattern,
         PhraseContourMelody,
-        SyncopatedBass, // <-- Import your new pattern
+        SyncopatedBass,
+        ChanceStepArp,
         LFO,
       } from "../src/index.js";
 
@@ -377,7 +377,25 @@
           pattern: bassPattern,
           midiChannel: 3,
           name: "FunkBassLine",
-          role: null, // no chord or kick role
+          role: null,
+          globalContext,
+          deviceManager: system.deviceManager,
+          midiOutputId: midiOutputs[0]?.id,
+        });
+
+        // 5) ChanceStepArp (NEW)
+        let chanceArp = new ChanceStepArp({
+          patternLength: 16,
+          advanceProbability: 0.7,
+          restProbability: 0.1,
+          baseVelocity: 90,
+          tensionApproachProb: 0.2,
+        });
+        const chanceArpLoop = new LiveLoop(system.midiBus, {
+          pattern: chanceArp,
+          midiChannel: 4,
+          name: "ChanceArp",
+          role: null,
           globalContext,
           deviceManager: system.deviceManager,
           midiOutputId: midiOutputs[0]?.id,
@@ -388,6 +406,7 @@
         transport.addLiveLoop(drumLoop);
         transport.addLiveLoop(melodyLoop);
         transport.addLiveLoop(bassLoop);
+        transport.addLiveLoop(chanceArpLoop);
 
         // -----------
         // Tap into the transport clock to do LFO + sweeps
@@ -576,18 +595,16 @@
 
         // Finally, wire up the new <live-loop-mixer>
         const mixerEl = document.getElementById("mixer");
-        mixerEl.system = system;
+        // We override its patternChoices to ensure "Arp" option is visible in the "Add new" dropdown:
+        mixerEl.patternChoices = [
+          { label: "Chord", value: "ColorfulChordSwellPattern" },
+          { label: "Drums", value: "EvolvingLockedDrumPattern" },
+          { label: "Melody", value: "PhraseContourMelody" },
+          { label: "Bass", value: "SyncopatedBass" },
+          { label: "Arp", value: "ChanceStepArp" },
+        ];
 
-        // NOTE: If you want the mixer "Add new" form to list "SyncopatedBass",
-        // ensure your 'live-loop-mixer.js' includes something like:
-        //   this.patternChoices = [
-        //     { label: "Chord", value: "ColorfulChordSwellPattern" },
-        //     { label: "Drums", value: "EvolvingLockedDrumPattern" },
-        //     { label: "Melody", value: "PhraseContourMelody" },
-        //     { label: "Bass", value: "SyncopatedBass" }
-        //   ];
-        //
-        // ... so the user can pick "Bass" from the dropdown.
+        mixerEl.system = system;
       })();
     </script>
   </body>
