@@ -162,7 +162,7 @@ export class LiveLoopMixer extends HTMLElement {
       </style>
     `;
 
-    // 3) Build the table header, including sort "buttons" for Name, Avg Pitch, Ch
+    // 3) Build the table header
     const isSortedByName = this._sortColumn === "name";
     const isSortedByPitch = this._sortColumn === "avgPitch";
     const isSortedByCh = this._sortColumn === "channel";
@@ -171,6 +171,7 @@ export class LiveLoopMixer extends HTMLElement {
     const pitchArrow = isSortedByPitch ? "&#9660;" : "&#9661;"; // ▼ / ▽
     const chArrow = isSortedByCh ? "&#9650;" : "&#9651;"; // ▲ / △
 
+    // Now we add two new columns for Delay and Reverb, after Pan
     const headerRow = `
       <tr>
         <th>
@@ -187,6 +188,8 @@ export class LiveLoopMixer extends HTMLElement {
         <th>Solo</th>
         <th>Volume</th>
         <th>Pan</th>
+        <th>Delay</th>
+        <th>Reverb</th>
         <th>Device</th>
         <th>
           Ch
@@ -205,9 +208,18 @@ export class LiveLoopMixer extends HTMLElement {
         if (typeof loop._octaveOffset === "undefined") loop._octaveOffset = 0;
         if (typeof loop._volume === "undefined") loop._volume = 100;
         if (typeof loop._pan === "undefined") loop._pan = 64;
+        if (typeof loop._delay === "undefined") loop._delay = 0;
+        if (typeof loop._reverb === "undefined") loop._reverb = 0;
+
+        // Retrieve deviceDefinition for each row's loop
+        const dev = this._getDeviceForLoop(loop);
+
+        // Check if the device supports "send_to_fx1" (delay) or "send_to_fx2" (reverb)
+        let ccDelay = dev ? dev.getCC("send_to_fx1", loop.midiChannel) : null;
+        let ccReverb = dev ? dev.getCC("send_to_fx2", loop.midiChannel) : null;
 
         // Build device dropdown
-        const devOptions = deviceManager.listOutputs().map((o) => {
+        const devOptions = this._system.deviceManager.listOutputs().map((o) => {
           const sel = loop.midiOutputId === o.outputId ? "selected" : "";
           return `<option value="${o.outputId}" ${sel}>${o.deviceName}</option>`;
         });
@@ -240,8 +252,22 @@ export class LiveLoopMixer extends HTMLElement {
           }
         }
 
+        // If ccDelay is found, show a slider; otherwise show dash
+        const delayCell =
+          ccDelay !== null
+            ? `<input type="range" min="0" max="127" data-action="delay" value="${loop._delay}" />`
+            : `<em>-</em>`;
+
+        // If ccReverb is found, show a slider; otherwise show dash
+        const reverbCell =
+          ccReverb !== null
+            ? `<input type="range" min="0" max="127" data-action="reverb" value="${loop._reverb}" />`
+            : `<em>-</em>`;
+
         return `
-        <tr data-uuid="${this._makeLoopId(loop)}">
+        <tr data-uuid="${this._makeLoopId(loop)}"
+            data-cc-delay="${ccDelay === null ? "" : ccDelay}"
+            data-cc-reverb="${ccReverb === null ? "" : ccReverb}">
           <td>${loop.name || "Loop"}</td>
           <td>
             <a href="#" style="color: blue; text-decoration: underline;" data-action="config"
@@ -268,6 +294,8 @@ export class LiveLoopMixer extends HTMLElement {
             <input type="range" min="0" max="127" data-action="pan"
                    value="${loop._pan}" />
           </td>
+          <td>${delayCell}</td>
+          <td>${reverbCell}</td>
           <td>
             <select data-action="setDevice">${devOptions.join("")}</select>
           </td>
@@ -291,7 +319,7 @@ export class LiveLoopMixer extends HTMLElement {
         </tbody>
       </table>
 
-      ${this._buildAddNewRowHTML(deviceManager)}
+      ${this._buildAddNewRowHTML(this._system.deviceManager)}
     `;
 
     // Bind header sort-button events
@@ -362,7 +390,8 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Binds row-level events (mute, solo, config, device, channel, oct +/-, volume, pan).
+   * Binds row-level events (mute, solo, device, channel, oct +/-,
+   * volume, pan, delay, reverb, config).
    */
   _bindRowEvents(transport) {
     const { midiBus } = this._system || {};
@@ -435,7 +464,7 @@ export class LiveLoopMixer extends HTMLElement {
           loop._volume = val; // store for display
           // If there's a device, get the trackVolume CC
           const dev = this._getDeviceForLoop(loop);
-          if (dev && this._system?.midiBus) {
+          if (dev && midiBus) {
             const ccNum = dev.getCC("trackVolume", loop.midiChannel);
             if (ccNum !== null) {
               midiBus.controlChange({
@@ -456,7 +485,7 @@ export class LiveLoopMixer extends HTMLElement {
           loop._pan = val; // store for display
           // If there's a device, get the trackPan CC
           const dev = this._getDeviceForLoop(loop);
-          if (dev && this._system?.midiBus) {
+          if (dev && midiBus) {
             const ccNum = dev.getCC("trackPan", loop.midiChannel);
             if (ccNum !== null) {
               midiBus.controlChange({
@@ -468,6 +497,52 @@ export class LiveLoopMixer extends HTMLElement {
             }
           }
         });
+
+      // Delay fader (if present)
+      const delayFader = rowEl.querySelector('input[data-action="delay"]');
+      if (delayFader) {
+        delayFader.addEventListener("input", (evt) => {
+          const val = parseInt(evt.target.value, 10);
+          loop._delay = val; // store for display
+          const dev = this._getDeviceForLoop(loop);
+          if (dev && midiBus) {
+            // We stored the actual CC # in data-cc-delay
+            const ccStr = rowEl.getAttribute("data-cc-delay");
+            if (ccStr) {
+              const ccNum = parseInt(ccStr, 10);
+              midiBus.controlChange({
+                outputId: loop.midiOutputId,
+                channel: loop.midiChannel,
+                cc: ccNum,
+                value: val,
+              });
+            }
+          }
+        });
+      }
+
+      // Reverb fader (if present)
+      const reverbFader = rowEl.querySelector('input[data-action="reverb"]');
+      if (reverbFader) {
+        reverbFader.addEventListener("input", (evt) => {
+          const val = parseInt(evt.target.value, 10);
+          loop._reverb = val; // store for display
+          const dev = this._getDeviceForLoop(loop);
+          if (dev && midiBus) {
+            // We stored the actual CC # in data-cc-reverb
+            const ccStr = rowEl.getAttribute("data-cc-reverb");
+            if (ccStr) {
+              const ccNum = parseInt(ccStr, 10);
+              midiBus.controlChange({
+                outputId: loop.midiOutputId,
+                channel: loop.midiChannel,
+                cc: ccNum,
+                value: val,
+              });
+            }
+          }
+        });
+      }
     });
   }
 
@@ -543,8 +618,10 @@ export class LiveLoopMixer extends HTMLElement {
     newLoop._userMuted = false;
     newLoop._userSolo = false;
     newLoop._octaveOffset = 0;
-    newLoop._volume = 100; // default volume
-    newLoop._pan = 64; // default pan
+    newLoop._volume = 100;
+    newLoop._pan = 64;
+    newLoop._delay = 0;
+    newLoop._reverb = 0;
     newLoop.setTranspose(0);
 
     // Add to transport
@@ -589,10 +666,9 @@ export class LiveLoopMixer extends HTMLElement {
       }
       case "EvolvingLockedDrumPattern": {
         configEl = document.createElement("evolving-locked-drum-config");
-        // If you want to set deviceDefinition for the drum config:
-        const devDef = this._getDeviceForLoop(loop);
-        if (devDef) {
-          configEl.deviceDefinition = devDef;
+        const dev = this._getDeviceForLoop(loop);
+        if (dev) {
+          configEl.deviceDefinition = dev;
         }
         break;
       }
