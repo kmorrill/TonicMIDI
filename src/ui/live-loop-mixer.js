@@ -35,21 +35,23 @@ function midiToNoteName(midiVal) {
 }
 
 /**
- * A scaled-back LiveLoopMixer component that displays each active LiveLoop
- * with columns: Name (clickable -> config), Avg Pitch, Oct+/-, Mute, Solo,
- * Volume, Pan, Delay, Reverb. Allows sorting by Name (asc) or Pitch (desc).
- * No device/channel columns or add/remove track features.
+ * LiveLoopMixer:
+ *  - Renders a table of current LiveLoops with columns for name, pitch, mute/solo, etc.
+ *  - Automatically re-renders when it hears the "liveLoopsChanged" event from the Connector.
  */
 export class LiveLoopMixer extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
 
-    // We expect `this.system = { transport, deviceManager, midiBus }` from outside
+    // We expect `this.system = { transport, deviceManager, midiBus }`
     this._system = null;
 
-    // Which column is used for sorting? "name" (asc) or "avgPitch" (desc).
-    this._sortColumn = null; // "name" or "avgPitch"
+    // Sorting: "name" (asc) or "avgPitch" (desc).
+    this._sortColumn = null;
+
+    // Bound event handler
+    this._onLiveLoopsChanged = this._onLiveLoopsChanged.bind(this);
   }
 
   /**
@@ -57,10 +59,33 @@ export class LiveLoopMixer extends HTMLElement {
    */
   set system(sys) {
     this._system = sys;
-    this.render();
+    this.render(); // initial render
   }
   get system() {
     return this._system;
+  }
+
+  /**
+   * Listen for "liveLoopsChanged" once we connect to the DOM,
+   * so we can auto-render any time loops are added/removed.
+   */
+  connectedCallback() {
+    document.addEventListener("liveLoopsChanged", this._onLiveLoopsChanged);
+  }
+
+  /**
+   * Clean up the event listener if removed from the DOM.
+   */
+  disconnectedCallback() {
+    document.removeEventListener("liveLoopsChanged", this._onLiveLoopsChanged);
+  }
+
+  /**
+   * Called whenever we get the "liveLoopsChanged" event from the Connector,
+   * or if a user calls .render() manually.
+   */
+  _onLiveLoopsChanged() {
+    this.render();
   }
 
   /**
@@ -77,15 +102,13 @@ export class LiveLoopMixer extends HTMLElement {
       return;
     }
 
-    // 1) Get all loops from transport, copy them for sorting
+    // 1) Copy loops for sorting
     const loops = [...transport.liveLoops];
 
     // 2) Sorting logic
     if (this._sortColumn === "name") {
-      // Sort by loop.name (asc)
       loops.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     } else if (this._sortColumn === "avgPitch") {
-      // Sort by average pitch (desc)
       loops.sort((a, b) => {
         const aPitch =
           (a.getApproximatePitch && a.getApproximatePitch()) ?? -999;
@@ -140,7 +163,7 @@ export class LiveLoopMixer extends HTMLElement {
       </style>
     `;
 
-    // 4) Build the table header
+    // 4) Table header
     const isSortedByName = this._sortColumn === "name";
     const isSortedByPitch = this._sortColumn === "avgPitch";
 
@@ -173,14 +196,13 @@ export class LiveLoopMixer extends HTMLElement {
     const bodyRows = loops
       .map((loop) => {
         // Ensure user-defined tracking props exist
-        if (typeof loop._userMuted === "undefined")
-          loop._userMuted = loop.muted;
-        if (typeof loop._userSolo === "undefined") loop._userSolo = false;
-        if (typeof loop._octaveOffset === "undefined") loop._octaveOffset = 0;
-        if (typeof loop._volume === "undefined") loop._volume = 100;
-        if (typeof loop._pan === "undefined") loop._pan = 64;
-        if (typeof loop._delay === "undefined") loop._delay = 0;
-        if (typeof loop._reverb === "undefined") loop._reverb = 0;
+        if (loop._userMuted === undefined) loop._userMuted = loop.muted;
+        if (loop._userSolo === undefined) loop._userSolo = false;
+        if (loop._octaveOffset === undefined) loop._octaveOffset = 0;
+        if (loop._volume === undefined) loop._volume = 100;
+        if (loop._pan === undefined) loop._pan = 64;
+        if (loop._delay === undefined) loop._delay = 0;
+        if (loop._reverb === undefined) loop._reverb = 0;
 
         const dev = this._getDeviceForLoop(loop);
         const ccDelay = dev ? dev.getCC("send_to_fx1", loop.midiChannel) : null;
@@ -189,8 +211,8 @@ export class LiveLoopMixer extends HTMLElement {
           : null;
 
         // Mute / Solo icons
-        const muteIcon = loop._userMuted ? "&#128263;" : "&#128266;"; // 🔇 / 🔊
-        const soloIcon = loop._userSolo ? "&#127911;" : "&#9898;"; // 🎧 / ⚪️
+        const muteIcon = loop._userMuted ? "&#128263;" : "&#128266;"; // 🔇/🔊
+        const soloIcon = loop._userSolo ? "&#127911;" : "&#9898;"; // 🎧/⚪
 
         // Avg Pitch
         let avgPitchDisplay = "(none)";
@@ -203,7 +225,7 @@ export class LiveLoopMixer extends HTMLElement {
           }
         }
 
-        // Delay / Reverb cells
+        // Delay/Reverb cells
         const delayCell =
           ccDelay != null
             ? `<input type="range" min="0" max="127" data-action="delay" value="${loop._delay}" />`
@@ -257,16 +279,16 @@ export class LiveLoopMixer extends HTMLElement {
       </table>
     `;
 
-    // 6) Combine all into shadowRoot
+    // Insert everything in shadowRoot
     this.shadowRoot.innerHTML = `${style} ${tableHTML}`;
 
-    // 7) Bind events
+    // Hook up events
     this._bindHeaderSortEvents();
     this._bindRowEvents();
   }
 
   /**
-   * Allows sorting by name or pitch on header button click.
+   * Sorting by name or pitch
    */
   _bindHeaderSortEvents() {
     this.shadowRoot.querySelectorAll(".sort-btn").forEach((btn) => {
@@ -279,14 +301,13 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * For each row, wire up Mute, Solo, Config link, Oct+/-, Volume, Pan, Delay, Reverb.
+   * For each row, wire up Mute, Solo, Config link, Oct+/-, Volume, Pan, Delay, Reverb
    */
   _bindRowEvents() {
     const { transport, midiBus } = this._system || {};
     if (!transport || !midiBus) return;
 
-    const rows = this.shadowRoot.querySelectorAll("tbody tr");
-    rows.forEach((rowEl) => {
+    this.shadowRoot.querySelectorAll("tbody tr").forEach((rowEl) => {
       const rowId = rowEl.getAttribute("data-uuid");
       const loop = this._findLoopByUuid(transport.liveLoops, rowId);
       if (!loop) return;
@@ -309,7 +330,7 @@ export class LiveLoopMixer extends HTMLElement {
           this.render();
         });
 
-      // Pattern config link
+      // Pattern config
       rowEl
         .querySelector('[data-action="config"]')
         ?.addEventListener("click", (evt) => {
@@ -420,8 +441,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * If any loop is in solo mode, only those remain unmuted; all others are muted.
-   * Otherwise each loop is muted if _userMuted is true.
+   * If any loop is in solo mode, only those remain unmuted; others are muted.
    */
   _applySoloMuteLogic() {
     const { transport } = this._system || {};
@@ -440,7 +460,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * If the user clicks the link in the Name cell, open the config UI for that pattern.
+   * If the user clicks the loop name, open that pattern’s config component.
    */
   _showPatternConfig(loop) {
     const ptype = loop.pattern?.constructor?.name;
@@ -453,7 +473,7 @@ export class LiveLoopMixer extends HTMLElement {
       }
       case "EvolvingLockedDrumPattern": {
         configEl = document.createElement("evolving-locked-drum-config");
-        // Optionally pass deviceDefinition
+        // optionally pass deviceDefinition
         const dev = this._getDeviceForLoop(loop);
         if (dev) {
           configEl.deviceDefinition = dev;
@@ -477,7 +497,7 @@ export class LiveLoopMixer extends HTMLElement {
         return;
     }
 
-    // Position & open the config
+    // Show the config
     configEl.style.position = "fixed";
     configEl.style.inset = "0";
     configEl.style.zIndex = "9999";
@@ -487,7 +507,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Looks up the deviceDefinition if loop.midiOutputId is set.
+   * Finds the device for the loop’s output, if any
    */
   _getDeviceForLoop(loop) {
     const { deviceManager } = this._system || {};
@@ -496,7 +516,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Create a unique ID for each loop row so we can find it after sorting.
+   * Creates a unique row ID for each loop so we can track them.
    */
   _makeLoopId(loop) {
     if (!loop._uuid) {
@@ -506,7 +526,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Find the corresponding loop from transport.liveLoops by that row ID.
+   * Finds the loop from transport.liveLoops by row ID
    */
   _findLoopByUuid(liveLoops, rowId) {
     return liveLoops.find((lp) => lp._uuid === rowId);

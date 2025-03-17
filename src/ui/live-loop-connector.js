@@ -330,7 +330,7 @@ export class LiveLoopConnector extends HTMLElement {
 
   /**
    * Actually create the new LiveLoop with chosen pattern, add to transport,
-   * and re-render the table.
+   * and re-render the table, then dispatch an event so others can react.
    */
   _handleAddNewLoop() {
     const { transport, midiBus } = this._system || {};
@@ -376,21 +376,29 @@ export class LiveLoopConnector extends HTMLElement {
     // Add to the transport
     transport.addLiveLoop(newLoop);
 
+    // Force a local re-render
+    this.render();
+
+    // **Dispatch an event** so the Mixer / others know loops changed:
+    this.dispatchEvent(
+      new CustomEvent("liveLoopsChanged", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+
     // Reset the "Name" field for a next addition if desired
     this.newLoopName = "NewLoop";
-    this.render();
   }
 
   /**
-   * Removes a loop from the transport and stops it.
+   * Removes a loop from the transport and stops it, then dispatches an event.
    */
   _removeLoop(loop) {
     const { transport, midiBus } = this._system || {};
     if (!transport || !midiBus) return;
 
-    // Force noteOff on any notes from this loop
-    // (We can also do midiBus.stopAllNotes(), but that stops everything.)
-    // Here, we can loop over loop.activeNotes if you prefer to noteOff them individually.
+    // Force noteOff on any notes from this loop (or do stopAllNotes if you prefer).
     for (const noteObj of loop.activeNotes || []) {
       midiBus.noteOff({
         outputId: loop.midiOutputId,
@@ -405,15 +413,22 @@ export class LiveLoopConnector extends HTMLElement {
       transport.liveLoops.splice(idx, 1);
     }
 
-    // Re-render
+    // Local re-render
     this.render();
+
+    // **Dispatch an event** so the Mixer / others know loops changed:
+    this.dispatchEvent(
+      new CustomEvent("liveLoopsChanged", {
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   /**
-   * Helper to make a unique row ID for each loop
+   * Utility to create a unique row ID for each loop
    */
   _makeLoopId(loop) {
-    // store a hidden property if not already
     if (!loop._uuid) {
       loop._uuid = Math.random().toString(36).substring(2);
     }
@@ -421,7 +436,7 @@ export class LiveLoopConnector extends HTMLElement {
   }
 
   /**
-   * Find a loop by the row ID we assigned
+   * Finds the LiveLoop in transport.liveLoops by row ID
    */
   _findLoopByUuid(liveLoops, rowId) {
     return liveLoops.find((lp) => lp._uuid === rowId);
