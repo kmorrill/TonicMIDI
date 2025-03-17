@@ -30,7 +30,7 @@ This is a playground for advanced generative concepts and quick device setups. F
 
 ### Project Overview
 
-OP-XY-Live consists of JavaScript modules that:
+TonicMIDI consists of JavaScript modules that:
 
 * Generate musical patterns (drums, chords, melodies) on every step.
 * Sync with an external MIDI clock.
@@ -43,8 +43,8 @@ OP-XY-Live consists of JavaScript modules that:
 1. **Clone and Install Dependencies**
 
     ```
-    git clone https://github.com/your-username/op-xy-live.git
-    cd op-xy-live
+    git clone https://github.com/kmorrill/TonicMIDI.git
+    cd tonicmidi
     npm install
     ```
 
@@ -73,7 +73,7 @@ OP-XY-Live consists of JavaScript modules that:
 
 ### Repo Structure
 
-* `op-xy-live/`
+* `tonicmidi/`
     * `demo/`
         + `index.html`   # Demo UI
     * `src/`
