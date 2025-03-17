@@ -1,7 +1,6 @@
-// File: live-loop-mixer.js
+// File: src/ui/live-loop-mixer.js
 
 import {
-  LiveLoop,
   ColorfulChordSwellPattern,
   EvolvingLockedDrumPattern,
   PhraseContourMelody,
@@ -9,7 +8,9 @@ import {
   ChanceStepArp,
 } from "../index.js";
 
-// Helper to convert a MIDI note (float or int) to e.g. "C#4"
+/**
+ * Helper: Convert a MIDI note number (float/int) to e.g. "C#4".
+ */
 function midiToNoteName(midiVal) {
   if (midiVal == null) return "(none)";
   const rounded = Math.round(midiVal);
@@ -33,36 +34,26 @@ function midiToNoteName(midiVal) {
   return `${name}${octave}`;
 }
 
+/**
+ * A scaled-back LiveLoopMixer component that displays each active LiveLoop
+ * with columns: Name (clickable -> config), Avg Pitch, Oct+/-, Mute, Solo,
+ * Volume, Pan, Delay, Reverb. Allows sorting by Name (asc) or Pitch (desc).
+ * No device/channel columns or add/remove track features.
+ */
 export class LiveLoopMixer extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
 
-    // We expect .system = { transport, deviceManager, midiBus, ... }
+    // We expect `this.system = { transport, deviceManager, midiBus }` from outside
     this._system = null;
 
-    // "Add New" form local state
-    this.newLoopName = "NewLoop";
-    this.newPatternType = "ColorfulChordSwellPattern";
-    this.newDeviceId = "";
-    this.newChannel = 1;
-
-    // The pattern types we offer in "Add New" row
-    this.patternChoices = [
-      { label: "Chord", value: "ColorfulChordSwellPattern" },
-      { label: "Drums", value: "EvolvingLockedDrumPattern" },
-      { label: "Melody", value: "PhraseContourMelody" },
-      { label: "Bass", value: "SyncopatedBass" },
-      { label: "Arp", value: "ChanceStepArp" },
-    ];
-
-    // Current active sort column: "name", "avgPitch", or "channel"
-    this._sortColumn = null;
+    // Which column is used for sorting? "name" (asc) or "avgPitch" (desc).
+    this._sortColumn = null; // "name" or "avgPitch"
   }
 
   /**
-   * The system must contain at least:
-   *   { transport, deviceManager, midiBus }.
+   * The system must contain at least { transport, deviceManager, midiBus }.
    */
   set system(sys) {
     this._system = sys;
@@ -73,7 +64,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Renders the mixer UI as a table + an "Add new" form.
+   * Renders the mixer UI as a table. No device/channel columns, no add/remove tracks.
    */
   render() {
     if (!this.shadowRoot) return;
@@ -81,33 +72,30 @@ export class LiveLoopMixer extends HTMLElement {
     if (!transport || !deviceManager) {
       this.shadowRoot.innerHTML = `
         <p style="color:red;">
-          LiveLoopMixer: No system/transport/deviceManager set.
+          LiveLoopMixer: No valid system.transport or system.deviceManager found.
         </p>`;
       return;
     }
 
-    // 1) Copy the liveLoops array so we can sort without mutating original
+    // 1) Get all loops from transport, copy them for sorting
     const loops = [...transport.liveLoops];
 
-    // 2) Apply sorting if _sortColumn is set
+    // 2) Sorting logic
     if (this._sortColumn === "name") {
+      // Sort by loop.name (asc)
       loops.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-    } else if (this._sortColumn === "channel") {
-      loops.sort((a, b) => a.midiChannel - b.midiChannel);
     } else if (this._sortColumn === "avgPitch") {
-      // Descending by average pitch
+      // Sort by average pitch (desc)
       loops.sort((a, b) => {
         const aPitch =
-          (a.getApproximatePitch && a.getApproximatePitch()) ?? null;
+          (a.getApproximatePitch && a.getApproximatePitch()) ?? -999;
         const bPitch =
-          (b.getApproximatePitch && b.getApproximatePitch()) ?? null;
-        const aVal = aPitch == null ? -999 : aPitch;
-        const bVal = bPitch == null ? -999 : bPitch;
-        return bVal - aVal; // descending
+          (b.getApproximatePitch && b.getApproximatePitch()) ?? -999;
+        return bPitch - aPitch; // descending
       });
     }
 
-    // Some minimal styling
+    // 3) Basic styling
     const style = `
       <style>
         :host {
@@ -117,37 +105,18 @@ export class LiveLoopMixer extends HTMLElement {
           border: 1px solid #ccc;
           padding: 0.5rem;
         }
-        .loop-list {
-          border-collapse: collapse;
+        table {
           width: 100%;
+          border-collapse: collapse;
           font-size: 0.85rem;
         }
-        .loop-list th,
-        .loop-list td {
+        th, td {
           border: 1px solid #ddd;
           padding: 0.3rem 0.5rem;
           text-align: left;
         }
-        .loop-list th {
+        th {
           background: #f2f2f2;
-        }
-        select,
-        input {
-          font-size: 0.85rem;
-          padding: 0.1rem;
-        }
-        button {
-          font-size: 0.8rem;
-          cursor: pointer;
-        }
-        .add-form {
-          display: flex;
-          gap: 0.3rem;
-          margin-top: 0.5rem;
-          align-items: center;
-        }
-        .add-form > * {
-          flex-shrink: 0;
         }
         .sort-btn {
           border: none;
@@ -163,49 +132,47 @@ export class LiveLoopMixer extends HTMLElement {
         input[type="range"] {
           width: 80px;
         }
+        a[data-action="config"] {
+          color: blue;
+          text-decoration: underline;
+          cursor: pointer;
+        }
       </style>
     `;
 
-    // 3) Build the table header
+    // 4) Build the table header
     const isSortedByName = this._sortColumn === "name";
     const isSortedByPitch = this._sortColumn === "avgPitch";
-    const isSortedByCh = this._sortColumn === "channel";
 
     const nameArrow = isSortedByName ? "&#9650;" : "&#9651;"; // ▲ / △
     const pitchArrow = isSortedByPitch ? "&#9660;" : "&#9661;"; // ▼ / ▽
-    const chArrow = isSortedByCh ? "&#9650;" : "&#9651;"; // ▲ / △
 
-    // Now we add two new columns for Delay and Reverb, after Pan
-    const headerRow = `
-      <tr>
-        <th>
-          Name
-          <button class="sort-btn" data-sort="name">${nameArrow}</button>
-        </th>
-        <th>Pattern</th>
-        <th>
-          Avg Pitch
-          <button class="sort-btn" data-sort="avgPitch">${pitchArrow}</button>
-        </th>
-        <th>Oct +/-</th>
-        <th>Mute</th>
-        <th>Solo</th>
-        <th>Volume</th>
-        <th>Pan</th>
-        <th>Delay</th>
-        <th>Reverb</th>
-        <th>Device</th>
-        <th>
-          Ch
-          <button class="sort-btn" data-sort="channel">${chArrow}</button>
-        </th>
-      </tr>
+    const headerHTML = `
+      <thead>
+        <tr>
+          <th>
+            Name
+            <button class="sort-btn" data-sort="name">${nameArrow}</button>
+          </th>
+          <th>
+            Avg Pitch
+            <button class="sort-btn" data-sort="avgPitch">${pitchArrow}</button>
+          </th>
+          <th>Oct +/-</th>
+          <th>Mute</th>
+          <th>Solo</th>
+          <th>Volume</th>
+          <th>Pan</th>
+          <th>Delay</th>
+          <th>Reverb</th>
+        </tr>
+      </thead>
     `;
 
-    // 4) Build the table rows from the sorted array
+    // 5) Build table rows
     const bodyRows = loops
       .map((loop) => {
-        // Initialize user flags if not present
+        // Ensure user-defined tracking props exist
         if (typeof loop._userMuted === "undefined")
           loop._userMuted = loop.muted;
         if (typeof loop._userSolo === "undefined") loop._userSolo = false;
@@ -215,37 +182,17 @@ export class LiveLoopMixer extends HTMLElement {
         if (typeof loop._delay === "undefined") loop._delay = 0;
         if (typeof loop._reverb === "undefined") loop._reverb = 0;
 
-        // Retrieve deviceDefinition for each row's loop
         const dev = this._getDeviceForLoop(loop);
-
-        // Check if the device supports "send_to_fx1" (delay) or "send_to_fx2" (reverb)
-        let ccDelay = dev ? dev.getCC("send_to_fx1", loop.midiChannel) : null;
-        let ccReverb = dev ? dev.getCC("send_to_fx2", loop.midiChannel) : null;
-
-        // Build device dropdown
-        const devOptions = this._system.deviceManager.listOutputs().map((o) => {
-          const sel = loop.midiOutputId === o.outputId ? "selected" : "";
-          return `<option value="${o.outputId}" ${sel}>${o.deviceName}</option>`;
-        });
-        const noneSel = loop.midiOutputId ? "" : "selected";
-        devOptions.unshift(`<option value="" ${noneSel}>-None-</option>`);
-
-        // Channel dropdown
-        let chOptions = "";
-        for (let c = 1; c <= 16; c++) {
-          chOptions += `<option value="${c}" ${
-            c === loop.midiChannel ? "selected" : ""
-          }>${c}</option>`;
-        }
-
-        // Pattern name (constructor)
-        const patternType = loop.pattern ? loop.pattern.constructor.name : "?";
+        const ccDelay = dev ? dev.getCC("send_to_fx1", loop.midiChannel) : null;
+        const ccReverb = dev
+          ? dev.getCC("send_to_fx2", loop.midiChannel)
+          : null;
 
         // Mute / Solo icons
         const muteIcon = loop._userMuted ? "&#128263;" : "&#128266;"; // 🔇 / 🔊
         const soloIcon = loop._userSolo ? "&#127911;" : "&#9898;"; // 🎧 / ⚪️
 
-        // Average pitch display
+        // Avg Pitch
         let avgPitchDisplay = "(none)";
         if (typeof loop.getApproximatePitch === "function") {
           const avgPitch = loop.getApproximatePitch();
@@ -256,27 +203,23 @@ export class LiveLoopMixer extends HTMLElement {
           }
         }
 
-        // If ccDelay is found, show a slider; otherwise show dash
+        // Delay / Reverb cells
         const delayCell =
-          ccDelay !== null
+          ccDelay != null
             ? `<input type="range" min="0" max="127" data-action="delay" value="${loop._delay}" />`
             : `<em>-</em>`;
-
-        // If ccReverb is found, show a slider; otherwise show dash
         const reverbCell =
-          ccReverb !== null
+          ccReverb != null
             ? `<input type="range" min="0" max="127" data-action="reverb" value="${loop._reverb}" />`
             : `<em>-</em>`;
 
         return `
         <tr data-uuid="${this._makeLoopId(loop)}"
-            data-cc-delay="${ccDelay === null ? "" : ccDelay}"
-            data-cc-reverb="${ccReverb === null ? "" : ccReverb}">
-          <td>${loop.name || "Loop"}</td>
+            data-cc-delay="${ccDelay == null ? "" : ccDelay}"
+            data-cc-reverb="${ccReverb == null ? "" : ccReverb}">
           <td>
-            <a href="#" style="color: blue; text-decoration: underline;" data-action="config"
-               data-ptype="${patternType}">
-              ${patternType}
+            <a href="#" data-action="config">
+              ${loop.name || "Loop"}
             </a>
           </td>
           <td>${avgPitchDisplay}</td>
@@ -285,10 +228,10 @@ export class LiveLoopMixer extends HTMLElement {
             <button data-action="octUp">+</button>
           </td>
           <td>
-            <span data-action="mute" class="icon-btn">${muteIcon}</span>
+            <span class="icon-btn" data-action="mute">${muteIcon}</span>
           </td>
           <td>
-            <span data-action="solo" class="icon-btn">${soloIcon}</span>
+            <span class="icon-btn" data-action="solo">${soloIcon}</span>
           </td>
           <td>
             <input type="range" min="0" max="127" data-action="volume"
@@ -300,107 +243,50 @@ export class LiveLoopMixer extends HTMLElement {
           </td>
           <td>${delayCell}</td>
           <td>${reverbCell}</td>
-          <td>
-            <select data-action="setDevice">${devOptions.join("")}</select>
-          </td>
-          <td>
-            <select data-action="setChannel">${chOptions}</select>
-          </td>
         </tr>
       `;
       })
       .join("");
 
-    // Build final HTML
-    this.shadowRoot.innerHTML = `
-      ${style}
-      <table class="loop-list">
-        <thead>
-          ${headerRow}
-        </thead>
+    const tableHTML = `
+      <table>
+        ${headerHTML}
         <tbody>
           ${bodyRows}
         </tbody>
       </table>
-
-      ${this._buildAddNewRowHTML(this._system.deviceManager)}
     `;
 
-    // Bind header sort-button events
+    // 6) Combine all into shadowRoot
+    this.shadowRoot.innerHTML = `${style} ${tableHTML}`;
+
+    // 7) Bind events
+    this._bindHeaderSortEvents();
+    this._bindRowEvents();
+  }
+
+  /**
+   * Allows sorting by name or pitch on header button click.
+   */
+  _bindHeaderSortEvents() {
     this.shadowRoot.querySelectorAll(".sort-btn").forEach((btn) => {
       btn.addEventListener("click", (evt) => {
-        const col = evt.target.dataset.sort;
+        const col = evt.target.dataset.sort; // "name" or "avgPitch"
         this._sortColumn = col;
         this.render();
       });
     });
-
-    // Bind row-level events
-    this._bindRowEvents(transport);
-
-    // Bind add-form events
-    this._bindAddFormEvents();
   }
 
   /**
-   * Build the HTML for the "Add new loop" row
+   * For each row, wire up Mute, Solo, Config link, Oct+/-, Volume, Pan, Delay, Reverb.
    */
-  _buildAddNewRowHTML(deviceManager) {
-    const devs = deviceManager.listOutputs();
-    const devOptions = devs.map((o) => {
-      const sel = o.outputId === this.newDeviceId ? "selected" : "";
-      return `<option value="${o.outputId}" ${sel}>${o.deviceName}</option>`;
-    });
-    devOptions.unshift(
-      `<option value="" ${this.newDeviceId ? "" : "selected"}>-None-</option>`
-    );
+  _bindRowEvents() {
+    const { transport, midiBus } = this._system || {};
+    if (!transport || !midiBus) return;
 
-    let channelOpts = "";
-    for (let c = 1; c <= 16; c++) {
-      channelOpts += `<option value="${c}" ${
-        c === this.newChannel ? "selected" : ""
-      }>${c}</option>`;
-    }
-
-    let patternOpts = this.patternChoices
-      .map((pc) => {
-        const sel = pc.value === this.newPatternType ? "selected" : "";
-        return `<option value="${pc.value}" ${sel}>${pc.label}</option>`;
-      })
-      .join("");
-
-    return `
-      <div class="add-form">
-        <span style="font-weight:bold;">Add:</span>
-        <input
-          style="width:60px;"
-          type="text"
-          value="${this.newLoopName}"
-          data-addfield="name"
-          placeholder="Name"
-        />
-        <select data-addfield="pattern">
-          ${patternOpts}
-        </select>
-        <select data-addfield="device">
-          ${devOptions.join("")}
-        </select>
-        <select data-addfield="channel">
-          ${channelOpts}
-        </select>
-        <button data-action="add">+</button>
-      </div>
-    `;
-  }
-
-  /**
-   * Binds row-level events (mute, solo, device, channel, oct +/-,
-   * volume, pan, delay, reverb, config).
-   */
-  _bindRowEvents(transport) {
-    const { midiBus } = this._system || {};
-
-    this.shadowRoot.querySelectorAll(".loop-list tbody tr").forEach((rowEl) => {
+    const rows = this.shadowRoot.querySelectorAll("tbody tr");
+    rows.forEach((rowEl) => {
       const rowId = rowEl.getAttribute("data-uuid");
       const loop = this._findLoopByUuid(transport.liveLoops, rowId);
       if (!loop) return;
@@ -408,7 +294,7 @@ export class LiveLoopMixer extends HTMLElement {
       // Mute
       rowEl
         .querySelector('[data-action="mute"]')
-        .addEventListener("click", () => {
+        ?.addEventListener("click", () => {
           loop._userMuted = !loop._userMuted;
           this._applySoloMuteLogic();
           this.render();
@@ -417,60 +303,46 @@ export class LiveLoopMixer extends HTMLElement {
       // Solo
       rowEl
         .querySelector('[data-action="solo"]')
-        .addEventListener("click", () => {
+        ?.addEventListener("click", () => {
           loop._userSolo = !loop._userSolo;
           this._applySoloMuteLogic();
           this.render();
         });
 
-      // Device
-      rowEl
-        .querySelector('select[data-action="setDevice"]')
-        .addEventListener("change", (evt) => {
-          loop.midiOutputId = evt.target.value || null;
-        });
-
-      // Channel
-      rowEl
-        .querySelector('select[data-action="setChannel"]')
-        .addEventListener("change", (evt) => {
-          loop.midiChannel = parseInt(evt.target.value, 10) || 1;
-        });
-
       // Pattern config link
-      const configLink = rowEl.querySelector('[data-action="config"]');
-      configLink.addEventListener("click", (evt) => {
-        evt.preventDefault();
-        this._showPatternConfig(loop);
-      });
-
-      // Octave +/- buttons
       rowEl
-        .querySelector('button[data-action="octDown"]')
-        .addEventListener("click", () => {
+        .querySelector('[data-action="config"]')
+        ?.addEventListener("click", (evt) => {
+          evt.preventDefault();
+          this._showPatternConfig(loop);
+        });
+
+      // Octave +/-
+      rowEl
+        .querySelector('[data-action="octDown"]')
+        ?.addEventListener("click", () => {
           loop._octaveOffset -= 1;
           loop.setTranspose(loop._octaveOffset * 12);
           this.render();
         });
       rowEl
-        .querySelector('button[data-action="octUp"]')
-        .addEventListener("click", () => {
+        .querySelector('[data-action="octUp"]')
+        ?.addEventListener("click", () => {
           loop._octaveOffset += 1;
           loop.setTranspose(loop._octaveOffset * 12);
           this.render();
         });
 
-      // Volume fader
+      // Volume
       rowEl
         .querySelector('input[data-action="volume"]')
-        .addEventListener("input", (evt) => {
+        ?.addEventListener("input", (evt) => {
           const val = parseInt(evt.target.value, 10);
-          loop._volume = val; // store for display
-          // If there's a device, get the trackVolume CC
+          loop._volume = val;
           const dev = this._getDeviceForLoop(loop);
-          if (dev && midiBus) {
+          if (dev) {
             const ccNum = dev.getCC("trackVolume", loop.midiChannel);
-            if (ccNum !== null) {
+            if (ccNum != null) {
               midiBus.controlChange({
                 outputId: loop.midiOutputId,
                 channel: loop.midiChannel,
@@ -481,17 +353,16 @@ export class LiveLoopMixer extends HTMLElement {
           }
         });
 
-      // Pan fader
+      // Pan
       rowEl
         .querySelector('input[data-action="pan"]')
-        .addEventListener("input", (evt) => {
+        ?.addEventListener("input", (evt) => {
           const val = parseInt(evt.target.value, 10);
-          loop._pan = val; // store for display
-          // If there's a device, get the trackPan CC
+          loop._pan = val;
           const dev = this._getDeviceForLoop(loop);
-          if (dev && midiBus) {
+          if (dev) {
             const ccNum = dev.getCC("trackPan", loop.midiChannel);
-            if (ccNum !== null) {
+            if (ccNum != null) {
               midiBus.controlChange({
                 outputId: loop.midiOutputId,
                 channel: loop.midiChannel,
@@ -502,15 +373,14 @@ export class LiveLoopMixer extends HTMLElement {
           }
         });
 
-      // Delay fader (if present)
+      // Delay
       const delayFader = rowEl.querySelector('input[data-action="delay"]');
       if (delayFader) {
         delayFader.addEventListener("input", (evt) => {
           const val = parseInt(evt.target.value, 10);
-          loop._delay = val; // store for display
+          loop._delay = val;
           const dev = this._getDeviceForLoop(loop);
-          if (dev && midiBus) {
-            // We stored the actual CC # in data-cc-delay
+          if (dev) {
             const ccStr = rowEl.getAttribute("data-cc-delay");
             if (ccStr) {
               const ccNum = parseInt(ccStr, 10);
@@ -525,15 +395,14 @@ export class LiveLoopMixer extends HTMLElement {
         });
       }
 
-      // Reverb fader (if present)
+      // Reverb
       const reverbFader = rowEl.querySelector('input[data-action="reverb"]');
       if (reverbFader) {
         reverbFader.addEventListener("input", (evt) => {
           const val = parseInt(evt.target.value, 10);
-          loop._reverb = val; // store for display
+          loop._reverb = val;
           const dev = this._getDeviceForLoop(loop);
-          if (dev && midiBus) {
-            // We stored the actual CC # in data-cc-reverb
+          if (dev) {
             const ccStr = rowEl.getAttribute("data-cc-reverb");
             if (ccStr) {
               const ccNum = parseInt(ccStr, 10);
@@ -551,100 +420,8 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Binds the "Add new" form events
-   */
-  _bindAddFormEvents() {
-    const addForm = this.shadowRoot.querySelector(".add-form");
-    if (!addForm) return;
-
-    addForm
-      .querySelector('input[data-addfield="name"]')
-      .addEventListener("input", (evt) => {
-        this.newLoopName = evt.target.value;
-      });
-    addForm
-      .querySelector('select[data-addfield="pattern"]')
-      .addEventListener("change", (evt) => {
-        this.newPatternType = evt.target.value;
-      });
-    addForm
-      .querySelector('select[data-addfield="device"]')
-      .addEventListener("change", (evt) => {
-        this.newDeviceId = evt.target.value;
-      });
-    addForm
-      .querySelector('select[data-addfield="channel"]')
-      .addEventListener("change", (evt) => {
-        this.newChannel = parseInt(evt.target.value, 10) || 1;
-      });
-    addForm
-      .querySelector('button[data-action="add"]')
-      .addEventListener("click", () => this._handleAddNewLoop());
-  }
-
-  /**
-   * Creates a new loop based on the form fields, adds it to transport, re-renders.
-   */
-  _handleAddNewLoop() {
-    const { transport, midiBus } = this._system || {};
-    if (!transport || !midiBus) {
-      alert("Missing system.transport or system.midiBus. Cannot create loop.");
-      return;
-    }
-
-    // Create the chosen pattern
-    let pattern;
-    switch (this.newPatternType) {
-      case "ColorfulChordSwellPattern":
-        pattern = new ColorfulChordSwellPattern();
-        break;
-      case "EvolvingLockedDrumPattern":
-        pattern = new EvolvingLockedDrumPattern();
-        break;
-      case "PhraseContourMelody":
-        pattern = new PhraseContourMelody();
-        break;
-      case "SyncopatedBass":
-        pattern = new SyncopatedBass();
-        break;
-      case "ChanceStepArp":
-        pattern = new ChanceStepArp();
-        break;
-      default:
-        alert("Unrecognized pattern type: " + this.newPatternType);
-        return;
-    }
-
-    // Build new LiveLoop
-    const newLoop = new LiveLoop(midiBus, {
-      pattern,
-      name: this.newLoopName,
-      midiChannel: this.newChannel,
-      muted: false,
-      midiOutputId: this.newDeviceId || null,
-    });
-
-    // Initialize user flags
-    newLoop._userMuted = false;
-    newLoop._userSolo = false;
-    newLoop._octaveOffset = 0;
-    newLoop._volume = 100;
-    newLoop._pan = 64;
-    newLoop._delay = 0;
-    newLoop._reverb = 0;
-    newLoop.setTranspose(0);
-
-    // Add to transport
-    transport.addLiveLoop(newLoop);
-
-    // Reset the "name" input
-    this.newLoopName = "NewLoop";
-    this.render();
-  }
-
-  /**
-   * If any loop is _userSolo=true, only those loops remain unmuted; all others are muted.
-   * Otherwise each loop just follows its _userMuted.
+   * If any loop is in solo mode, only those remain unmuted; all others are muted.
+   * Otherwise each loop is muted if _userMuted is true.
    */
   _applySoloMuteLogic() {
     const { transport } = this._system || {};
@@ -663,7 +440,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Opens the appropriate config modal for a loop’s pattern type.
+   * If the user clicks the link in the Name cell, open the config UI for that pattern.
    */
   _showPatternConfig(loop) {
     const ptype = loop.pattern?.constructor?.name;
@@ -676,6 +453,7 @@ export class LiveLoopMixer extends HTMLElement {
       }
       case "EvolvingLockedDrumPattern": {
         configEl = document.createElement("evolving-locked-drum-config");
+        // Optionally pass deviceDefinition
         const dev = this._getDeviceForLoop(loop);
         if (dev) {
           configEl.deviceDefinition = dev;
@@ -699,7 +477,7 @@ export class LiveLoopMixer extends HTMLElement {
         return;
     }
 
-    // Position it to fill the screen
+    // Position & open the config
     configEl.style.position = "fixed";
     configEl.style.inset = "0";
     configEl.style.zIndex = "9999";
@@ -709,7 +487,7 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Utility: retrieve deviceDefinition if loop.midiOutputId is set.
+   * Looks up the deviceDefinition if loop.midiOutputId is set.
    */
   _getDeviceForLoop(loop) {
     const { deviceManager } = this._system || {};
@@ -718,19 +496,20 @@ export class LiveLoopMixer extends HTMLElement {
   }
 
   /**
-   * Creates a unique ID to identify the loop's row, so we can find it after sorting.
+   * Create a unique ID for each loop row so we can find it after sorting.
    */
   _makeLoopId(loop) {
-    return `${loop.name}__ch${loop.midiChannel}__${(loop._uuid ||= Math.random()
-      .toString(36)
-      .slice(2))}`;
+    if (!loop._uuid) {
+      loop._uuid = Math.random().toString(36).slice(2);
+    }
+    return loop._uuid;
   }
 
   /**
-   * Looks up the loop in the liveLoops array by the "uuid" we assigned.
+   * Find the corresponding loop from transport.liveLoops by that row ID.
    */
   _findLoopByUuid(liveLoops, rowId) {
-    return liveLoops.find((lp) => this._makeLoopId(lp) === rowId);
+    return liveLoops.find((lp) => lp._uuid === rowId);
   }
 }
 

@@ -54,11 +54,24 @@
       sequencer that sends clock, and the patterns will sync up automatically.
     </p>
 
+    <!-- 1) LiveLoop Connector on top -->
+    <fieldset>
+      <legend>LiveLoop Connector</legend>
+      <p style="max-width: 600px">
+        Use this connector to add new LiveLoops or remove them from the system.
+        You can select a pattern type, device, MIDI channel, then create the
+        loop on-the-fly. Removing a loop stops it immediately.
+      </p>
+      <live-loop-connector id="connector"></live-loop-connector>
+    </fieldset>
+
+    <!-- 2) LiveLoop Mixer below -->
     <fieldset>
       <legend>LiveLoop Mixer</legend>
       <p style="max-width: 600px">
-        A compact view of all current LiveLoops. You can mute, solo, remap them
-        to a device & channel, or even add a new loop on the fly.
+        A compact view of all current LiveLoops. You can adjust octaves, Mute,
+        Solo, Volume, Pan, Delay, and Reverb sends here. If a pattern has a
+        configuration UI, you can click its name to open it.
       </p>
       <live-loop-mixer id="mixer"></live-loop-mixer>
     </fieldset>
@@ -232,7 +245,9 @@
       <p>
         Also, I encourage anyone who programs JavaScript to contribute to the
         repository. It's easy to add devices and patterns that extend the
-        capabilities. The repo is at
+        capabilities. You can also use this as a JS library and skin with your
+        own UI. It's a very useful library to built on top of for automating
+        MIDI devices. The repo is at
         <a
           href="https://github.com/kmorrill/TonicMIDI?tab=readme-ov-file#readme"
           >https://github.com/kmorrill/TonicMIDI?tab=readme-ov-file#readme</a
@@ -240,16 +255,19 @@
       </p>
     </div>
 
-    <!-- Include other custom elements used by the page -->
+    <!-- Import our custom elements used on this page -->
     <script type="module">
+      import "../src/ui/live-loop-connector.js";
+      import "../src/ui/live-loop-mixer.js";
+
       import "../src/ui/chance-step-arp-config.js";
       import "../src/ui/evolving-locked-drum-config.js";
       import "../src/ui/colorful-chord-swell-config.js";
       import "../src/ui/phrase-contour-melody-config.js";
       import "../src/ui/syncopated-bass-config.js";
-      import "../src/ui/live-loop-mixer.js";
     </script>
 
+    <!-- The main script that builds the system, loads patterns, etc. -->
     <script type="module">
       import { createDefaultSystem } from "../src/system/create-default-system.js";
       import {
@@ -342,10 +360,10 @@
         },
       };
 
-      // Real-time LFO store
+      // Track real-time LFOs
       const activeLFOs = [];
 
-      // One-shot sweeps store
+      // Track one-shot sweeps
       const queuedOneShots = [];
 
       (async function main() {
@@ -361,7 +379,7 @@
         globalContext.energyManager = energyManager;
         globalContext.chordManager = chordManager;
 
-        // Authorize a chord provider
+        // Authorize chord provider
         chordManager.authorizeProvider("ColorfulChordSwellPattern");
 
         // 1) Chord Swell
@@ -420,7 +438,7 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // 4) SyncopatedBass
+        // 4) Syncopated Bass
         let bassPattern = new SyncopatedBass({
           patternLength: 16,
           genre: "funk",
@@ -437,7 +455,7 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // 5) ChanceStepArp (NEW)
+        // 5) ChanceStepArp
         let chanceArp = new ChanceStepArp({
           patternLength: 16,
           advanceProbability: 0.7,
@@ -455,49 +473,43 @@
           midiOutputId: midiOutputs[0]?.id,
         });
 
-        // Add loops to the transport
+        // Add them to transport
         transport.addLiveLoop(chordLoop);
         transport.addLiveLoop(drumLoop);
         transport.addLiveLoop(melodyLoop);
         transport.addLiveLoop(bassLoop);
         transport.addLiveLoop(chanceArpLoop);
 
-        // -----------
-        // Tap into the transport clock to do LFO + sweeps
-        // -----------
+        // Wrap the original pulse function
         const originalClockFn = transport._onClockPulse.bind(transport);
         transport._onClockPulse = function (msg) {
-          // call original logic
+          // Original logic
           originalClockFn(msg);
-          // Then do custom updates
-          const deltaTime = 1.0 / 24.0; // each pulse ~1/24 beat
+          // Then do LFO & sweeps
+          const deltaTime = 1.0 / 24.0;
           updateAllLFOs(deltaTime, this.timeInBeats);
           checkOneShots(this.stepIndex, deltaTime);
         };
 
         console.log("System ready! Press play on external MIDI clock...");
 
-        // -------------------------------------------------
         // Energy controls
-        // -------------------------------------------------
         document.querySelectorAll("button[data-hype]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newHype = btn.getAttribute("data-hype");
             energyManager.setHypeLevel(newHype);
-            console.log("EnergyManager setHypeLevel:", newHype);
+            console.log("[EnergyManager] setHypeLevel:", newHype);
           });
         });
         document.querySelectorAll("button[data-tension]").forEach((btn) => {
           btn.addEventListener("click", () => {
             const newTension = btn.getAttribute("data-tension");
             energyManager.setTensionLevel(newTension);
-            console.log("EnergyManager setTensionLevel:", newTension);
+            console.log("[EnergyManager] setTensionLevel:", newTension);
           });
         });
 
-        // -------------------------------------------------
-        // Real-time LFO manager
-        // -------------------------------------------------
+        // LFO code
         document.getElementById("addLfoBtn").addEventListener("click", () => {
           const channel = parseInt(
             document.getElementById("lfoChannelSelect").value,
@@ -513,7 +525,6 @@
             amplitude: preset.amplitude,
             targetParam: preset.targetParam,
           });
-
           const lfoObj = { channel, presetKey, lfo: myLfo };
           activeLFOs.push(lfoObj);
           renderActiveLFOList();
@@ -537,7 +548,6 @@
         }
 
         function updateAllLFOs(deltaTime, absoluteTime) {
-          // For each active LFO, update & send CC
           activeLFOs.forEach(({ channel, lfo }) => {
             const value = lfo.update(deltaTime);
             const deviceDef = system.deviceManager.getDeviceForOutput(
@@ -555,9 +565,7 @@
           });
         }
 
-        // -------------------------------------------------
-        // Arrangement One-Shots (Sweeps)
-        // -------------------------------------------------
+        // One-shot sweeps
         document
           .getElementById("enqueueSweepBtn")
           .addEventListener("click", () => {
@@ -574,9 +582,8 @@
             const preset = LFO_PRESETS_SLOW[presetKey];
             if (!preset) return;
 
-            // We'll do 1 full cycle over 'steps' steps
+            // 1 cycle over 'steps' steps
             const freq = 1 / (steps / 4);
-
             const job = {
               channel,
               steps,
@@ -591,7 +598,7 @@
               done: false,
             };
 
-            // schedule start at next multiple-of-16 step
+            // schedule at next 16-step boundary
             const currentStep = transport.stepIndex;
             const nextMultiple16 = Math.ceil(currentStep / 16) * 16;
             job.startStep = nextMultiple16;
@@ -625,11 +632,9 @@
 
             const endStep = job.startStep + job.steps;
             if (stepIndex >= endStep) {
-              // finished
               job.done = true;
               return;
             }
-            // in the active range
             const val = job.lfo.update(deltaTime);
             const deviceDef = system.deviceManager.getDeviceForOutput(
               system.midiOutputs[0]?.id
@@ -647,18 +652,14 @@
           renderSweepList();
         }
 
-        // Finally, wire up the new <live-loop-mixer>
-        const mixerEl = document.getElementById("mixer");
-        // We override its patternChoices to ensure "Arp" option is visible in the "Add new" dropdown:
-        mixerEl.patternChoices = [
-          { label: "Chord", value: "ColorfulChordSwellPattern" },
-          { label: "Drums", value: "EvolvingLockedDrumPattern" },
-          { label: "Melody", value: "PhraseContourMelody" },
-          { label: "Bass", value: "SyncopatedBass" },
-          { label: "Arp", value: "ChanceStepArp" },
-        ];
+        // Bind the connector and mixer to the same system
+        const connectorEl = document.getElementById("connector");
+        connectorEl.system = system;
 
+        const mixerEl = document.getElementById("mixer");
         mixerEl.system = system;
+
+        console.log("Connector and Mixer are set up. Enjoy!");
       })();
     </script>
   </body>
