@@ -1,4 +1,4 @@
-OP-XY-Live
+TonicMIDI
 ================
 
 A browser-based MIDI sequencer and pattern library designed to control hardware instruments (such as the OP-XY). It focuses on generative and evolving music concepts—like chord swells, evolving drum lines, and melodic phrases—that respond to energy/tension changes in real time.
@@ -182,3 +182,9 @@ The dev UI is minimal—feel free to build your own front-end!
 Enjoy hacking, evolving, and jamming with your hardware!
 
 If you have ideas or want to contribute, open a Pull Request or get in touch.
+
+## Support TonicMIDI
+
+By donating through PayPal, you can help support this project and keep it thriving. I've invested several hundred dollars to create and host TonicMIDI, and I hope to continue adding new features and improvements. Your donation will directly contribute to the project's growth and ensure its continued availability.
+
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?business=LJA2SVLSM8C4S&no_recurring=0&item_name=Help+keep+TonicMIDI+growing&currency_code=USD)
