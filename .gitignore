@@ -3,3 +3,4 @@ node_modules/
 coverage/
 docs/api-temp.md
 dist/
+server.log
