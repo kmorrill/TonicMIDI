@@ -90,4 +90,15 @@ describe('opxy CC prototype demo', () => {
     meterValue = document.querySelector('.encoder-meter__value').textContent;
     expect(meterValue).toBe('50%');
   });
+
+  it('toggles track buttons and exposes state API', () => {
+    const buttons = document.querySelectorAll('.track-button');
+    expect(buttons).toHaveLength(8);
+    const first = buttons[0];
+    expect(first.classList.contains('active')).toBe(false);
+    first.click();
+    expect(first.classList.contains('active')).toBe(true);
+    api.setTrackState('1', false);
+    expect(first.classList.contains('active')).toBe(false);
+  });
 });
