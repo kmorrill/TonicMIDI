@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+    />
+    <title>OP-XY · CC UI Prototype</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont,
+          sans-serif;
+        --bg: #050608;
+        --panel: #0e1118;
+        --raised: #161b25;
+        --accent: #63f5c7;
+        --accent-soft: rgba(99, 245, 199, 0.18);
+        --text: #f5f6f8;
+        --muted: #9ca5bb;
+        --divider: rgba(255, 255, 255, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at 20% 20%, #101423, #050608 70%);
+        color: var(--text);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        touch-action: manipulation;
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        position: relative;
+      }
+
+      .panel {
+        background: var(--panel);
+        border-radius: 1rem;
+        padding: 1rem;
+        box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+      }
+
+      .panel h2 {
+        margin: 0 0 0.35rem 0;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 1rem;
+        color: var(--accent);
+      }
+
+      .panel p {
+        margin: 0 0 0.65rem 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .piano {
+        margin-top: 0.5rem;
+        position: relative;
+        width: 100%;
+        max-width: 1024px;
+        aspect-ratio: 14 / 4.5;
+        margin-inline: auto;
+      }
+
+      .white-keys,
+      .black-keys {
+        display: grid;
+        grid-template-columns: repeat(28, minmax(0, 1fr));
+        column-gap: 0.1rem;
+        row-gap: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .white-keys {
+        position: absolute;
+        inset: 0;
+        padding-bottom: 0;
+      }
+
+      .black-keys {
+        position: absolute;
+        inset: 0;
+        padding: 0 0.1rem 12% 0.1rem;
+        pointer-events: none;
+      }
+
+      .key {
+        border: none;
+        text-align: left;
+        border-radius: 0.6rem;
+        padding: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap: 0.2rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+        font-size: 0.75rem;
+      }
+
+      .key:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+      }
+
+      .key.white {
+        background: linear-gradient(180deg, #fdfdfc, #d8dae5 85%);
+        color: #0e1118;
+        box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.08);
+      }
+
+      .key.black {
+        background: linear-gradient(180deg, #2c3242, #080a11 80%);
+        color: var(--text);
+        pointer-events: auto;
+        justify-self: center;
+        align-self: start;
+        height: 92%;
+        min-width: 0;
+        width: 70%;
+        border-radius: 0.45rem 0.45rem 0.35rem 0.35rem;
+        box-shadow: 0 14px 16px rgba(4, 6, 12, 0.35);
+        margin-top: 0.05rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .key .note {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .key .action {
+        color: rgba(0, 0, 0, 0.7);
+      }
+
+      .key.black .action {
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .key.black .note,
+      .key.black .action {
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        transform: rotate(180deg);
+        white-space: nowrap;
+      }
+
+      .key.active {
+        background: var(--accent);
+        color: #050608;
+        transform: translateY(2px);
+        box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.1);
+      }
+
+      #encoderView {
+        display: none;
+      }
+
+      body[data-mode='encoders'] #pianoView {
+        display: none;
+      }
+
+      body[data-mode='encoders'] #encoderView {
+        display: block;
+      }
+
+      .active-key-readout {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .active-key-readout span {
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.85rem;
+      }
+
+      .encoders {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .encoder {
+        background: var(--raised);
+        border-radius: 0.9rem;
+        padding: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-height: 130px;
+        position: relative;
+      }
+
+      .encoder strong {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .encoder h3 {
+        margin: 0;
+        font-size: 1.05rem;
+      }
+
+      .encoder p {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .encoder-meter {
+        width: 68px;
+        height: 68px;
+        border-radius: 50%;
+        background: radial-gradient(circle at center, #181d2b 55%, #0d1018 56%);
+        position: relative;
+        margin-bottom: 0.25rem;
+      }
+
+      .encoder-meter::after {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: 50%;
+        background: conic-gradient(var(--accent) var(--meter-progress, 0deg), rgba(255, 255, 255, 0.08) 0deg);
+        mask: radial-gradient(circle at center, transparent 55%, #000 55%);
+      }
+
+      .encoder-meter__value {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .helper {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-top: 0.6rem;
+        text-align: center;
+      }
+
+      .mini-keyboard {
+        position: fixed;
+        left: 1rem;
+        bottom: 1rem;
+        border-radius: 0.9rem;
+        background: rgba(5, 6, 8, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.45rem 0.6rem 0.65rem;
+        backdrop-filter: blur(14px);
+        width: clamp(260px, 34vw, 360px);
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(12px);
+        transition: opacity 0.15s ease, transform 0.2s ease, visibility 0s linear 0.2s;
+        visibility: hidden;
+      }
+
+      .mini-keyboard.visible {
+        visibility: visible;
+        opacity: 1;
+        transform: translateY(0);
+        transition: opacity 0.15s ease, transform 0.2s ease;
+      }
+
+      .mini-white-keys,
+      .mini-black-keys {
+        display: grid;
+        grid-template-columns: repeat(28, minmax(0, 1fr));
+      }
+
+      .mini-white-keys {
+        gap: 0.08rem;
+        position: relative;
+      }
+
+      .mini-black-keys {
+        gap: 0.08rem;
+        position: absolute;
+        inset: 0.35rem 0.35rem auto 0.35rem;
+        grid-template-columns: repeat(28, minmax(0, 1fr));
+        pointer-events: none;
+        height: 0;
+      }
+
+      .mini-key {
+        border-radius: 0.3rem;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .mini-key.white {
+        background: linear-gradient(180deg, #fdfdfc, #cfd2dc 80%);
+        height: 46px;
+        box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.07);
+      }
+
+      .mini-key.white.active {
+        background: var(--accent);
+        box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+      }
+
+      .mini-key.black {
+        background: linear-gradient(180deg, #2c3242, #090b11 70%);
+        height: 28px;
+        margin: 0 0.08rem;
+      }
+
+      .mini-key.black.active {
+        background: var(--accent);
+        box-shadow: 0 0 6px rgba(99, 245, 199, 0.5);
+      }
+
+      @media (orientation: landscape) and (max-height: 520px) {
+        body {
+          padding: 0.8rem;
+        }
+
+        header {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .panel {
+          padding: 0.8rem;
+        }
+
+        .piano {
+          aspect-ratio: 14 / 3.4;
+        }
+      }
+    </style>
+  </head>
+  <body data-mode="keys">
+    <main>
+      <section class="panel" id="pianoView" aria-live="polite">
+        <div class="piano" aria-label="Two octave keyboard">
+          <div class="white-keys" id="whiteKeys"></div>
+          <div class="black-keys" id="blackKeys"></div>
+        </div>
+        <p class="helper">Hold a key to reveal encoder assignments.</p>
+      </section>
+
+      <section class="panel" id="encoderView" aria-hidden="true">
+        <div class="active-key-readout">
+          <span id="activeKeyLabel">None</span>
+        </div>
+        <div class="encoders" id="encoderGrid"></div>
+        <p class="helper">Release the key to jump back to the piano map.</p>
+      </section>
+      <div class="mini-keyboard" id="miniKeyboard" aria-hidden="true">
+        <div class="mini-white-keys" id="miniWhiteKeys"></div>
+        <div class="mini-black-keys" id="miniBlackKeys"></div>
+      </div>
+    </main>
+
+    <script type="module">
+      const BASE_MIDI_NOTE = 53; // hardware emits F3 but we label down to F2
+      const DISPLAY_OCTAVE_OFFSET = -1; // shift readout down one octave
+      const keyBlueprints = [
+        { note: 'F2', type: 'white', label: 'Lorem Ipsum Dolor' },
+        { note: 'F#2', type: 'black', label: 'Sit Amet Consectetur' },
+        { note: 'G2', type: 'white', label: 'Adipiscing Elit Sed' },
+        { note: 'G#2', type: 'black', label: 'Do Eiusmod Tempor' },
+        { note: 'A2', type: 'white', label: 'Incididunt Ut Labore' },
+        { note: 'A#2', type: 'black', label: 'Et Dolore Magna' },
+        { note: 'B2', type: 'white', label: 'Aliqua Enim Minim' },
+        { note: 'C3', type: 'white', label: 'Veniam Quis Nostrud' },
+        { note: 'C#3', type: 'black', label: 'Exercitation Ullamco Laboris' },
+        { note: 'D3', type: 'white', label: 'Nisi Ut Aliquip' },
+        { note: 'D#3', type: 'black', label: 'Ex Ea Commodo' },
+        { note: 'E3', type: 'white', label: 'Consequat Duis Aute' },
+        { note: 'F3', type: 'white', label: 'Irure Dolor In' },
+        { note: 'F#3', type: 'black', label: 'Reprehenderit Voluptate Velit' },
+        { note: 'G3', type: 'white', label: 'Esse Cillum Dolore' },
+        { note: 'G#3', type: 'black', label: 'Fugiat Nulla Pariatur' },
+        { note: 'A3', type: 'white', label: 'Excepteur Sint Occaecat' },
+        { note: 'A#3', type: 'black', label: 'Cupidatat Non Proident' },
+        { note: 'B3', type: 'white', label: 'Sunt In Culpa' },
+        { note: 'C4', type: 'white', label: 'Qui Officia Deserunt' },
+        { note: 'C#4', type: 'black', label: 'Mollit Anim Id' },
+        { note: 'D4', type: 'white', label: 'Est Laborum Lorem' },
+        { note: 'D#4', type: 'black', label: 'Ipsum Dolor Sit' },
+        { note: 'E4', type: 'white', label: 'Amet Consectetur Adipiscing' }
+      ];
+
+      const encoderBaseData = [
+        { cc: 100 },
+        { cc: 101 },
+        { cc: 102 },
+        { cc: 103 },
+        { cc: 104 },
+        { cc: 105 },
+        { cc: 106 },
+        { cc: 107 }
+      ];
+      const fallbackTitles = ['Scene Morph','Energy Lift','Tension Drift','Drum Texture','Bass Depth','Lead Timbre','Space / FX','Macro Spare'];
+      const fallbackDescriptions = [
+        'Blend between ambient pads and percussive layers.',
+        'Push hype level via EnergyManager automation.',
+        'Increase harmonic tension and chord extensions.',
+        'Route CCs to drum device filter/bit settings.',
+        'Thicken low end: octave mix + drive.',
+        'Crossfade FM ↔ analog voices.',
+        'Balance delay vs reverb sends globally.',
+        'Reserved for future live tweaks.'
+      ];
+      const encoderStateByNote = new Map();
+      const ensureEncoderState = note => {
+        if (!encoderStateByNote.has(note)) {
+          const map = new Map();
+          encoderBaseData.forEach(def => map.set(def.cc, 0));
+          encoderStateByNote.set(note, map);
+        }
+        return encoderStateByNote.get(note);
+      };
+
+      const whiteKeysData = [];
+      const blackKeysData = [];
+      let whiteIndexCounter = 0;
+      let lastWhiteIndex = -1;
+
+      keyBlueprints.forEach((blueprint, idx) => {
+        const entry = { ...blueprint, midi: BASE_MIDI_NOTE + idx };
+        ensureEncoderState(entry.note);
+        if (entry.type === 'white') {
+          entry.whiteIndex = whiteIndexCounter;
+          whiteKeysData.push(entry);
+          lastWhiteIndex = entry.whiteIndex;
+          whiteIndexCounter += 1;
+        } else {
+          entry.anchor = Math.max(lastWhiteIndex, 0);
+          blackKeysData.push(entry);
+        }
+      });
+
+      const whiteContainer = document.getElementById('whiteKeys');
+      const blackContainer = document.getElementById('blackKeys');
+      const encoderGrid = document.getElementById('encoderGrid');
+      const activeKeyLabel = document.getElementById('activeKeyLabel');
+      const encoderPanel = document.getElementById('encoderView');
+      const pianoPanel = document.getElementById('pianoView');
+      const midiStatusText = document.createElement('strong');
+      midiStatusText.id = 'midiStatusText';
+      midiStatusText.textContent = '';
+      const midiStatusPill = document.createElement('div');
+      midiStatusPill.id = 'midiStatusPill';
+      const lastNoteText = document.createElement('strong');
+      lastNoteText.id = 'lastNoteText';
+      lastNoteText.textContent = '';
+      const miniKeyboard = document.getElementById('miniKeyboard');
+      const miniWhiteKeys = document.getElementById('miniWhiteKeys');
+      const miniBlackKeys = document.getElementById('miniBlackKeys');
+
+      const noteButtons = new Map();
+      const midiButtons = new Map();
+      const activeNotes = new Set();
+      const miniNoteIndicators = new Map();
+      const encoderMeters = new Map();
+
+      let focusNote = null;
+      let midiAccess = null;
+      const boundInputs = new Map();
+      let midiActivityTimeout = null;
+
+      const createKeyElement = (keyData, options = {}) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `key ${options.variant || 'white'}`;
+        btn.innerHTML = `
+          <span class="note">${keyData.note}</span>
+          <span class="action">${keyData.label}</span>
+        `;
+        btn.dataset.note = keyData.note;
+        btn.dataset.action = keyData.label;
+        btn.dataset.midi = keyData.midi;
+        btn.style.gridColumn = options.gridColumn;
+        btn.addEventListener('pointerdown', event => handlePress(event, btn));
+        btn.addEventListener('pointerup', handleRelease);
+        btn.addEventListener('pointercancel', handleRelease);
+        btn.addEventListener('lostpointercapture', handleRelease);
+        noteButtons.set(keyData.note, btn);
+        midiButtons.set(String(keyData.midi), btn);
+        return btn;
+      };
+
+      const createMiniKeyElement = (keyData, options = {}) => {
+        const key = document.createElement('div');
+        key.className = `mini-key ${options.variant || 'white'}`;
+        key.style.gridColumn = options.gridColumn;
+        key.dataset.note = keyData.note;
+        miniNoteIndicators.set(keyData.note, key);
+        return key;
+      };
+
+      const updateMiniKeyboardVisibility = () => {
+        if (activeNotes.size > 0) {
+          miniKeyboard.classList.add('visible');
+          miniKeyboard.removeAttribute('aria-hidden');
+        } else {
+          miniKeyboard.classList.remove('visible');
+          miniKeyboard.setAttribute('aria-hidden', 'true');
+        }
+      };
+
+      const encoderTitleSource = {
+        F2: ['Lorem Ipsum', 'Dolor Sit', 'Amet Consectetur', 'Adipiscing Elit', 'Sed Do', 'Eiusmod Tempor', 'Incididunt Ut', 'Labore Et'],
+        'F#2': ['Dolore Magna', 'Aliqua Enim', 'Minim Veniam', 'Quis Nostrud', 'Exercitation Ullamco', 'Laboris Nisi', 'Ut Aliquip', 'Ex Ea'],
+        G2: ['Commodo Consequat', 'Duis Aute', 'Irure Dolor', 'In Reprehenderit', 'In Voluptate', 'Velit Esse', 'Cillum Dolore', 'Eu Fugiat'],
+        'G#2': ['Nulla Pariatur', 'Excepteur Sint', 'Occaecat Cupidatat', 'Non Proident', 'Sunt In', 'Culpa Qui', 'Officia Deserunt', 'Mollit Anim'],
+        A2: ['Id Est', 'Laborum', 'Ipsum Dolor', 'Sit Amet', 'Consectetur Adipiscing', 'Elit Sed', 'Do Eiusmod', 'Tempor Incididunt'],
+        'A#2': ['Ut Labore', 'Et Dolore', 'Magna Aliqua', 'Enim Minim', 'Veniam Quis', 'Nostrud Exercitation', 'Ullamco Laboris', 'Nisi Ut'],
+        B2: ['Aliquip Ex', 'Ea Commodo', 'Consequat Duis', 'Aute Irure', 'Dolor In', 'Reprehenderit In', 'Voluptate Velit', 'Esse Cillum'],
+        C3: ['Dolore Eu', 'Fugiat Nulla', 'Pariatur Excepteur', 'Sint Occaecat', 'Cupidatat Non', 'Proident Sunt', 'In Culpa', 'Qui Officia'],
+        'C#3': ['Deserunt Mollit', 'Anim Id', 'Est Laborum', 'Lorem Ipsum', 'Dolor Sit', 'Amet Consectetur', 'Adipiscing Elit', 'Sed Do'],
+        D3: ['Eiusmod Tempor', 'Incididunt Ut', 'Labore Et', 'Dolore Magna', 'Aliqua Enim', 'Minim Veniam', 'Quis Nostrud', 'Exercitation Ullamco'],
+        'D#3': ['Laboris Nisi', 'Ut Aliquip', 'Ex Ea', 'Commodo Consequat', 'Duis Aute', 'Irure Dolor', 'In Reprehenderit', 'In Voluptate'],
+        E3: ['Velit Esse', 'Cillum Dolore', 'Eu Fugiat', 'Nulla Pariatur', 'Excepteur Sint', 'Occaecat Cupidatat', 'Non Proident', 'Sunt In'],
+        F3: ['Culpa Qui', 'Officia Deserunt', 'Mollit Anim', 'Id Est', 'Laborum', 'Ipsum Dolor', 'Sit Amet', 'Consectetur Adipiscing'],
+        'F#3': ['Elit Sed', 'Do Eiusmod', 'Tempor Incididunt', 'Ut Labore', 'Et Dolore', 'Magna Aliqua', 'Enim Minim', 'Veniam Quis'],
+        G3: ['Nostrud Exercitation', 'Ullamco Laboris', 'Nisi Ut', 'Aliquip Ex', 'Ea Commodo', 'Consequat Duis', 'Aute Irure', 'Dolor In'],
+        'G#3': ['Reprehenderit In', 'Voluptate Velit', 'Esse Cillum', 'Dolore Eu', 'Fugiat Nulla', 'Pariatur Excepteur', 'Sint Occaecat', 'Cupidatat Non'],
+        A3: ['Proident Sunt', 'In Culpa', 'Qui Officia', 'Deserunt Mollit', 'Anim Id', 'Est Laborum', 'Lorem Ipsum', 'Dolor Sit'],
+        'A#3': ['Amet Consectetur', 'Adipiscing Elit', 'Sed Do', 'Eiusmod Tempor', 'Incididunt Ut', 'Labore Et', 'Dolore Magna', 'Aliqua Enim'],
+        B3: ['Minim Veniam', 'Quis Nostrud', 'Exercitation Ullamco', 'Laboris Nisi', 'Ut Aliquip', 'Ex Ea', 'Commodo Consequat', 'Duis Aute'],
+        C4: ['Irure Dolor', 'In Reprehenderit', 'In Voluptate', 'Velit Esse', 'Cillum Dolore', 'Eu Fugiat', 'Nulla Pariatur', 'Excepteur Sint'],
+        'C#4': ['Occaecat Cupidatat', 'Non Proident', 'Sunt In', 'Culpa Qui', 'Officia Deserunt', 'Mollit Anim', 'Id Est', 'Laborum'],
+        D4: ['Ipsum Dolor', 'Sit Amet', 'Consectetur Adipiscing', 'Elit Sed', 'Do Eiusmod', 'Tempor Incididunt', 'Ut Labore', 'Et Dolore'],
+        'D#4': ['Magna Aliqua', 'Enim Minim', 'Veniam Quis', 'Nostrud Exercitation', 'Ullamco Laboris', 'Nisi Ut', 'Aliquip Ex', 'Ea Commodo'],
+        E4: ['Consequat Duis', 'Aute Irure', 'Dolor In', 'Reprehenderit In', 'Voluptate Velit', 'Esse Cillum', 'Dolore Eu', 'Fugiat Nulla']
+      };
+
+      const encoderDescriptionSource = {
+        "F2": [
+                "lorem ipsum dolor",
+                "sit amet consectetur",
+                "adipiscing elit sed",
+                "do eiusmod tempor",
+                "incididunt ut labore",
+                "et dolore magna",
+                "aliqua enim minim",
+                "veniam quis nostrud"
+        ],
+        "F#2": [
+                "exercitation ullamco laboris",
+                "nisi aliquip commodo",
+                "consequat duis aute",
+                "irure dolor in",
+                "reprehenderit in voluptate",
+                "velit esse cillum",
+                "dolore eu fugiat",
+                "nulla pariatur excepteur"
+        ],
+        "G2": [
+                "sint occaecat cupidatat",
+                "non proident sunt",
+                "in culpa qui",
+                "officia deserunt mollit",
+                "anim id est",
+                "laborum lorem ipsum",
+                "dolor sit amet",
+                "consectetur adipiscing elit"
+        ],
+        "G#2": [
+                "sed do eiusmod",
+                "tempor incididunt ut",
+                "labore et dolore",
+                "magna aliqua enim",
+                "minim veniam quis",
+                "nostrud exercitation ullamco",
+                "laboris nisi aliquip",
+                "commodo consequat duis"
+        ],
+        "A2": [
+                "aute irure dolor",
+                "in reprehenderit in",
+                "voluptate velit esse",
+                "cillum dolore eu",
+                "fugiat nulla pariatur",
+                "excepteur sint occaecat",
+                "cupidatat non proident",
+                "sunt in culpa"
+        ],
+        "A#2": [
+                "qui officia deserunt",
+                "mollit anim id",
+                "est laborum lorem",
+                "ipsum dolor sit",
+                "amet consectetur adipiscing",
+                "elit sed do",
+                "eiusmod tempor incididunt",
+                "ut labore et"
+        ],
+        "B2": [
+                "dolore magna aliqua",
+                "enim minim veniam",
+                "quis nostrud exercitation",
+                "ullamco laboris nisi",
+                "aliquip commodo consequat",
+                "duis aute irure",
+                "dolor in reprehenderit",
+                "in voluptate velit"
+        ],
+        "C3": [
+                "esse cillum dolore",
+                "eu fugiat nulla",
+                "pariatur excepteur sint",
+                "occaecat cupidatat non",
+                "proident sunt in",
+                "culpa qui officia",
+                "deserunt mollit anim",
+                "id est laborum"
+        ],
+        "C#3": [
+                "lorem ipsum dolor",
+                "sit amet consectetur",
+                "adipiscing elit sed",
+                "do eiusmod tempor",
+                "incididunt ut labore",
+                "et dolore magna",
+                "aliqua enim minim",
+                "veniam quis nostrud"
+        ],
+        "D3": [
+                "exercitation ullamco laboris",
+                "nisi aliquip commodo",
+                "consequat duis aute",
+                "irure dolor in",
+                "reprehenderit in voluptate",
+                "velit esse cillum",
+                "dolore eu fugiat",
+                "nulla pariatur excepteur"
+        ],
+        "D#3": [
+                "sint occaecat cupidatat",
+                "non proident sunt",
+                "in culpa qui",
+                "officia deserunt mollit",
+                "anim id est",
+                "laborum lorem ipsum",
+                "dolor sit amet",
+                "consectetur adipiscing elit"
+        ],
+        "E3": [
+                "sed do eiusmod",
+                "tempor incididunt ut",
+                "labore et dolore",
+                "magna aliqua enim",
+                "minim veniam quis",
+                "nostrud exercitation ullamco",
+                "laboris nisi aliquip",
+                "commodo consequat duis"
+        ],
+        "F3": [
+                "aute irure dolor",
+                "in reprehenderit in",
+                "voluptate velit esse",
+                "cillum dolore eu",
+                "fugiat nulla pariatur",
+                "excepteur sint occaecat",
+                "cupidatat non proident",
+                "sunt in culpa"
+        ],
+        "F#3": [
+                "qui officia deserunt",
+                "mollit anim id",
+                "est laborum lorem",
+                "ipsum dolor sit",
+                "amet consectetur adipiscing",
+                "elit sed do",
+                "eiusmod tempor incididunt",
+                "ut labore et"
+        ],
+        "G3": [
+                "dolore magna aliqua",
+                "enim minim veniam",
+                "quis nostrud exercitation",
+                "ullamco laboris nisi",
+                "aliquip commodo consequat",
+                "duis aute irure",
+                "dolor in reprehenderit",
+                "in voluptate velit"
+        ],
+        "G#3": [
+                "esse cillum dolore",
+                "eu fugiat nulla",
+                "pariatur excepteur sint",
+                "occaecat cupidatat non",
+                "proident sunt in",
+                "culpa qui officia",
+                "deserunt mollit anim",
+                "id est laborum"
+        ],
+        "A3": [
+                "lorem ipsum dolor",
+                "sit amet consectetur",
+                "adipiscing elit sed",
+                "do eiusmod tempor",
+                "incididunt ut labore",
+                "et dolore magna",
+                "aliqua enim minim",
+                "veniam quis nostrud"
+        ],
+        "A#3": [
+                "exercitation ullamco laboris",
+                "nisi aliquip commodo",
+                "consequat duis aute",
+                "irure dolor in",
+                "reprehenderit in voluptate",
+                "velit esse cillum",
+                "dolore eu fugiat",
+                "nulla pariatur excepteur"
+        ],
+        "B3": [
+                "sint occaecat cupidatat",
+                "non proident sunt",
+                "in culpa qui",
+                "officia deserunt mollit",
+                "anim id est",
+                "laborum lorem ipsum",
+                "dolor sit amet",
+                "consectetur adipiscing elit"
+        ],
+        "C4": [
+                "sed do eiusmod",
+                "tempor incididunt ut",
+                "labore et dolore",
+                "magna aliqua enim",
+                "minim veniam quis",
+                "nostrud exercitation ullamco",
+                "laboris nisi aliquip",
+                "commodo consequat duis"
+        ],
+        "C#4": [
+                "aute irure dolor",
+                "in reprehenderit in",
+                "voluptate velit esse",
+                "cillum dolore eu",
+                "fugiat nulla pariatur",
+                "excepteur sint occaecat",
+                "cupidatat non proident",
+                "sunt in culpa"
+        ],
+        "D4": [
+                "qui officia deserunt",
+                "mollit anim id",
+                "est laborum lorem",
+                "ipsum dolor sit",
+                "amet consectetur adipiscing",
+                "elit sed do",
+                "eiusmod tempor incididunt",
+                "ut labore et"
+        ],
+        "D#4": [
+                "dolore magna aliqua",
+                "enim minim veniam",
+                "quis nostrud exercitation",
+                "ullamco laboris nisi",
+                "aliquip commodo consequat",
+                "duis aute irure",
+                "dolor in reprehenderit",
+                "in voluptate velit"
+        ],
+        "E4": [
+                "esse cillum dolore",
+                "eu fugiat nulla",
+                "pariatur excepteur sint",
+                "occaecat cupidatat non",
+                "proident sunt in",
+                "culpa qui officia",
+                "deserunt mollit anim",
+                "id est laborum"
+        ]
+      };
+      const encoderDescriptionsByNote = new Map(Object.entries(encoderDescriptionSource));
+      const getEncoderTitles = note => encoderTitleSource[note] || fallbackTitles;
+      const getEncoderDescriptions = note => encoderDescriptionsByNote.get(note) || fallbackDescriptions;
+
+
+
+      const showEncodersForButton = btn => {
+        if (!btn) return;
+        document.body.dataset.mode = 'encoders';
+        pianoPanel.setAttribute('aria-hidden', 'true');
+        encoderPanel.removeAttribute('aria-hidden');
+        activeKeyLabel.textContent = `${btn.dataset.note} · ${btn.dataset.action}`;
+        const descriptions = getEncoderDescriptions(btn.dataset.note);
+        const titles = getEncoderTitles(btn.dataset.note);
+        const state = encoderStateByNote.get(btn.dataset.note);
+        encoderGrid.querySelectorAll('.encoder').forEach((card, idx) => {
+          const paragraph = card.querySelector('p');
+          const title = card.querySelector('h3');
+          if (title && titles) {
+            title.textContent = titles[idx] || title.textContent;
+          }
+          if (paragraph) {
+            paragraph.textContent = descriptions?.[idx] || '';
+          }
+          const knob = encoderBaseData[idx];
+          if (knob && state) {
+            const stored = state.get(knob.cc) ?? 0;
+            setMeterVisual(knob.cc, stored);
+          }
+        });
+        focusNote = btn.dataset.note;
+      };
+
+      const hideEncoders = () => {
+        document.body.dataset.mode = 'keys';
+        pianoPanel.removeAttribute('aria-hidden');
+        encoderPanel.setAttribute('aria-hidden', 'true');
+        activeKeyLabel.textContent = 'None';
+        focusNote = null;
+      };
+
+      const setKeyStateByButton = (btn, isActive) => {
+        if (!btn) return;
+        const note = btn.dataset.note;
+        if (isActive) {
+          activeNotes.add(note);
+          btn.classList.add('active');
+          const mini = miniNoteIndicators.get(note);
+          if (mini) {
+            mini.classList.add('active');
+          }
+          showEncodersForButton(btn);
+        } else {
+          if (!activeNotes.has(note)) return;
+          activeNotes.delete(note);
+          btn.classList.remove('active');
+          const mini = miniNoteIndicators.get(note);
+          if (mini) {
+            mini.classList.remove('active');
+          }
+          if (activeNotes.size === 0) {
+            hideEncoders();
+            updateMiniKeyboardVisibility();
+            return;
+          }
+          if (focusNote === note) {
+            const nextActive = activeNotes.values().next();
+            if (!nextActive.done) {
+              const fallbackButton = noteButtons.get(nextActive.value);
+              if (fallbackButton) {
+                showEncodersForButton(fallbackButton);
+              }
+            }
+          }
+        }
+        updateMiniKeyboardVisibility();
+      };
+
+      const clearAllNotes = () => {
+        activeNotes.forEach(note => {
+          const btn = noteButtons.get(note);
+          if (btn) {
+            btn.classList.remove('active');
+          }
+          const mini = miniNoteIndicators.get(note);
+          if (mini) {
+            mini.classList.remove('active');
+          }
+        });
+        activeNotes.clear();
+        hideEncoders();
+        updateMiniKeyboardVisibility();
+      };
+
+      const handlePress = (event, btn) => {
+        if (event.pointerType === 'mouse' && event.button !== 0) {
+          return;
+        }
+        btn.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        setKeyStateByButton(btn, true);
+      };
+
+      const handleRelease = event => {
+        const btn = event?.target?.closest('.key');
+        if (!btn) return;
+        setKeyStateByButton(btn, false);
+      };
+
+      const setMidiStatus = (message, variant = 'default') => {
+        midiStatusText.textContent = message;
+        midiStatusPill.dataset.variant = variant;
+        if (variant === 'error') {
+          midiStatusPill.style.border = '1px solid rgba(255, 99, 132, 0.5)';
+        } else if (variant === 'active') {
+          midiStatusPill.style.border = '1px solid rgba(99, 245, 199, 0.55)';
+        } else {
+          midiStatusPill.style.border = '';
+        }
+      };
+
+      const flashMidiActivity = () => {
+        midiStatusPill.classList.add('active');
+        clearTimeout(midiActivityTimeout);
+        midiActivityTimeout = setTimeout(() => {
+          midiStatusPill.classList.remove('active');
+        }, 120);
+      };
+
+      const midiToNoteName = midiNumber => {
+        if (typeof midiNumber !== 'number' || Number.isNaN(midiNumber)) {
+          return '—';
+        }
+        const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const octave = Math.floor(midiNumber / 12) - 1 + DISPLAY_OCTAVE_OFFSET;
+        const label = names[midiNumber % 12] || '?';
+        return `${label}${octave}`;
+      };
+
+      const setMeterVisual = (ccNumber, value) => {
+        const meterEntry = encoderMeters.get(ccNumber);
+        if (!meterEntry) return;
+        const percent = Math.max(0, Math.min(127, value)) / 127;
+        meterEntry.meter.style.setProperty('--meter-progress', `${percent * 360}deg`);
+        meterEntry.meterValue.textContent = `${Math.round(percent * 100)}%`;
+      };
+
+      const updateEncoderMeter = (ccNumber, value, noteOverride) => {
+        const noteKey = noteOverride || focusNote;
+        if (!noteKey) return;
+        const state = ensureEncoderState(noteKey);
+        const clamped = Math.max(0, Math.min(127, value));
+        state.set(ccNumber, clamped);
+        if (noteKey === focusNote) {
+          setMeterVisual(ccNumber, clamped);
+        }
+      };
+
+      const updateLastNote = (noteNumber, channel, velocity, button) => {
+        const name =
+          button?.dataset?.note ||
+          midiToNoteName(noteNumber);
+        const chDisplay = typeof channel === 'number' ? `Ch ${channel + 1}` : 'Ch —';
+        lastNoteText.textContent = `${name} · ${chDisplay}${
+          typeof velocity === 'number' ? ` · vel ${velocity}` : ''
+        }`;
+      };
+
+      whiteKeysData.forEach((key, index) => {
+        const start = index * 2 + 1;
+        const btn = createKeyElement(key, {
+          variant: 'white',
+          gridColumn: `${start} / span 2`
+        });
+        whiteContainer.appendChild(btn);
+        const mini = createMiniKeyElement(key, {
+          variant: 'white',
+          gridColumn: `${start} / span 2`
+        });
+        miniWhiteKeys.appendChild(mini);
+      });
+
+      blackKeysData.forEach(key => {
+        const start = key.anchor * 2 + 2;
+        const btn = createKeyElement(key, {
+          variant: 'black',
+          gridColumn: `${start} / span 2`
+        });
+        blackContainer.appendChild(btn);
+        const mini = createMiniKeyElement(key, {
+          variant: 'black',
+          gridColumn: `${start} / span 2`
+        });
+        miniBlackKeys.appendChild(mini);
+      });
+
+      const initialNote = keyBlueprints[0]?.note;
+      const initialTitles = getEncoderTitles(initialNote);
+      const initialDescriptions = getEncoderDescriptions(initialNote);
+
+      encoderBaseData.forEach((knob, idx) => {
+        const card = document.createElement('article');
+        card.className = 'encoder';
+        const meter = document.createElement('div');
+        meter.className = 'encoder-meter';
+        meter.style.setProperty('--meter-progress', '0deg');
+        const meterValue = document.createElement('span');
+        meterValue.className = 'encoder-meter__value';
+        meterValue.textContent = '0%';
+        meter.appendChild(meterValue);
+        encoderMeters.set(knob.cc, { meter, meterValue, value: 0 });
+        card.innerHTML = `
+          <strong>CC ${knob.cc}</strong>
+          <h3>${initialTitles[idx] || fallbackTitles[idx]}</h3>
+          <p>${initialDescriptions[idx] || fallbackDescriptions[idx]}</p>
+        `;
+        card.insertBefore(meter, card.firstChild);
+        encoderGrid.appendChild(card);
+      });
+      if (initialNote) {
+        const initialState = encoderStateByNote.get(initialNote);
+        if (initialState) {
+          encoderBaseData.forEach(def => {
+            const value = initialState.get(def.cc) ?? 0;
+            setMeterVisual(def.cc, value);
+          });
+        }
+      }
+
+      const resolveButtonForMidi = midiNote => {
+        if (midiButtons.has(String(midiNote))) {
+          return midiButtons.get(String(midiNote));
+        }
+        if (midiButtons.has(String(midiNote - 12))) {
+          return midiButtons.get(String(midiNote - 12));
+        }
+        if (midiButtons.has(String(midiNote + 12))) {
+          return midiButtons.get(String(midiNote + 12));
+        }
+        return null;
+      };
+
+      const setMidiNoteState = (midiNote, isActive = true) => {
+        const btn = resolveButtonForMidi(midiNote);
+        if (!btn) {
+          console.debug('[opxy-cc] Note outside range', midiNote);
+          return null;
+        }
+        setKeyStateByButton(btn, isActive);
+        return btn;
+      };
+
+      const setNoteState = (noteName, isActive = true) => {
+        const btn = noteButtons.get(noteName);
+        if (!btn) return;
+        setKeyStateByButton(btn, isActive);
+      };
+
+      const handleMidiMessage = event => {
+        const [status, noteNumber, velocity = 0] = event.data;
+        const command = status >> 4;
+        const channel = status & 0xf;
+        if (command === 11) {
+          if (noteNumber >= 100 && noteNumber <= 107) {
+            updateEncoderMeter(noteNumber, velocity, focusNote);
+            flashMidiActivity();
+          }
+        } else if (command === 9) {
+          if (velocity === 0) {
+            const btn = setMidiNoteState(noteNumber, false);
+            if (btn) {
+              updateLastNote(noteNumber, channel, velocity, btn);
+            }
+          } else {
+            const btn = setMidiNoteState(noteNumber, true);
+            if (btn) {
+              updateLastNote(noteNumber, channel, velocity, btn);
+            }
+          }
+          flashMidiActivity();
+        } else if (command === 8) {
+          const btn = setMidiNoteState(noteNumber, false);
+          if (btn) {
+            updateLastNote(noteNumber, channel, velocity, btn);
+          }
+          flashMidiActivity();
+        }
+      };
+
+      const bindInput = input => {
+        if (!input || !input.id) return;
+        if (boundInputs.has(input.id)) return;
+        const handler = event => handleMidiMessage(event);
+        input.addEventListener('midimessage', handler);
+        boundInputs.set(input.id, { handler, name: input.name });
+        setMidiStatus(`Listening · ${input.name || 'Unknown input'}`, 'active');
+      };
+
+      const unbindInput = input => {
+        if (!input || !input.id) return;
+        const entry = boundInputs.get(input.id);
+        if (!entry) return;
+        input.removeEventListener('midimessage', entry.handler);
+        boundInputs.delete(input.id);
+        if (boundInputs.size === 0) {
+          setMidiStatus('Connected · awaiting notes', 'default');
+        }
+      };
+
+      const handleStateChange = event => {
+        const port = event.port;
+        if (port.type !== 'input') return;
+        const target = midiAccess?.inputs?.get(port.id) || port;
+        if (port.state === 'connected') {
+          bindInput(target);
+        } else if (port.state === 'disconnected') {
+          unbindInput(target);
+        }
+      };
+
+      const initMidi = async () => {
+        if (!('requestMIDIAccess' in navigator)) {
+          setMidiStatus('Web MIDI not supported in this browser', 'error');
+          return;
+        }
+        try {
+          midiAccess = await navigator.requestMIDIAccess();
+          setMidiStatus('Connected · awaiting notes');
+          let hasInput = false;
+          midiAccess.inputs.forEach(input => {
+            hasInput = true;
+            bindInput(input);
+          });
+          if (!hasInput) {
+            setMidiStatus('Connected · no inputs detected');
+          }
+          midiAccess.addEventListener('statechange', handleStateChange);
+        } catch (error) {
+          console.error('Failed to acquire MIDI access:', error);
+          setMidiStatus('Permission denied for Web MIDI', 'error');
+        }
+      };
+
+      document.addEventListener('keyup', event => {
+        if (event.key === 'Escape') {
+          clearAllNotes();
+        }
+      });
+
+      initMidi();
+
+      window.opxyCCPrototype = {
+        setMidiNoteState,
+        setNoteState,
+        clearAllNotes,
+        setCCValue: (note, cc, value) => updateEncoderMeter(cc, value, note)
+      };
+    </script>
+  </body>
+</html>
