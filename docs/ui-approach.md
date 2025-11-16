@@ -8,7 +8,8 @@ A two-layer control surface designed for fast, *momentary* navigation:
 
 1. **State A – Track + Piano Map (default).**
    - A row of eight track buttons (OP-XY tracks 1–8) anchors the top. They’re large, red-armed toggles sized for mobile touches and desktop clicks.
-   - Track buttons expose the `setTrackState(track, bool)` API so automations/tests can flip them.
+   - If a track is unmapped, tapping its button opens a plugin picker (Chord Swell, Evolving Drums, Contour Melody, Syncopated Bass, Chance Arp).
+   - Once a plugin is chosen, the popup exposes mute and volume controls, and the button label reflects the assignment (`Track 3 · Contour Melody`). The same behaviors are accessible from tests via `window.opxyCCPrototype.setTrackState(trackId, { plugin, muted, volume })`.
    - F2 → E4 laid out as a wide, glowing keyboard.
    - Each key has a short lorem-ipsum label; the key is the navigation index.
    - Footer reminder: “Hold a key to reveal encoder assignments.”

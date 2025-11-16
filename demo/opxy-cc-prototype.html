@@ -386,6 +386,139 @@
         outline-offset: 2px;
       }
 
+      .track-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 40;
+      }
+
+      .track-modal[hidden] {
+        display: none;
+      }
+
+      .track-modal__panel {
+        background: var(--panel);
+        border-radius: 1rem;
+        width: min(420px, 90vw);
+        padding: 1.2rem;
+        border: 1px solid var(--divider);
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+
+      .track-modal__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .track-modal__header h3 {
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 1rem;
+      }
+
+      .track-modal__close {
+        background: none;
+        border: 1px solid var(--divider);
+        border-radius: 999px;
+        color: var(--text);
+        cursor: pointer;
+        padding: 0.2rem 0.6rem;
+      }
+
+      .plugin-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.5rem;
+      }
+
+      .plugin-list button {
+        border: 1px solid var(--divider);
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+        background: var(--raised);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 0.85rem;
+        text-align: left;
+        transition: background 0.2s ease, border 0.2s ease;
+      }
+
+      .plugin-list button.selected {
+        border-color: var(--accent);
+        background: rgba(255, 45, 45, 0.18);
+      }
+
+      .track-modal__controls.disabled {
+        opacity: 0.4;
+        pointer-events: none;
+      }
+
+      .track-modal__controls label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .track-modal__controls input[type='range'] {
+        accent-color: var(--accent);
+      }
+      .track-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .track-panel p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .track-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.7rem;
+      }
+
+      .track-button {
+        border: 1px solid var(--divider);
+        border-radius: 0.7rem;
+        background: var(--raised);
+        color: var(--text);
+        padding: 0.75rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+        transition: background 0.2s ease, border 0.2s ease, transform 0.1s ease;
+      }
+
+      .track-button.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #050505;
+        transform: translateY(2px);
+      }
+
+      .track-button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
       @media (orientation: landscape) and (max-height: 520px) {
         body {
           padding: 0.8rem;
@@ -443,6 +576,27 @@
         <div class="mini-black-keys" id="miniBlackKeys"></div>
       </div>
     </main>
+
+    <div class="track-modal" id="trackModal" hidden>
+      <div class="track-modal__panel">
+        <div class="track-modal__header">
+          <h3 id="trackModalTitle">Track</h3>
+          <button class="track-modal__close" id="trackModalClose">Close</button>
+        </div>
+        <p style="margin:0;color:var(--muted);font-size:0.85rem;">Select a plugin:</p>
+        <div class="plugin-list" id="pluginList"></div>
+        <div class="track-modal__controls" id="trackModalControls">
+          <label>
+            <span>Mute track</span>
+            <input type="checkbox" id="trackModalMute" />
+          </label>
+          <label>
+            <span>Volume</span>
+            <input type="range" id="trackModalVolume" min="0" max="100" value="75" />
+          </label>
+        </div>
+      </div>
+    </div>
 
     <script type="module">
       const BASE_MIDI_NOTE = 53; // hardware emits F3 but we label down to F2
@@ -541,27 +695,122 @@
       const miniKeyboard = document.getElementById('miniKeyboard');
       const miniWhiteKeys = document.getElementById('miniWhiteKeys');
       const miniBlackKeys = document.getElementById('miniBlackKeys');
+      const pluginOptions = [
+        'Chord Swell',
+        'Evolving Drums',
+        'Contour Melody',
+        'Syncopated Bass',
+        'Chance Arp'
+      ];
       const trackControls = document.getElementById('trackControls');
       const trackButtons = [...trackControls.querySelectorAll('.track-button')];
-      const trackStates = new Map(trackButtons.map(btn => [btn.dataset.track, false]));
-      const setTrackState = (trackId, isActive) => {
-        if (!trackStates.has(trackId)) {
-          return;
-        }
-        const stateValue = Boolean(isActive);
-        trackStates.set(trackId, stateValue);
+      const trackStates = new Map(
+        trackButtons.map(btn => [
+          btn.dataset.track,
+          { plugin: null, muted: false, volume: 75 }
+        ])
+      );
+      const refreshTrackButton = trackId => {
+        const state = trackStates.get(trackId);
         const button = trackButtons.find(btn => btn.dataset.track === trackId);
-        if (button) {
-          button.classList.toggle('active', stateValue);
-          button.setAttribute('aria-pressed', String(stateValue));
+        if (!button || !state) return;
+        const label = state.plugin
+          ? `Track ${trackId} · ${state.plugin}`
+          : `Track ${trackId}`;
+        button.textContent = label;
+        const active = Boolean(state.plugin) && !state.muted;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      };
+
+      const applyTrackState = (trackId, updates = {}) => {
+        const state = trackStates.get(trackId);
+        if (!state) return;
+        Object.assign(state, updates);
+        refreshTrackButton(trackId);
+        if (trackModalActiveId === trackId) {
+          updateModalControls();
         }
       };
 
       trackButtons.forEach(button => {
-        button.addEventListener('click', () => {
-          const current = trackStates.get(button.dataset.track);
-          setTrackState(button.dataset.track, !current);
+        refreshTrackButton(button.dataset.track);
+        button.addEventListener('click', () => openTrackModal(button.dataset.track));
+      });
+
+      const trackModal = document.getElementById('trackModal');
+      const pluginList = document.getElementById('pluginList');
+      const trackModalTitle = document.getElementById('trackModalTitle');
+      const trackModalClose = document.getElementById('trackModalClose');
+      const trackModalControls = document.getElementById('trackModalControls');
+      const trackModalMute = document.getElementById('trackModalMute');
+      const trackModalVolume = document.getElementById('trackModalVolume');
+
+      pluginOptions.forEach(option => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.plugin = option;
+        button.textContent = option;
+        pluginList.appendChild(button);
+      });
+
+      let trackModalActiveId = null;
+
+      const openTrackModal = trackId => {
+        trackModalActiveId = trackId;
+        trackModal.removeAttribute('hidden');
+        trackModalTitle.textContent = `Track ${trackId}`;
+        pluginList.querySelectorAll('button').forEach(button => {
+          const isSelected =
+            button.dataset.plugin === trackStates.get(trackId)?.plugin;
+          button.classList.toggle('selected', isSelected);
         });
+        updateModalControls();
+      };
+
+      const closeTrackModal = () => {
+        trackModal.setAttribute('hidden', '');
+        trackModalActiveId = null;
+      };
+
+      const updateModalControls = () => {
+        if (!trackModalActiveId) return;
+        const state = trackStates.get(trackModalActiveId);
+        if (!state?.plugin) {
+          trackModalControls.classList.add('disabled');
+          return;
+        }
+        trackModalControls.classList.remove('disabled');
+        trackModalMute.checked = Boolean(state.muted);
+        trackModalVolume.value = state.volume ?? 75;
+      };
+
+      pluginList.addEventListener('click', event => {
+        const button = event.target.closest('button[data-plugin]');
+        if (!button || !trackModalActiveId) return;
+        const pluginName = button.dataset.plugin;
+        applyTrackState(trackModalActiveId, { plugin: pluginName, muted: false });
+        pluginList
+          .querySelectorAll('button')
+          .forEach(btn => btn.classList.toggle('selected', btn === button));
+        updateModalControls();
+      });
+
+      trackModalClose.addEventListener('click', closeTrackModal);
+      trackModal.addEventListener('click', event => {
+        if (event.target === trackModal) {
+          closeTrackModal();
+        }
+      });
+
+      trackModalMute.addEventListener('change', event => {
+        if (!trackModalActiveId) return;
+        applyTrackState(trackModalActiveId, { muted: event.target.checked });
+      });
+
+      trackModalVolume.addEventListener('input', event => {
+        if (!trackModalActiveId) return;
+        applyTrackState(trackModalActiveId, { volume: Number(event.target.value) });
       });
 
       const noteButtons = new Map();
@@ -1235,12 +1484,12 @@
 
       initMidi();
 
-window.opxyCCPrototype = {
+      window.opxyCCPrototype = {
         setMidiNoteState,
         setNoteState,
         clearAllNotes,
         setCCValue: (note, cc, value) => updateEncoderMeter(cc, value, note),
-        setTrackState
+        setTrackState: (trackId, updates) => applyTrackState(trackId, updates)
       };
     </script>
   </body>
