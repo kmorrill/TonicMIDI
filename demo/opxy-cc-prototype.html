@@ -464,10 +464,11 @@
         pointer-events: none;
       }
 
-      .track-modal__controls label {
+      .track-modal__controls label,
+      .track-modal__controls .control-row {
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 0.6rem;
         font-size: 1rem;
         color: var(--muted);
       }
@@ -481,7 +482,54 @@
 
       .track-modal__controls input[type='range'] {
         accent-color: var(--accent);
-        height: 36px;
+        height: 42px;
+      }
+
+      .toggle-row {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .toggle-row button {
+        flex: 1;
+        border: 1px solid var(--divider);
+        border-radius: 0.85rem;
+        padding: 0.9rem;
+        font-size: 1rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        background: var(--raised);
+        color: var(--muted);
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
+      }
+
+      .toggle-row button.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #050505;
+      }
+
+      .track-modal__controls .volume-row {
+        gap: 0.5rem;
+      }
+
+      .track-modal__controls input[type='range']::-webkit-slider-thumb {
+        width: 28px;
+        height: 28px;
+      }
+
+      .track-modal__controls input[type='range']::-webkit-slider-runnable-track {
+        height: 18px;
+      }
+
+      .track-modal__controls input[type='range']::-moz-range-thumb {
+        width: 28px;
+        height: 28px;
+      }
+
+      .track-modal__controls input[type='range']::-moz-range-track {
+        height: 18px;
       }
       .track-panel {
         display: flex;
@@ -597,11 +645,11 @@
         </div>
         <div class="track-modal__controls" id="trackModalControls">
           <p style="margin:0;color:var(--muted);font-size:0.85rem;">Track controls</p>
-          <label>
-            <span>Mute track</span>
-            <input type="checkbox" id="trackModalMute" />
-          </label>
-          <label>
+          <div class="toggle-row">
+            <button type="button" id="trackModalMuteBtn">Mute</button>
+            <button type="button" id="trackModalSoloBtn">Solo</button>
+          </div>
+          <label class="volume-row">
             <span>Volume</span>
             <input type="range" id="trackModalVolume" min="0" max="100" value="75" />
           </label>
@@ -718,7 +766,7 @@
       const trackStates = new Map(
         trackButtons.map(btn => [
           btn.dataset.track,
-          { plugin: null, muted: false, volume: 75 }
+          { plugin: null, muted: false, solo: false, volume: 75 }
         ])
       );
       const refreshTrackButton = trackId => {
@@ -731,6 +779,7 @@
         button.textContent = label;
         const active = Boolean(state.plugin) && !state.muted;
         button.classList.toggle('active', active);
+        button.classList.toggle('soloed', Boolean(state.solo));
         button.setAttribute('aria-pressed', String(active));
       };
 
@@ -755,7 +804,8 @@
       const trackModalClose = document.getElementById('trackModalClose');
       const trackPluginMode = document.getElementById('trackPluginMode');
       const trackModalControls = document.getElementById('trackModalControls');
-      const trackModalMute = document.getElementById('trackModalMute');
+      const trackModalMuteBtn = document.getElementById('trackModalMuteBtn');
+      const trackModalSoloBtn = document.getElementById('trackModalSoloBtn');
       const trackModalVolume = document.getElementById('trackModalVolume');
 
       pluginOptions.forEach(option => {
@@ -809,7 +859,8 @@
           return;
         }
         showControlsMode();
-        trackModalMute.checked = Boolean(state.muted);
+        trackModalMuteBtn.classList.toggle('active', Boolean(state.muted));
+        trackModalSoloBtn.classList.toggle('active', Boolean(state.solo));
         trackModalVolume.value = state.volume ?? 75;
       };
 
@@ -831,9 +882,16 @@
         }
       });
 
-      trackModalMute.addEventListener('change', event => {
+      trackModalMuteBtn.addEventListener('click', () => {
         if (!trackModalActiveId) return;
-        applyTrackState(trackModalActiveId, { muted: event.target.checked });
+        const current = trackStates.get(trackModalActiveId);
+        applyTrackState(trackModalActiveId, { muted: !current?.muted });
+      });
+
+      trackModalSoloBtn.addEventListener('click', () => {
+        if (!trackModalActiveId) return;
+        const current = trackStates.get(trackModalActiveId);
+        applyTrackState(trackModalActiveId, { solo: !current?.solo });
       });
 
       trackModalVolume.addEventListener('input', event => {
