@@ -69,6 +69,7 @@
 
       .piano {
         margin-top: 0.5rem;
+        margin-bottom: 0.6rem;
         position: relative;
         width: 100%;
         max-width: 1024px;
@@ -122,6 +123,7 @@
         background: linear-gradient(180deg, #fdfdfd, #c9c9d3 85%);
         color: #111;
         box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.08);
+        border-radius: 0 0 0.9rem 0.9rem;
       }
 
       .key.black {
@@ -133,12 +135,22 @@
         height: 92%;
         min-width: 0;
         width: 70%;
-        border-radius: 0.45rem 0.45rem 0.35rem 0.35rem;
+        border-radius: 0 0 0.35rem 0.35rem;
         box-shadow: 0 14px 16px rgba(4, 6, 12, 0.35);
-        margin-top: 0.05rem;
+        margin-top: -0.15rem;
         display: flex;
+        flex-direction: column;
+        justify-content: space-between;
         align-items: center;
-        justify-content: center;
+        padding: 0.8rem 0.35rem;
+      }
+
+      .key.flavor-selected {
+        box-shadow: inset 0 0 0 2px var(--accent);
+      }
+
+      .mini-key.flavor-selected {
+        box-shadow: inset 0 0 0 2px var(--accent);
       }
 
       .key .note {
@@ -160,6 +172,21 @@
         text-orientation: mixed;
         transform: rotate(180deg);
         white-space: nowrap;
+        text-align: center;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .key.black .note {
+        overflow: visible;
+        text-overflow: clip;
+      }
+
+      .key.black .action {
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .key.active {
@@ -203,6 +230,158 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
         gap: 0.75rem;
+      }
+
+      #encoderView.drum-mode .encoders[hidden] {
+        display: none;
+      }
+
+      .drum-focus {
+        display: none;
+        gap: 1rem;
+        margin-top: 0.75rem;
+      }
+
+      #encoderView.drum-mode .drum-focus {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+        align-items: stretch;
+      }
+
+      #encoderView.drum-mode .encoders {
+        display: none;
+      }
+
+      .drum-focus__column {
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 1rem;
+        background: rgba(7, 8, 10, 0.65);
+        padding: 1.1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+
+      .drum-focus__column h3 {
+        margin: 0;
+        font-size: 1.15rem;
+      }
+
+      .drum-focus__subheading {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .drum-zoom {
+        border-radius: 1rem;
+        background: linear-gradient(180deg, #fafafa, #c9c9d3 90%);
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.08);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .drum-zoom__piano {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 14 / 5;
+      }
+
+      .drum-zoom__white-keys,
+      .drum-zoom__black-keys {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: repeat(14, minmax(0, 1fr));
+        column-gap: 0.08rem;
+      }
+
+      .drum-zoom__white-keys {
+        z-index: 1;
+      }
+
+      .drum-zoom__black-keys {
+        z-index: 2;
+        pointer-events: none;
+        padding: 0 0.35rem 12% 0.35rem;
+      }
+
+      .drum-key {
+        border: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .drum-key.white {
+        grid-row: 1 / -1;
+        border-radius: 0 0 0.7rem 0.7rem;
+        background: linear-gradient(180deg, #fefefe, #d1d1da 90%);
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        padding: 0.6rem 0.4rem;
+        color: #151515;
+        min-height: 140px;
+      }
+
+      .drum-key.white .drum-key__label {
+        font-size: 0.78rem;
+        text-align: center;
+      }
+
+      .drum-key.white .drum-key__note {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+      }
+
+      .drum-key.white.drum-key--main {
+        border: 2px solid var(--accent);
+        background: linear-gradient(180deg, #fff, #d7d7e4 90%);
+      }
+
+      .drum-key.white.drum-key--flavor {
+        cursor: pointer;
+        background: linear-gradient(180deg, #fefefe, #d9d9e1 90%);
+        transition: transform 0.15s ease, border 0.15s ease;
+      }
+
+      .drum-key.white.drum-key--flavor.active {
+        border-color: var(--accent);
+        transform: translateY(2px);
+        color: var(--accent);
+      }
+
+      .drum-key.white.drum-key--flavor:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+
+      .drum-key.black {
+        align-self: start;
+        justify-self: center;
+        width: 70%;
+        border-radius: 0 0 0.4rem 0.4rem;
+        background: linear-gradient(180deg, #23232b, #07070b 85%);
+        min-height: 70%;
+        box-shadow: 0 8px 12px rgba(4, 6, 12, 0.35);
+      }
+
+      .drum-encoders {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+      }
+
+      .drum-encoders .encoder {
+        min-height: 150px;
       }
 
       .encoder {
@@ -269,6 +448,11 @@
         font-size: 0.85rem;
         margin-top: 0.6rem;
         text-align: center;
+      }
+
+      .piano-helper {
+        margin-top: 11px;
+        display: block;
       }
 
       .mini-keyboard {
@@ -339,6 +523,9 @@
         display: flex;
         flex-direction: column;
         gap: 0.6rem;
+        max-width: 1024px;
+        width: 100%;
+        margin-inline: auto;
       }
 
       .track-panel p {
@@ -349,8 +536,9 @@
 
       .track-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 0.7rem;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: clamp(0.3rem, 1vw, 0.7rem);
+        width: 100%;
       }
 
       .track-button {
@@ -358,13 +546,14 @@
         border-radius: 0.7rem;
         background: var(--raised);
         color: var(--text);
-        padding: 0.75rem;
-        font-size: 0.9rem;
+        padding: clamp(0.35rem, 1.2vw, 0.55rem) clamp(0.15rem, 1vw, 0.5rem);
+        font-size: clamp(0.85rem, 1.4vw, 1rem);
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         cursor: pointer;
         transition: background 0.2s ease, border 0.2s ease, transform 0.1s ease;
+        min-width: 0;
       }
 
       .track-button.active {
@@ -499,6 +688,7 @@
       .track-modal__controls .volume-row {
         gap: 0.8rem;
         margin-top: 1rem;
+        margin-left: 1.25rem;
       }
 
       .track-modal__controls input[type='range']::-webkit-slider-thumb {
@@ -518,48 +708,150 @@
       .track-modal__controls input[type='range']::-moz-range-track {
         height: 18px;
       }
-      .track-panel {
-        display: flex;
-        flex-direction: column;
-        gap: 0.6rem;
+      @media (max-width: 940px) and (orientation: landscape) {
+        body {
+          padding: 0.6rem;
+          gap: 0.6rem;
+          font-size: 1.05rem;
+        }
+
+        main {
+          gap: 0.6rem;
+        }
+
+        .panel {
+          padding: 0.85rem;
+          border-radius: 0.85rem;
+        }
+
+        .track-grid {
+          gap: 0.35rem;
+        }
+
+        .track-button {
+          font-size: 1rem;
+          padding: 0.65rem 0.45rem;
+          min-height: 3rem;
+        }
+
+        .piano {
+          max-width: none;
+          aspect-ratio: 13 / 3.6;
+          margin-inline: 0;
+        }
+
+        .key {
+          font-size: 0.85rem;
+          padding: 0.65rem;
+        }
+
+        .key .note {
+          font-size: 1rem;
+        }
+
+        .encoders,
+        .drum-encoders {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .drum-focus__column {
+          padding: 0.85rem;
+        }
+
+        .drum-zoom {
+          padding: 0.75rem;
+        }
+
+        .helper {
+          font-size: 0.95rem;
+        }
+
+        .mini-keyboard {
+          width: clamp(240px, 48vw, 340px);
+          left: 0.6rem;
+          bottom: 0.6rem;
+        }
       }
 
-      .track-panel p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.85rem;
+      @media (max-width: 760px) and (orientation: landscape) {
+        body {
+          padding: 0.45rem;
+        }
+
+        .panel {
+          padding: 0.75rem;
+        }
+
+        .track-grid {
+          gap: 0.25rem;
+        }
+
+        .track-button {
+          padding: 0.5rem 0.35rem;
+        }
+
+        .piano {
+          aspect-ratio: 12 / 3.3;
+          margin-inline: 0;
+        }
+
+        .drum-zoom__white-keys .drum-key {
+          min-height: 120px;
+        }
       }
 
-      .track-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: 0.7rem;
+      @media (max-width: 900px) {
+        body {
+          padding: 0.5rem;
+        }
+
+        main {
+          gap: 0.5rem;
+        }
+
+        .panel {
+          padding: 0.75rem;
+        }
+
+        .track-panel,
+        .piano {
+          max-width: none;
+          margin-inline: 0;
+        }
+
+        .piano {
+          aspect-ratio: 14 / 5.7;
+        }
       }
 
-      .track-button {
-        border: 1px solid var(--divider);
-        border-radius: 0.7rem;
-        background: var(--raised);
-        color: var(--text);
-        padding: 0.75rem;
-        font-size: 0.9rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        cursor: pointer;
-        transition: background 0.2s ease, border 0.2s ease, transform 0.1s ease;
+      @media (max-width: 820px) {
+        .track-grid {
+          display: flex;
+          gap: 0.35rem;
+          overflow-x: auto;
+          scroll-snap-type: x proximity;
+          padding-bottom: 0.2rem;
+        }
+
+        .track-grid::-webkit-scrollbar {
+          display: none;
+        }
+
+        .track-button {
+          flex: 0 0 clamp(72px, 18vw, 120px);
+          scroll-snap-align: center;
+          text-align: center;
+        }
+
+        .piano {
+          aspect-ratio: 14 / 6.2;
+        }
       }
 
-      .track-button.active {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: #050505;
-        transform: translateY(2px);
-      }
-
-      .track-button:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
+      @media (max-width: 720px) {
+        .piano {
+          aspect-ratio: 14 / 6.8;
+        }
       }
 
       @media (orientation: landscape) and (max-height: 520px) {
@@ -585,17 +877,15 @@
   <body data-mode="keys">
     <main>
       <section class="panel track-panel" id="trackPanel">
-        <h2>Track Gate</h2>
-        <p>Tap to arm or idle each of the eight OP-XY tracks.</p>
         <div class="track-grid" id="trackControls">
-          <button class="track-button" data-track="1" aria-pressed="false">Track 1</button>
-          <button class="track-button" data-track="2" aria-pressed="false">Track 2</button>
-          <button class="track-button" data-track="3" aria-pressed="false">Track 3</button>
-          <button class="track-button" data-track="4" aria-pressed="false">Track 4</button>
-          <button class="track-button" data-track="5" aria-pressed="false">Track 5</button>
-          <button class="track-button" data-track="6" aria-pressed="false">Track 6</button>
-          <button class="track-button" data-track="7" aria-pressed="false">Track 7</button>
-          <button class="track-button" data-track="8" aria-pressed="false">Track 8</button>
+          <button class="track-button" data-track="1" aria-pressed="false">1</button>
+          <button class="track-button" data-track="2" aria-pressed="false">2</button>
+          <button class="track-button" data-track="3" aria-pressed="false">3</button>
+          <button class="track-button" data-track="4" aria-pressed="false">4</button>
+          <button class="track-button" data-track="5" aria-pressed="false">5</button>
+          <button class="track-button" data-track="6" aria-pressed="false">6</button>
+          <button class="track-button" data-track="7" aria-pressed="false">7</button>
+          <button class="track-button" data-track="8" aria-pressed="false">8</button>
         </div>
       </section>
 
@@ -604,12 +894,84 @@
           <div class="white-keys" id="whiteKeys"></div>
           <div class="black-keys" id="blackKeys"></div>
         </div>
-        <p class="helper">Hold a key to reveal encoder assignments.</p>
+        <p class="helper piano-helper">Hold a key to reveal encoder assignments.</p>
       </section>
 
       <section class="panel" id="encoderView" aria-hidden="true">
         <div class="active-key-readout">
           <span id="activeKeyLabel">None</span>
+        </div>
+        <div class="drum-focus" id="drumFocus" hidden aria-hidden="true">
+          <div class="drum-focus__column">
+            <h3>Select a Flavor</h3>
+            <p class="drum-focus__subheading">Evolving Drums morphs as you pick a vibe.</p>
+            <div class="drum-zoom" aria-label="Zoomed view of the F2 key and neighbors">
+              <div class="drum-zoom__piano">
+                <div class="drum-zoom__white-keys">
+                  <div class="drum-key white drum-key--main" style="grid-column: 1 / span 2">
+                    <span class="drum-key__note">F2</span>
+                    <span class="drum-key__label">Evolving Drums</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="drum-key white drum-key--flavor active"
+                    data-flavor-choice="ambient"
+                    aria-pressed="true"
+                    style="grid-column: 3 / span 2"
+                  >
+                    <span class="drum-key__note">G2</span>
+                    <span class="drum-key__label">Ambient</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="drum-key white drum-key--flavor"
+                    data-flavor-choice="tribal"
+                    aria-pressed="false"
+                    style="grid-column: 5 / span 2"
+                  >
+                    <span class="drum-key__note">A2</span>
+                    <span class="drum-key__label">Tribal</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="drum-key white drum-key--flavor"
+                    data-flavor-choice="electronic"
+                    aria-pressed="false"
+                    style="grid-column: 7 / span 2"
+                  >
+                    <span class="drum-key__note">B2</span>
+                    <span class="drum-key__label">Electronic</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="drum-key white drum-key--flavor"
+                    data-flavor-choice="lofi"
+                    aria-pressed="false"
+                    style="grid-column: 9 / span 2"
+                  >
+                    <span class="drum-key__note">C3</span>
+                    <span class="drum-key__label">LoFi</span>
+                  </button>
+                  <div class="drum-key white" style="grid-column: 11 / span 2">
+                    <span class="drum-key__note">D3</span>
+                  </div>
+                  <div class="drum-key white" style="grid-column: 13 / span 2">
+                    <span class="drum-key__note">E3</span>
+                  </div>
+                </div>
+                <div class="drum-zoom__black-keys" aria-hidden="true">
+                  <span class="drum-key black" style="grid-column: 2 / span 2"></span>
+                  <span class="drum-key black" style="grid-column: 4 / span 2"></span>
+                  <span class="drum-key black" style="grid-column: 6 / span 2"></span>
+                  <span class="drum-key black" style="grid-column: 10 / span 2"></span>
+                  <span class="drum-key black" style="grid-column: 12 / span 2"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="drum-focus__column">
+            <div class="drum-encoders" id="drumEncoderGrid" aria-live="polite"></div>
+          </div>
         </div>
         <div class="encoders" id="encoderGrid"></div>
         <p class="helper">Release the key to jump back to the piano map.</p>
@@ -647,7 +1009,7 @@
       const BASE_MIDI_NOTE = 53; // hardware emits F3 but we label down to F2
       const DISPLAY_OCTAVE_OFFSET = -1; // shift readout down one octave
       const keyBlueprints = [
-        { note: 'F2', type: 'white', label: 'Lorem Ipsum Dolor' },
+        { note: 'F2', type: 'white', label: 'Evolving Drums' },
         { note: 'F#2', type: 'black', label: 'Sit Amet Consectetur' },
         { note: 'G2', type: 'white', label: 'Adipiscing Elit Sed' },
         { note: 'G#2', type: 'black', label: 'Do Eiusmod Tempor' },
@@ -694,6 +1056,25 @@
         'Balance delay vs reverb sends globally.',
         'Reserved for future live tweaks.'
       ];
+      const DRUM_NOTE = 'F2';
+      const drumFlavorDefault = 'ambient';
+      const drumEncoderData = [
+        { cc: 100, title: 'Drum Itensity', description: 'Macro energy for the evolving kit.' },
+        { cc: 101, title: 'Gibberish Scatter', description: 'Inventive nonsense texture macro.' },
+        { cc: 102, title: 'Gibberish Bloom', description: 'Shape the imaginary shimmer tail.' },
+        { cc: 103, title: 'Gibberish Crush', description: 'A faux control for extra character.' }
+      ];
+      const drumFlavorNotes = {
+        ambient: 'G2',
+        tribal: 'A2',
+        electronic: 'B2',
+        lofi: 'C3'
+      };
+      const drumFlavorByNote = Object.fromEntries(
+        Object.entries(drumFlavorNotes).map(([flavor, note]) => [note, flavor])
+      );
+      let currentDrumFlavor = drumFlavorDefault;
+      let drumModeActive = false;
       const encoderStateByNote = new Map();
       const ensureEncoderState = note => {
         if (!encoderStateByNote.has(note)) {
@@ -726,6 +1107,9 @@
       const whiteContainer = document.getElementById('whiteKeys');
       const blackContainer = document.getElementById('blackKeys');
       const encoderGrid = document.getElementById('encoderGrid');
+      const drumFocus = document.getElementById('drumFocus');
+      const drumEncoderGrid = document.getElementById('drumEncoderGrid');
+      const drumFlavorButtons = Array.from(document.querySelectorAll('[data-flavor-choice]'));
       const activeKeyLabel = document.getElementById('activeKeyLabel');
       const encoderPanel = document.getElementById('encoderView');
       const pianoPanel = document.getElementById('pianoView');
@@ -759,9 +1143,7 @@
         const state = trackStates.get(trackId);
         const button = trackButtons.find(btn => btn.dataset.track === trackId);
         if (!button || !state) return;
-        const label = state.plugin
-          ? `Track ${trackId} · ${state.plugin}`
-          : `Track ${trackId}`;
+        const label = state.plugin ? `${trackId} · ${state.plugin}` : `${trackId}`;
         button.textContent = label;
         const active = Boolean(state.plugin) && !state.muted;
         button.classList.toggle('active', active);
@@ -891,6 +1273,42 @@
       const activeNotes = new Set();
       const miniNoteIndicators = new Map();
       const encoderMeters = new Map();
+      const updateFlavorKeyHighlight = flavor => {
+        Object.entries(drumFlavorNotes).forEach(([flavorName, note]) => {
+          const noteBtn = noteButtons.get(note);
+          if (noteBtn) {
+            noteBtn.classList.toggle('flavor-selected', drumModeActive && flavorName === flavor);
+          }
+          const mini = miniNoteIndicators.get(note);
+          if (mini) {
+            mini.classList.toggle('flavor-selected', drumModeActive && flavorName === flavor);
+          }
+        });
+      };
+      const setDrumFlavorChoice = flavor => {
+        if (!flavor) return;
+        currentDrumFlavor = flavor;
+        drumFlavorButtons.forEach(btn => {
+          const isActive = btn.dataset.flavorChoice === flavor;
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+        updateFlavorKeyHighlight(flavor);
+      };
+      const applyDrumFlavorFromNote = (note, isActive) => {
+        const flavor = drumFlavorByNote[note];
+        if (!flavor || !drumModeActive) {
+          return false;
+        }
+        if (isActive) {
+          setDrumFlavorChoice(flavor);
+        }
+        return true;
+      };
+      drumFlavorButtons.forEach(btn =>
+        btn.addEventListener('click', () => setDrumFlavorChoice(btn.dataset.flavorChoice))
+      );
+      setDrumFlavorChoice(currentDrumFlavor);
 
       let focusNote = null;
       let midiAccess = null;
@@ -1210,7 +1628,23 @@
       const getEncoderTitles = note => encoderTitleSource[note] || fallbackTitles;
       const getEncoderDescriptions = note => encoderDescriptionsByNote.get(note) || fallbackDescriptions;
 
-
+      const toggleDrumMode = isActive => {
+        const enabled = Boolean(isActive);
+        drumModeActive = enabled;
+        encoderPanel.classList.toggle('drum-mode', enabled);
+        if (drumFocus) {
+          drumFocus.hidden = !enabled;
+          drumFocus.setAttribute('aria-hidden', enabled ? 'false' : 'true');
+        }
+        if (encoderGrid) {
+          encoderGrid.hidden = enabled;
+        }
+        if (enabled) {
+          setDrumFlavorChoice(currentDrumFlavor);
+        } else {
+          updateFlavorKeyHighlight(currentDrumFlavor);
+        }
+      };
 
       const showEncodersForButton = btn => {
         if (!btn) return;
@@ -1218,24 +1652,35 @@
         pianoPanel.setAttribute('aria-hidden', 'true');
         encoderPanel.removeAttribute('aria-hidden');
         activeKeyLabel.textContent = `${btn.dataset.note} · ${btn.dataset.action}`;
-        const descriptions = getEncoderDescriptions(btn.dataset.note);
-        const titles = getEncoderTitles(btn.dataset.note);
         const state = encoderStateByNote.get(btn.dataset.note);
-        encoderGrid.querySelectorAll('.encoder').forEach((card, idx) => {
-          const paragraph = card.querySelector('p');
-          const title = card.querySelector('h3');
-          if (title && titles) {
-            title.textContent = titles[idx] || title.textContent;
+        if (btn.dataset.note === DRUM_NOTE) {
+          toggleDrumMode(true);
+          if (state) {
+            drumEncoderData.forEach(def => {
+              const stored = state.get(def.cc) ?? 0;
+              setMeterVisual(def.cc, stored);
+            });
           }
-          if (paragraph) {
-            paragraph.textContent = descriptions?.[idx] || '';
-          }
-          const knob = encoderBaseData[idx];
-          if (knob && state) {
-            const stored = state.get(knob.cc) ?? 0;
-            setMeterVisual(knob.cc, stored);
-          }
-        });
+        } else {
+          toggleDrumMode(false);
+          const descriptions = getEncoderDescriptions(btn.dataset.note);
+          const titles = getEncoderTitles(btn.dataset.note);
+          encoderGrid.querySelectorAll('.encoder').forEach((card, idx) => {
+            const paragraph = card.querySelector('p');
+            const title = card.querySelector('h3');
+            if (title && titles) {
+              title.textContent = titles[idx] || title.textContent;
+            }
+            if (paragraph) {
+              paragraph.textContent = descriptions?.[idx] || '';
+            }
+            const knob = encoderBaseData[idx];
+            if (knob && state) {
+              const stored = state.get(knob.cc) ?? 0;
+              setMeterVisual(knob.cc, stored);
+            }
+          });
+        }
         focusNote = btn.dataset.note;
       };
 
@@ -1244,12 +1689,16 @@
         pianoPanel.removeAttribute('aria-hidden');
         encoderPanel.setAttribute('aria-hidden', 'true');
         activeKeyLabel.textContent = 'None';
+        toggleDrumMode(false);
         focusNote = null;
       };
 
       const setKeyStateByButton = (btn, isActive) => {
         if (!btn) return;
         const note = btn.dataset.note;
+        if (applyDrumFlavorFromNote(note, isActive)) {
+          return;
+        }
         if (isActive) {
           activeNotes.add(note);
           btn.classList.add('active');
@@ -1345,12 +1794,21 @@
         return `${label}${octave}`;
       };
 
+      const registerEncoderMeter = (ccNumber, meter, meterValue) => {
+        if (!encoderMeters.has(ccNumber)) {
+          encoderMeters.set(ccNumber, []);
+        }
+        encoderMeters.get(ccNumber).push({ meter, meterValue });
+      };
+
       const setMeterVisual = (ccNumber, value) => {
-        const meterEntry = encoderMeters.get(ccNumber);
-        if (!meterEntry) return;
+        const meterEntries = encoderMeters.get(ccNumber);
+        if (!meterEntries || meterEntries.length === 0) return;
         const percent = Math.max(0, Math.min(127, value)) / 127;
-        meterEntry.meter.style.setProperty('--meter-progress', `${percent * 360}deg`);
-        meterEntry.meterValue.textContent = `${Math.round(percent * 100)}%`;
+        meterEntries.forEach(entry => {
+          entry.meter.style.setProperty('--meter-progress', `${percent * 360}deg`);
+          entry.meterValue.textContent = `${Math.round(percent * 100)}%`;
+        });
       };
 
       const updateEncoderMeter = (ccNumber, value, noteOverride) => {
@@ -1416,7 +1874,7 @@
         meterValue.className = 'encoder-meter__value';
         meterValue.textContent = '0%';
         meter.appendChild(meterValue);
-        encoderMeters.set(knob.cc, { meter, meterValue, value: 0 });
+        registerEncoderMeter(knob.cc, meter, meterValue);
         card.innerHTML = `
           <strong>CC ${knob.cc}</strong>
           <h3>${initialTitles[idx] || fallbackTitles[idx]}</h3>
@@ -1424,6 +1882,26 @@
         `;
         card.insertBefore(meter, card.firstChild);
         encoderGrid.appendChild(card);
+      });
+
+      drumEncoderData.forEach(def => {
+        const card = document.createElement('article');
+        card.className = 'encoder';
+        const meter = document.createElement('div');
+        meter.className = 'encoder-meter';
+        meter.style.setProperty('--meter-progress', '0deg');
+        const meterValue = document.createElement('span');
+        meterValue.className = 'encoder-meter__value';
+        meterValue.textContent = '0%';
+        meter.appendChild(meterValue);
+        registerEncoderMeter(def.cc, meter, meterValue);
+        card.innerHTML = `
+          <strong>CC ${def.cc}</strong>
+          <h3>${def.title}</h3>
+          <p>${def.description}</p>
+        `;
+        card.insertBefore(meter, card.firstChild);
+        drumEncoderGrid.appendChild(card);
       });
       if (initialNote) {
         const initialState = encoderStateByNote.get(initialNote);

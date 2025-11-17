@@ -57,43 +57,67 @@ describe('opxy CC prototype demo', () => {
   });
 
   it('updates encoder titles/descriptions by key', () => {
-    api.setNoteState('F2', true);
-    const firstEncoder = document.querySelector('.encoder h3');
-    const firstDescription = document.querySelector('.encoder p');
+    api.setNoteState('G2', true);
+    const encoderGrid = document.getElementById('encoderGrid');
+    const firstEncoder = encoderGrid.querySelector('.encoder h3');
+    const firstDescription = encoderGrid.querySelector('.encoder p');
     const initialTitle = firstEncoder.textContent;
     const initialDescription = firstDescription.textContent;
 
-    api.setNoteState('F2', false);
-    api.setNoteState('G2', true);
+    api.setNoteState('G2', false);
+    api.setNoteState('A2', true);
 
-    expect(document.querySelector('.encoder h3').textContent).not.toBe(initialTitle);
-    expect(document.querySelector('.encoder p').textContent).not.toBe(initialDescription);
+    expect(encoderGrid.querySelector('.encoder h3').textContent).not.toBe(initialTitle);
+    expect(encoderGrid.querySelector('.encoder p').textContent).not.toBe(initialDescription);
   });
 
   it('tracks encoder meter values separately per note', () => {
     api.setNoteState('F2', true);
     api.setCCValue('F2', 100, 64); // roughly 50%
-    let meterValue = document.querySelector('.encoder-meter__value').textContent;
+    let meterValue = document.querySelector('.drum-encoders .encoder .encoder-meter__value').textContent;
     expect(meterValue).toBe('50%');
 
     api.setNoteState('F2', false);
     api.setNoteState('G2', true);
-    meterValue = document.querySelector('.encoder-meter__value').textContent;
+    meterValue = document.querySelector('#encoderGrid .encoder .encoder-meter__value').textContent;
     expect(meterValue).toBe('0%');
 
     api.setCCValue('G2', 100, 10);
-    meterValue = document.querySelector('.encoder-meter__value').textContent;
+    meterValue = document.querySelector('#encoderGrid .encoder .encoder-meter__value').textContent;
     expect(meterValue).toBe('8%');
 
     api.setNoteState('G2', false);
     api.setNoteState('F2', true);
-    meterValue = document.querySelector('.encoder-meter__value').textContent;
+    meterValue = document.querySelector('.drum-encoders .encoder .encoder-meter__value').textContent;
     expect(meterValue).toBe('50%');
+  });
+
+  it('keeps drum mode active and remembers flavor selections', () => {
+    const drumFocus = document.getElementById('drumFocus');
+    const getFlavorButton = flavor =>
+      document.querySelector(`[data-flavor-choice='${flavor}']`);
+
+    api.setNoteState('F2', true);
+    expect(drumFocus.hidden).toBe(false);
+    expect(getFlavorButton('ambient').classList.contains('active')).toBe(true);
+    expect(document.querySelector("[data-note='G2']").classList.contains('flavor-selected')).toBe(true);
+
+    api.setNoteState('A2', true);
+    expect(drumFocus.hidden).toBe(false);
+    expect(getFlavorButton('tribal').classList.contains('active')).toBe(true);
+    expect(document.querySelector("[data-note='A2']").classList.contains('flavor-selected')).toBe(true);
+
+    api.setNoteState('F2', false);
+    expect(drumFocus.hidden).toBe(true);
+
+    api.setNoteState('F2', true);
+    expect(getFlavorButton('tribal').classList.contains('active')).toBe(true);
+    expect(document.querySelector("[data-note='A2']").classList.contains('flavor-selected')).toBe(true);
   });
 
   it('updates track state programmatically', () => {
     const first = document.querySelector('.track-button');
-    expect(first.textContent).toBe('Track 1');
+    expect(first.textContent).toBe('1');
     api.setTrackState('1', { plugin: 'Chord Swell', muted: false });
     expect(first.textContent).toContain('Chord Swell');
     expect(first.classList.contains('active')).toBe(true);
