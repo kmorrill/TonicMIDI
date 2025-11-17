@@ -295,15 +295,22 @@
         transition: opacity 0.15s ease, transform 0.2s ease;
       }
 
-      .mini-white-keys,
+      .mini-white-keys {
+        display: grid;
+        grid-template-columns: repeat(28, minmax(0, 1fr));
+        gap: 0.08rem;
+        position: relative;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+      }
+
       .mini-black-keys {
         display: grid;
         grid-template-columns: repeat(28, minmax(0, 1fr));
-      }
-
-      .mini-white-keys {
         gap: 0.08rem;
-        transition: background 0.2s ease, box-shadow 0.2s ease;
+        position: absolute;
+        inset: 0.35rem 0.35rem auto 0.35rem;
+        pointer-events: none;
+        height: 0;
       }
 
       .mini-key.white {
