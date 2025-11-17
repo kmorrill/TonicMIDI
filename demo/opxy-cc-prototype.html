@@ -467,13 +467,21 @@
       .track-modal__controls label {
         display: flex;
         flex-direction: column;
-        gap: 0.3rem;
-        font-size: 0.85rem;
+        gap: 0.5rem;
+        font-size: 1rem;
         color: var(--muted);
+      }
+
+      .track-modal__controls input[type='checkbox'] {
+        width: 72px;
+        height: 38px;
+        accent-color: var(--accent);
+        cursor: pointer;
       }
 
       .track-modal__controls input[type='range'] {
         accent-color: var(--accent);
+        height: 36px;
       }
       .track-panel {
         display: flex;
@@ -597,7 +605,6 @@
             <span>Volume</span>
             <input type="range" id="trackModalVolume" min="0" max="100" value="75" />
           </label>
-          <button class="track-modal__close" id="trackModalChangePlugin" style="align-self:flex-start;">Change Plugin</button>
         </div>
       </div>
     </div>
@@ -750,7 +757,6 @@
       const trackModalControls = document.getElementById('trackModalControls');
       const trackModalMute = document.getElementById('trackModalMute');
       const trackModalVolume = document.getElementById('trackModalVolume');
-      const trackModalChangePlugin = document.getElementById('trackModalChangePlugin');
 
       pluginOptions.forEach(option => {
         const button = document.createElement('button');
@@ -835,11 +841,6 @@
         applyTrackState(trackModalActiveId, { volume: Number(event.target.value) });
       });
 
-      trackModalChangePlugin.addEventListener('click', () => {
-        if (!trackModalActiveId) return;
-        updatePluginSelection(trackModalActiveId);
-        showPluginMode();
-      });
 
       const noteButtons = new Map();
       const midiButtons = new Map();
