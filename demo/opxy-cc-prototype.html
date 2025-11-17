@@ -583,9 +583,12 @@
           <h3 id="trackModalTitle">Track</h3>
           <button class="track-modal__close" id="trackModalClose">Close</button>
         </div>
-        <p style="margin:0;color:var(--muted);font-size:0.85rem;">Select a plugin:</p>
-        <div class="plugin-list" id="pluginList"></div>
+        <div id="trackPluginMode">
+          <p style="margin:0;color:var(--muted);font-size:0.85rem;">Select a plugin:</p>
+          <div class="plugin-list" id="pluginList"></div>
+        </div>
         <div class="track-modal__controls" id="trackModalControls">
+          <p style="margin:0;color:var(--muted);font-size:0.85rem;">Track controls</p>
           <label>
             <span>Mute track</span>
             <input type="checkbox" id="trackModalMute" />
@@ -594,6 +597,7 @@
             <span>Volume</span>
             <input type="range" id="trackModalVolume" min="0" max="100" value="75" />
           </label>
+          <button class="track-modal__close" id="trackModalChangePlugin" style="align-self:flex-start;">Change Plugin</button>
         </div>
       </div>
     </div>
@@ -742,9 +746,11 @@
       const pluginList = document.getElementById('pluginList');
       const trackModalTitle = document.getElementById('trackModalTitle');
       const trackModalClose = document.getElementById('trackModalClose');
+      const trackPluginMode = document.getElementById('trackPluginMode');
       const trackModalControls = document.getElementById('trackModalControls');
       const trackModalMute = document.getElementById('trackModalMute');
       const trackModalVolume = document.getElementById('trackModalVolume');
+      const trackModalChangePlugin = document.getElementById('trackModalChangePlugin');
 
       pluginOptions.forEach(option => {
         const button = document.createElement('button');
@@ -756,15 +762,31 @@
 
       let trackModalActiveId = null;
 
-      const openTrackModal = trackId => {
-        trackModalActiveId = trackId;
-        trackModal.removeAttribute('hidden');
-        trackModalTitle.textContent = `Track ${trackId}`;
+      const showPluginMode = () => {
+        trackPluginMode.style.display = 'block';
+        trackModalControls.style.display = 'none';
+      };
+
+      const showControlsMode = () => {
+        trackPluginMode.style.display = 'none';
+        trackModalControls.style.display = 'flex';
+      };
+
+      showPluginMode();
+
+      const updatePluginSelection = trackId => {
         pluginList.querySelectorAll('button').forEach(button => {
           const isSelected =
             button.dataset.plugin === trackStates.get(trackId)?.plugin;
           button.classList.toggle('selected', isSelected);
         });
+      };
+
+      const openTrackModal = trackId => {
+        trackModalActiveId = trackId;
+        trackModal.removeAttribute('hidden');
+        trackModalTitle.textContent = `Track ${trackId}`;
+        updatePluginSelection(trackId);
         updateModalControls();
       };
 
@@ -777,10 +799,10 @@
         if (!trackModalActiveId) return;
         const state = trackStates.get(trackModalActiveId);
         if (!state?.plugin) {
-          trackModalControls.classList.add('disabled');
+          showPluginMode();
           return;
         }
-        trackModalControls.classList.remove('disabled');
+        showControlsMode();
         trackModalMute.checked = Boolean(state.muted);
         trackModalVolume.value = state.volume ?? 75;
       };
@@ -793,7 +815,7 @@
         pluginList
           .querySelectorAll('button')
           .forEach(btn => btn.classList.toggle('selected', btn === button));
-        updateModalControls();
+        closeTrackModal();
       });
 
       trackModalClose.addEventListener('click', closeTrackModal);
@@ -811,6 +833,12 @@
       trackModalVolume.addEventListener('input', event => {
         if (!trackModalActiveId) return;
         applyTrackState(trackModalActiveId, { volume: Number(event.target.value) });
+      });
+
+      trackModalChangePlugin.addEventListener('click', () => {
+        if (!trackModalActiveId) return;
+        updatePluginSelection(trackModalActiveId);
+        showPluginMode();
       });
 
       const noteButtons = new Map();
